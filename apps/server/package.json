@@ -1,0 +1,23 @@
+{
+  "name": "@reviewroom/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/index.ts",
+    "start": "node --disable-warning=ExperimentalWarning src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@fastify/websocket": "11.3.7",
+    "@reviewroom/shared": "workspace:*",
+    "fastify": "5.12.8",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/ws": "8.18.2",
+    "vitest": "5.1.0"
+  }
+}
