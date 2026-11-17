@@ -55,7 +55,8 @@ events and Claude tool inputs are validated with them at each boundary.
 
 Single user, local machine, but untrusted input (PR contents, any web page in the browser):
 
-- Loopback only, origin allowlist on every request and WebSocket upgrade.
+- Loopback only, origin allowlist on every request and WebSocket upgrade, and a `Host`
+  allowlist against DNS rebinding (rebound pages send same-origin GETs without `Origin`).
 - Claude is read-only by default; the gate decides every tool call (ADR 0005).
 - PR checkouts never load their own Claude settings or MCP config.
 - No shell strings: every `git`/`gh` call is an argument array.
@@ -71,3 +72,4 @@ Single user, local machine, but untrusted input (PR contents, any web page in th
 | [0004](adr/0004-findings-via-mcp-tool.md) | Claude reports findings through an MCP tool |
 | [0005](adr/0005-permission-gate.md) | App-owned PreToolUse permission gate |
 | [0006](adr/0006-sqlite-storage.md) | `node:sqlite` for persistence |
+| [0007](adr/0007-project-identity-and-review-prompt.md) | A project is its repository root; its review prompt is stored as text |

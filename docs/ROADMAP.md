@@ -16,10 +16,10 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 1: Projects
 
-- [ ] `projects` repository + `GET/POST/PATCH/DELETE /api/projects`; validate the path is a git repo
-- [ ] Projects section in the rail: list, add by folder path (Dialog), remove
-- [ ] Per-project review prompt editor with a sensible default prompt
-- [ ] Reviews in the list pane grouped by project (still placeholder reviews)
+- [x] `projects` repository + `GET/POST/PATCH/DELETE /api/projects`; validate the path is a git repo
+- [x] Projects section in the rail: list, add by folder path (Dialog), remove
+- [x] Per-project review prompt editor with a sensible default prompt
+- [x] Reviews in the list pane grouped by project (still placeholder reviews)
 
 ## Phase 2: Review lifecycle (no Claude yet)
 

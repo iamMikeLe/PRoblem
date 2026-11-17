@@ -21,4 +21,12 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    version: 2,
+    name: "projects_updated_at",
+    sql: `
+      ALTER TABLE projects ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
+      UPDATE projects SET updated_at = created_at;
+    `,
+  },
 ];
