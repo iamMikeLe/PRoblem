@@ -1,6 +1,6 @@
 # 0002. Fastify on Node's native TypeScript, no server build
 
-- Status: accepted
+- Status: superseded by [0008](0008-electron-with-typed-ipc.md)
 - Date: 2026-11-17
 
 ## Context

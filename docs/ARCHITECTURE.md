@@ -1,47 +1,74 @@
 # Architecture
 
+ReviewRoom is an Electron desktop app (ADR 0008). There is no HTTP server: the sandboxed UI talks
+to the main process only through a typed IPC contract.
+
 ## Overview
 
 ```mermaid
 flowchart LR
-  subgraph Browser
+  subgraph Renderer["Renderer (sandboxed, no Node)"]
     UI[React + Fluent UI<br/>Teams shell]
-    Q[TanStack Query<br/>server cache]
+    Q[TanStack Query<br/>cache]
     S[Zustand<br/>live review state]
   end
-  subgraph Server["Node 24 · Fastify · 127.0.0.1"]
-    API[REST /api/*]
-    WS[WebSocket /ws<br/>EventHub]
+  P[Preload<br/>contextBridge: invoke / onEvent]
+  subgraph Main["Main process (Node 24 in Electron)"]
+    D[IPC dispatcher<br/>zod-validated contract]
+    SVC[Services<br/>projects · reviews · git]
     SES[Session service<br/>Agent SDK query per turn]
     GATE[PreToolUse<br/>permission gate]
     MCP[report_findings<br/>in-process MCP tool]
-    GIT[git / gh<br/>argument-array spawns]
     DB[(SQLite<br/>~/.reviewroom)]
   end
   CC[Claude Code<br/>local login]
-  UI --> Q --> API
-  WS --> S --> UI
-  API --> DB
-  API --> GIT
-  API --> SES
-  SES --> CC
+  UI --> Q -- invoke --> P --> D --> SVC --> DB
+  D --> SES --> CC
   CC --> GATE
   CC --> MCP --> DB
-  SES --> WS
-  MCP --> WS
+  SES -- events --> P -- onEvent --> S --> UI
 ```
 
-Every package shares one contract: the zod schemas in `packages/shared`. HTTP bodies, WebSocket
-events and Claude tool inputs are validated with them at each boundary.
+## Code layout (`apps/desktop`)
+
+| Path | Role | Electron? |
+| --- | --- | --- |
+| `src/main/index.ts` | App lifecycle, single instance, wiring | yes |
+| `src/main/window.ts` | Secure `BrowserWindow`, navigation guards, hidden title bar | yes |
+| `src/main/ipc/register.ts` | `ipcMain.handle` per channel, sender check, `broadcast()` | yes |
+| `src/main/ipc/dispatcher.ts` | Validate input → handler → `IpcResult` | no |
+| `src/main/ipc/handlers.ts` | Channel → use case | no |
+| `src/main/ipc/trust.ts` | Is this URL our own UI? | no |
+| `src/main/projects/`, `db/`, `git/` | Services, SQLite, git | no |
+| `src/preload/index.ts` | `window.reviewroom` bridge | yes |
+| `src/renderer/` | React app | no (browser APIs) |
+
+Everything without Electron is tested in plain Node (`test/main`) or jsdom (`test/renderer`).
+
+## The IPC contract
+
+`packages/shared/src/ipc.ts` maps each channel (`projects:create`, `dialog:pickFolder`, ...) to a
+zod input and output schema.
+
+1. The renderer calls `api.projects.create(body)` → `window.reviewroom.invoke("projects:create", body)`.
+2. The preload forwards only channels from `IPC_CHANNELS` to `ipcRenderer.invoke`.
+3. Main rejects calls from any frame that is not our UI, then the dispatcher parses the input.
+   On failure it returns `{ ok: false, error: { code: "invalid_request" } }`.
+4. The handler runs the use case. An `AppFailure` keeps its code (`project_exists`, ...);
+   anything else is logged and reported as `internal`.
+5. The renderer parses `data` with the output schema before React sees it.
+
+Events (review status, findings, stream output from Phase 3) go the other way on one channel,
+validated by `AppEventSchema`.
 
 ## Data flow of a review turn (from Phase 3)
 
-1. The user sends a message in a review → `POST /api/reviews/:id/messages`.
+1. The user sends a message → `invoke("reviews:send", { reviewId, text })`.
 2. The session service starts `query()` in the review's workdir (`resume` after the first turn).
 3. Each SDK message becomes a normalized review event, is appended to SQLite, then broadcast.
 4. Tool calls go through the permission gate; when it needs the user, the review turns
    `needs-input` and an approval card appears.
-5. Claude calls `report_findings`; the server assigns stable numbers, stores and broadcasts them.
+5. Claude calls `report_findings`; main assigns stable numbers, stores and broadcasts them.
 6. The turn ends, the status becomes `idle`.
 
 ## Storage
@@ -53,10 +80,10 @@ events and Claude tool inputs are validated with them at each boundary.
 
 ## Security model
 
-Single user, local machine, but untrusted input (PR contents, any web page in the browser):
+Single user, local machine, untrusted input (PR contents):
 
-- Loopback only, origin allowlist on every request and WebSocket upgrade, and a `Host`
-  allowlist against DNS rebinding (rebound pages send same-origin GETs without `Origin`).
+- Renderer: `contextIsolation`, `sandbox`, no Node, strict CSP, no navigation, no new windows.
+- IPC: only contract channels; inputs validated; only our own frame may call.
 - Claude is read-only by default; the gate decides every tool call (ADR 0005).
 - PR checkouts never load their own Claude settings or MCP config.
 - No shell strings: every `git`/`gh` call is an argument array.
@@ -67,9 +94,10 @@ Single user, local machine, but untrusted input (PR contents, any web page in th
 | ADR | Decision |
 | --- | --- |
 | [0001](adr/0001-fluent-ui-teams-theme.md) | Fluent UI v9 with Teams themes for the UI |
-| [0002](adr/0002-fastify-on-native-typescript.md) | Fastify on Node's native TypeScript, no server build |
-| [0003](adr/0003-shared-zod-contracts.md) | One zod contract package shared by server and web |
+| [0002](adr/0002-fastify-on-native-typescript.md) | ~~Fastify on Node's native TypeScript~~ (superseded by 0008) |
+| [0003](adr/0003-shared-zod-contracts.md) | One zod contract package shared by main and renderer |
 | [0004](adr/0004-findings-via-mcp-tool.md) | Claude reports findings through an MCP tool |
 | [0005](adr/0005-permission-gate.md) | App-owned PreToolUse permission gate |
 | [0006](adr/0006-sqlite-storage.md) | `node:sqlite` for persistence |
 | [0007](adr/0007-project-identity-and-review-prompt.md) | A project is its repository root; its review prompt is stored as text |
+| [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |

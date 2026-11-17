@@ -5,43 +5,54 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 0: Foundation
 
-- [x] pnpm monorepo: `apps/server`, `apps/web`, `packages/shared`
+- [x] pnpm monorepo: `apps/server`, `apps/web`, `packages/shared` (later merged into `apps/desktop`)
 - [x] Strict TypeScript 7, Biome, Vitest in every package
-- [x] Fastify server on Node 24 native TS, loopback only, origin guard, `/api/health`, `/ws` hello
+- [x] Fastify server on Node 24 native TS, loopback only, origin guard, `/api/health`, `/ws` hello (replaced by Electron IPC in Phase 1.5)
 - [x] SQLite with append-only migrations
 - [x] Fluent UI Teams-dark shell: title bar, app rail, list pane, main pane (placeholder data)
 - [x] Claude Code setup: `CLAUDE.md`, agents, skills, commands, hooks, permissions
 - [x] CI workflow, ADRs 0001–0006
-- [ ] Initialize git and make the first commit
+- [x] Initialize git and make the first commit
 
 ## Phase 1: Projects
 
-- [x] `projects` repository + `GET/POST/PATCH/DELETE /api/projects`; validate the path is a git repo
+- [x] `projects` repository + create/list/update/remove (first over HTTP, now IPC); validate the path is a git repo
 - [x] Projects section in the rail: list, add by folder path (Dialog), remove
 - [x] Per-project review prompt editor with a sensible default prompt
 - [x] Reviews in the list pane grouped by project (still placeholder reviews)
+
+## Phase 1.5: Desktop app (Electron)
+
+- [x] `apps/desktop`: Electron 45 + electron-vite; services moved into the main process (ADR 0008)
+- [x] Typed IPC contract in `packages/shared`; dispatcher validates input, renderer validates output
+- [x] Secure window: context isolation, sandbox, CSP, sender check, no navigation, single instance
+- [x] Teams-style title bar is the window title bar (traffic lights / caption buttons)
+- [x] Native folder picker in Add project
+- [x] Remove Fastify, WebSocket, origin guard; port all tests
+- [ ] Packaged `.dmg` with electron-builder (`pnpm package`), checked on a clean machine
+- [ ] Main → renderer event wiring used by the UI (lands with Phase 3 streaming)
 
 ## Phase 2: Review lifecycle (no Claude yet)
 
 - [ ] Git module: fetch, resolve branch/PR head, default base, merge base (argument-array spawns)
 - [ ] Create a review from a branch name or a GitHub PR URL (`gh pr view`), in an isolated
       worktree or in the project checkout (refuse a dirty tree)
-- [ ] `reviews` table and API; list pane shows real reviews with status dots; delete placeholders
+- [ ] `reviews` table and IPC channels; list pane shows real reviews with status dots; delete placeholders
 - [ ] New review dialog (source, base, isolated checkbox remembered per project, prompt)
 - [ ] Close a review: confirm, remove its worktree, archive the record
 
 ## Phase 3: Claude sessions
 
 - [ ] Add the Agent SDK; session service with one `query()` per turn and `resume`
-- [ ] Normalize SDK messages into review events; persist and broadcast over `/ws`
-- [ ] Zustand store fed by the socket for all reviews; status dots update live
+- [ ] Normalize SDK messages into review events; persist and broadcast to the renderer
+- [ ] Zustand store fed by `onEvent` for all reviews; status dots update live
 - [ ] Conversation tab: markdown messages, collapsible tool-call cards, auto-scroll that respects the user
 - [ ] Composer: send, `/skill` completion, Stop (interrupt), model picker
 - [ ] Survives restart: transcript reloads, next message resumes the same session
 
 ## Phase 4: Findings
 
-- [ ] `report_findings` MCP tool with server-assigned stable numbers (ADR 0004)
+- [ ] `report_findings` MCP tool with stable numbers assigned by the main process (ADR 0004)
 - [ ] Findings tab: Fluent DataGrid with severity, title, location, verdict; filter by verdict
 - [ ] Accept / dismiss / reopen; "Ask about #N" prefills the composer
 - [ ] Open `file:line` in the editor (configurable command template), in the review's workdir
@@ -51,7 +62,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 - [ ] `PreToolUse` gate: read-only tools and allowlisted read-only Bash run; the rest asks (ADR 0005)
 - [ ] Approval cards in the conversation: Allow once / Allow for this review / Deny with message
-- [ ] `needs-input` status and a notification when a review waits for you
+- [ ] `needs-input` status, a native notification and dock badge when a review waits for you
 - [ ] Untrusted PR checkouts never load their own `.claude/` or `.mcp.json`
 - [ ] Fix mode per review: allow edits inside the workdir only
 - [ ] Security audit of the whole gate (`security-auditor`)
@@ -77,11 +88,11 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [ ] Search in the title bar across reviews and findings
 - [ ] Keyboard shortcuts (next review, next finding, focus composer)
 - [ ] Toasts, error boundary, empty states, loading skeletons
-- [ ] Server serves the built UI: one `pnpm start` for production use
+- [ ] Renderer bundle: minify and split routes
 
 ## Phase 9: Showcase
 
-- [ ] End-to-end smoke test (Playwright) of the main flow with a fake Claude
+- [ ] End-to-end smoke test (Playwright's Electron support) of the main flow with a fake Claude
 - [ ] Screenshots and a short GIF in the README
 - [ ] `/demo-prep` → `docs/DEMO.md`; rehearse the demo
-- [ ] Stretch: desktop packaging (Tauri)
+- [ ] Code signing and notarization for macOS; auto-update

@@ -15,7 +15,7 @@ verdicts, Claude session ids. Many reviews write concurrently from one process.
 3. **`better-sqlite3` + an ORM**: mature. Con: native build step, more dependencies.
 
 ## Decision
-`node:sqlite` with a tiny append-only migration runner (`apps/server/src/db`).
+`node:sqlite` with a tiny append-only migration runner (`apps/desktop/src/main/db`).
 
 ## Consequences
 - Repositories are plain functions over `DatabaseSync`; tests use `:memory:`.

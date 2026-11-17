@@ -20,3 +20,7 @@ shapes for MCP tool inputs, so the same schemas describe what Claude may send.
 ## Consequences
 - Changing a contract is a single edit that both sides type-check against.
 - Every boundary validates; invalid input fails loudly with a clear error.
+
+## Update (ADR 0008)
+The transport is now Electron IPC instead of HTTP and WebSocket. The decision stands: the IPC
+contract (`packages/shared/src/ipc.ts`) is the same idea, channel → input and output schemas.

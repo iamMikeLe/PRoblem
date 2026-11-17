@@ -29,8 +29,8 @@ on until it is met.
 
 For each step:
 
-1. Contract first: add or change zod schemas in `packages/shared` (see the `api-contract` skill).
-2. Server, then web. UI follows the `fluent-teams-ui` skill; Claude integration follows
+1. Contract first: add or change zod schemas in `packages/shared` (see the `ipc-contract` skill).
+2. Main process, then renderer. UI follows the `fluent-teams-ui` skill; Claude integration follows
    `agent-sdk-integration`.
 3. Write the test with the code, not after.
 4. Run the narrowest check: `pnpm --filter <package> test` and `pnpm typecheck`.
@@ -42,9 +42,9 @@ For each step:
 Launch in one message, so they run concurrently:
 
 - `code-reviewer` always.
-- `security-auditor` if the change touches permissions, commands, paths, tokens, the HTTP/WS
-  boundary, or posting to a git host.
-- `ui-reviewer` if the change touches `apps/web/src`.
+- `security-auditor` if the change touches permissions, commands, paths, tokens, the preload/IPC
+  boundary or window settings, or posting to a git host.
+- `ui-reviewer` if the change touches `apps/desktop/src/renderer`.
 - `test-engineer` if any acceptance criterion has no test yet.
 
 Fix every real finding. If you disagree with one, say why in your report instead of silently
@@ -55,8 +55,8 @@ ignoring it. Re-run `pnpm verify` after fixes.
 ## 5. Close
 
 - Tick the item in `docs/ROADMAP.md`; update `docs/ARCHITECTURE.md` if the design changed.
-- See it working: run `pnpm dev` and exercise the feature in the browser when it has UI.
-- Propose a Conventional Commit message (`feat(server): ...`). Commit only if the user asks.
+- See it working: run `pnpm dev` and exercise the feature in the Electron window when it has UI.
+- Propose a Conventional Commit message (`feat(desktop): ...`). Commit only if the user asks.
 
 ## Report
 

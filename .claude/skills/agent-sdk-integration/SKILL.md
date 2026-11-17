@@ -1,6 +1,6 @@
 ---
 name: agent-sdk-integration
-description: How ReviewRoom drives Claude through the Claude Agent SDK - one query() per turn with session resume, streaming SDK messages to the browser, the report_findings MCP tool, the PreToolUse permission gate, interrupt, and testing with a fake query. Use for any work in apps/server/src/modules/claude or anything that starts, streams, stops or permissions a Claude turn.
+description: How ReviewRoom drives Claude through the Claude Agent SDK - one query() per turn with session resume, streaming SDK messages to the renderer, the report_findings MCP tool, the PreToolUse permission gate, interrupt, and testing with a fake query. Use for any work in apps/desktop/src/main/claude or anything that starts, streams, stops or permissions a Claude turn.
 ---
 
 # Claude Agent SDK integration
@@ -15,7 +15,7 @@ and correct this skill if it is out of date.
   `cwd` set to the review's workdir.
 - The first turn's prompt is the project's review prompt filled with base, head, PR info.
 - Store the `session_id` from the first `system`/`init` message on the review; later turns pass
-  `resume: sessionId`, which also works after a server restart.
+  `resume: sessionId`, which also works after the app restarts.
 - Load `settingSources: ["user", "project"]` only for trusted checkouts. For an isolated worktree
   of someone's PR, load project settings from the main checkout, never from the PR (see the
   security-auditor invariants).
@@ -24,7 +24,9 @@ and correct this skill if it is out of date.
 
 - Iterate the async generator and, for every SDK message:
   1. append a normalized event to the review's event log (SQLite), then
-  2. `hub.broadcast()` it to all clients tagged with the review id.
+  2. `broadcast()` it (`ipc/register.ts`) to the renderer, tagged with the review id.
+- The Agent SDK runs in the Electron main process (Node 24). Keep the session service
+  Electron-free; inject `query` and `broadcast` so it is testable.
 - Normalize in one module (`toReviewEvents(message)`), so the UI depends on our event schema,
   not the SDK's message shapes.
 - Stop = call `interrupt()` on the running query (keep a `Map<reviewId, Query>`); the review stays
@@ -41,15 +43,15 @@ const findingsServer = createSdkMcpServer({
   tools: [
     tool("report_findings", "Create, update or withdraw review findings.", ReportFindingsInputShape,
       async (input) => {
-        const saved = upsertFindings(db, reviewId, input); // server assigns stable numbers
-        hub.broadcast({ type: "review.findings", reviewId, findings: saved });
+        const saved = upsertFindings(db, reviewId, input); // main assigns stable numbers
+        broadcast({ type: "review.findings", reviewId, findings: saved });
         return { content: [{ type: "text", text: summarize(saved) }] };
       }),
   ],
 });
 ```
 
-- New findings get the next free number from the server; updates reference an existing number.
+- New findings get the next free number from the main process; updates reference an existing number.
   Claude never chooses a number, so `#3` always means the same finding.
 - The system prompt appendix tells Claude to call `report_findings` at the end of every turn in
   which its view of the findings changed.
@@ -62,7 +64,7 @@ const findingsServer = createSdkMcpServer({
   matching the read-only allowlist; everything else asks.
 - User `allow` rules must not widen this: force `permissionMode: "default"`.
 - While waiting, the review status is `needs-input`; the pending request is persisted so the
-  card survives a page reload (but not a server restart; the turn is then aborted).
+  card survives a page reload (but not an app restart; the turn is then aborted).
 
 ## Testing
 

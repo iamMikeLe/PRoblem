@@ -1,6 +1,6 @@
 ---
 name: fluent-teams-ui
-description: UI conventions for the ReviewRoom web app - Fluent UI v9 components and tokens, the Microsoft Teams-style dark shell layout, theming, icons and accessibility rules. Use whenever creating or changing React components or styles in apps/web.
+description: UI conventions for the ReviewRoom desktop UI (Electron renderer) - Fluent UI v9 components and tokens, the Microsoft Teams-style dark shell layout, theming, icons and accessibility rules. Use whenever creating or changing React components or styles in apps/desktop/src/renderer.
 ---
 
 # Fluent UI v9, Teams style
@@ -8,7 +8,7 @@ description: UI conventions for the ReviewRoom web app - Fluent UI v9 components
 ReviewRoom looks and behaves like Microsoft Teams (dark): a title bar with search, a narrow app
 rail, a list pane, and a main pane with a header, tabs and a composer at the bottom.
 
-## Shell (`apps/web/src/app/App.tsx`)
+## Shell (`apps/desktop/src/renderer/src/app/App.tsx`)
 
 ```
 ┌──────────────────────── TitleBar 48px ─────────────────────────┐
@@ -21,6 +21,14 @@ rail, a list pane, and a main pane with a header, tabs and a composer at the bot
 
 Background layers (darkest to lightest feel in Teams dark): rail/title `colorNeutralBackground3`,
 list `colorNeutralBackground2`, main `colorNeutralBackground1`.
+
+## Window chrome
+
+The native title bar is hidden; `TitleBar` is the window's title bar. It is a drag region
+(`WebkitAppRegion: "drag"`), and every interactive element in it needs `WebkitAppRegion: "no-drag"`.
+It leaves room for the macOS traffic lights (left) or the Windows/Linux caption buttons (right),
+based on `window.reviewroom.platform`. Prefer native surfaces where they exist: folder picker via
+`api.dialog.pickFolder()`, notifications and dock badge from the main process.
 
 ## Rules
 
@@ -47,6 +55,6 @@ list `colorNeutralBackground2`, main `colorNeutralBackground1`.
 
 ## State
 
-- Server data: React Query. Live stream state for all reviews: the Zustand store fed by the
-  WebSocket. Component state only for transient UI (an open menu).
+- Main-process data: React Query over `lib/api.ts`. Live stream state for all reviews: the
+  Zustand store fed by `window.reviewroom.onEvent`. Component state only for transient UI (an open menu).
 - Switching reviews must keep each review's scroll position, composer draft and pending approvals.

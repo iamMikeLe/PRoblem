@@ -26,7 +26,7 @@ default prompt represented: the committed migration 1 already has `review_prompt
 - A project's `path` is the real path of its work-tree root (option 3). A subfolder is
   normalized up; a linked worktree is its own project; bare repositories are rejected.
   The root must contain the folder the user picked, so `core.worktree` cannot redirect it
-  (`outside_repository`). Only a leading `~` / `~/` is expanded, with the server's home folder.
+  (`outside_repository`). Only a leading `~` / `~/` is expanded, with the user's home folder.
 - The prompt text is stored (option 1). `DEFAULT_REVIEW_PROMPT` lives in `packages/shared`;
   "Reset to default" puts it back into the editor for the user to save, and the UI shows a
   Default/Custom badge.

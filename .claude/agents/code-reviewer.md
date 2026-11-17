@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Independent read-only reviewer for ReviewRoom changes. Use after implementing a feature or before committing, to review the diff for correctness bugs, contract drift between server and web, missing tests, and violations of project conventions. Reports findings ranked by severity; never edits.
+description: Independent read-only reviewer for ReviewRoom changes. Use after implementing a feature or before committing, to review the diff for correctness bugs, contract drift between main process and renderer, missing tests, and violations of project conventions. Reports findings ranked by severity; never edits.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -17,15 +17,18 @@ Uncommitted changes plus commits not on `main`, unless told otherwise:
 
 1. **Correctness**: logic, async/race conditions (many reviews run concurrently), error paths,
    resource cleanup (sockets, child processes, worktrees, abort controllers).
-2. **Contracts**: every request body, response, WS event and Claude tool input is validated with a
-   schema from `packages/shared`. No duplicated or hand-written types for the same data.
-3. **Persistence**: migrations are append-only; multi-statement writes use a transaction.
-4. **UI**: Fluent components and `tokens` only, no hex colors; accessible names on icon buttons;
+2. **Contracts**: every IPC input/output, event and Claude tool input is validated with a schema
+   from `packages/shared`. New channels are in `IPC_CHANNELS`, `ipcContract` and `createHandlers`.
+   No duplicated or hand-written types for the same data.
+3. **Electron boundary**: services stay Electron-free; nothing new is exposed on the preload
+   besides `invoke`/`onEvent`; no `webPreferences` weakened.
+4. **Persistence**: migrations are append-only; multi-statement writes use a transaction.
+5. **UI**: Fluent components and `tokens` only, no hex colors; accessible names on icon buttons;
    state that must survive switching reviews is not kept in component-local state.
-5. **Tests**: changed behavior is covered at the right level (unit for pure logic, `app.inject`
-   for routes, Testing Library for components). Name the missing test.
-6. **TypeScript**: no `any`, no non-null `!`, no unchecked `as` casts at boundaries.
-7. **Scope**: unrelated refactors, leftover debug code, TODOs without a roadmap item.
+6. **Tests**: changed behavior is covered at the right level (unit for pure logic, service tests
+   on in-memory SQLite and temp repos, Testing Library with `stubBridge` for components). Name the missing test.
+7. **TypeScript**: no `any`, no non-null `!`, no unchecked `as` casts at boundaries.
+8. **Scope**: unrelated refactors, leftover debug code, TODOs without a roadmap item.
 
 Security-sensitive changes (permissions, shell commands, paths, tokens) also need the
 `security-auditor` agent; say so if you see them.

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CreateProjectRequestSchema,
   DEFAULT_REVIEW_PROMPT,
-  ProjectListResponseSchema,
+  ipcContract,
   ReviewPromptSchema,
   UpdateProjectRequestSchema,
 } from "../src/index.ts";
@@ -46,11 +46,10 @@ describe("project contracts", () => {
   });
 
   it("parses a project list and requires updatedAt", () => {
-    expect(ProjectListResponseSchema.parse({ projects: [project] }).projects).toHaveLength(1);
+    const listOutput = ipcContract["projects:list"].output;
+    expect(listOutput.parse([project])).toHaveLength(1);
     const { updatedAt: _omitted, ...withoutUpdatedAt } = project;
-    expect(ProjectListResponseSchema.safeParse({ projects: [withoutUpdatedAt] }).success).toBe(
-      false,
-    );
+    expect(listOutput.safeParse([withoutUpdatedAt]).success).toBe(false);
   });
 
   it("ships a default prompt that passes its own validation", () => {

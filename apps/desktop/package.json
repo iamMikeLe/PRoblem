@@ -1,0 +1,39 @@
+{
+  "name": "@reviewroom/desktop",
+  "productName": "ReviewRoom",
+  "version": "0.1.0",
+  "description": "Run many Claude Code reviews side by side",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "devDependencies": {
+    "@fluentui/react-components": "9.75.2",
+    "@fluentui/react-icons": "2.0.346",
+    "@reviewroom/shared": "workspace:*",
+    "@tanstack/react-query": "5.108.0",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "electron": "45.3.3",
+    "electron-builder": "26.18.0",
+    "electron-vite": "6.0.0",
+    "jsdom": "29.1.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.8",
+    "vitest": "5.1.0",
+    "zod": "4.6.7",
+    "zustand": "5.1.0"
+  }
+}

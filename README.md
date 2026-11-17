@@ -2,12 +2,12 @@
 
 **Run many AI code reviews side by side, without losing your place.**
 
-ReviewRoom is a local web app that runs [Claude Code](https://claude.com/claude-code) reviews of git
+ReviewRoom is a desktop app (Electron) that runs [Claude Code](https://claude.com/claude-code) reviews of git
 branches and pull requests, many at once and across several repositories. Each review keeps its own
 live conversation and a numbered list of findings you can triage. The UI is laid out like
 Microsoft Teams, in its dark theme.
 
-> Status: **Phase 0 (foundation) done.** See [the roadmap](docs/ROADMAP.md) for progress.
+> Status: **Phase 1 (projects) and the Electron move done.** See [the roadmap](docs/ROADMAP.md) for progress.
 
 ## Why
 
@@ -27,15 +27,15 @@ review its own room:
 
 | Area | Choice | Why |
 | --- | --- | --- |
-| Monorepo | pnpm workspaces | One install, shared contract package |
-| Contract | zod 4 in `packages/shared` | One schema → types + runtime validation on both sides ([ADR 0003](docs/adr/0003-shared-zod-contracts.md)) |
-| Server | Fastify 5, Node 24 (native TS) | Plugins, hooks, `inject()` testing; no server build step ([ADR 0002](docs/adr/0002-fastify-on-native-typescript.md)) |
+| Shell | Electron 45 + electron-vite | Ships Node 24, so the Agent SDK and SQLite run in-process; native dialogs and window chrome ([ADR 0008](docs/adr/0008-electron-with-typed-ipc.md)) |
+| Transport | Typed IPC contract (zod) | No open port; every input validated in main, every output in the UI ([ADR 0003](docs/adr/0003-shared-zod-contracts.md)) |
+| Monorepo | pnpm workspaces | Desktop app + shared contract package |
 | Storage | `node:sqlite` | Transactions and queries with zero native deps ([ADR 0006](docs/adr/0006-sqlite-storage.md)) |
-| Realtime | WebSocket (`@fastify/websocket`) | Push every review's events to every tab |
 | AI | Claude Agent SDK | Uses your local Claude Code login, skills and settings ([ADR 0004](docs/adr/0004-findings-via-mcp-tool.md), [0005](docs/adr/0005-permission-gate.md)) |
 | UI | React 19, Fluent UI v9 (Teams themes) | Microsoft's own design system for a Teams look ([ADR 0001](docs/adr/0001-fluent-ui-teams-theme.md)) |
-| Client state | TanStack Query + Zustand | Server cache vs. live stream state |
+| Client state | TanStack Query + Zustand | Request cache vs. live stream state |
 | Quality | Vitest, Testing Library, Biome, TypeScript 7 strict, GitHub Actions | |
+| Packaging | electron-builder | `.dmg` / NSIS / AppImage |
 
 ## Getting started
 
@@ -47,34 +47,37 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173. The API runs on `127.0.0.1:4400` and Vite proxies `/api` and `/ws` to it.
+`pnpm dev` opens the ReviewRoom window with hot reload for the UI.
 
 | Script | What it does |
 | --- | --- |
-| `pnpm dev` | Server (watch mode) + web dev server |
+| `pnpm dev` | Electron app in development (electron-vite, HMR) |
+| `pnpm start` | Run the production build locally |
+| `pnpm package` | Build a distributable into `apps/desktop/dist` (unsigned) |
 | `pnpm verify` | Lint, type check, test, build: the definition of green |
-| `pnpm test` | Vitest in every package |
+| `pnpm test` | Vitest: main process in Node, UI in jsdom |
 | `pnpm format` | Biome format and safe fixes |
 
-Configuration (environment variables, all optional): `REVIEWROOM_PORT` (4400), `REVIEWROOM_HOME`
-(`~/.reviewroom`, holds the SQLite database and worktrees), `REVIEWROOM_WEB_ORIGIN`
-(`http://localhost:5173`), `LOG_LEVEL` (`info`).
+Data lives in `~/.reviewroom` (SQLite database, worktrees); set `REVIEWROOM_HOME` to use another folder.
 
 ## Project structure
 
 ```
 review-room/
 ├── apps/
-│   ├── server/          Fastify API + WebSocket, SQLite, Claude sessions
-│   └── web/             React + Fluent UI, Teams-style shell
+│   └── desktop/
+│       ├── src/main/        Electron main: IPC dispatcher, services, SQLite, git
+│       ├── src/preload/     window.reviewroom bridge (invoke / onEvent)
+│       ├── src/renderer/    React + Fluent UI, Teams-style shell
+│       └── test/            main (Node) and renderer (jsdom) suites
 ├── packages/
-│   └── shared/          zod schemas: domain, API, events
+│   └── shared/              zod schemas: domain, IPC contract, events
 ├── docs/
-│   ├── ARCHITECTURE.md  how it fits together
-│   ├── ROADMAP.md       the phases we build in
-│   └── adr/             architecture decision records
-├── .claude/             Claude Code setup: agents, skills, commands, hooks
-└── .github/workflows/   CI
+│   ├── ARCHITECTURE.md      how it fits together
+│   ├── ROADMAP.md           the phases we build in
+│   └── adr/                 architecture decision records
+├── .claude/                 Claude Code setup: agents, skills, commands, hooks
+└── .github/workflows/       CI
 ```
 
 ## Built with Claude Code
@@ -86,7 +89,7 @@ assistant works by the same rules as a human contributor:
 | --- | --- | --- |
 | Project memory | `CLAUDE.md` | Commands, layout, conventions and hard rules loaded into every session |
 | Agents | `.claude/agents/` | `architect` (plans), `code-reviewer`, `security-auditor`, `ui-reviewer` (read-only reviews), `test-engineer` (tests only) |
-| Skills | `.claude/skills/` | `ship-feature` (the delivery workflow), `api-contract`, `fluent-teams-ui`, `agent-sdk-integration`, `write-adr` |
+| Skills | `.claude/skills/` | `ship-feature` (the delivery workflow), `ipc-contract`, `fluent-teams-ui`, `agent-sdk-integration`, `write-adr` |
 | Commands | `.claude/commands/` | `/phase <n>`, `/verify`, `/review`, `/adr <title>`, `/demo-prep` |
 | Hooks | `.claude/hooks/` | Session start: inject the current roadmap phase. Before edits: protect lockfile, `.env`, git internals. After edits: Biome format + lint feedback |
 | Permissions | `.claude/settings.json` | Allow the safe dev loop, ask for dependency changes and commits, deny secrets and `git push` |

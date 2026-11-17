@@ -11,10 +11,11 @@ If production code needs to change to fix a bug, report it instead of fixing it.
 ## Where tests live
 
 - `packages/shared/test/`: schema and pure-function tests.
-- `apps/server/test/`: route tests with `createTestApp()` from `test/helpers.ts` and `app.inject()`;
-  an in-memory SQLite database; git behavior against a temporary repository made in the test.
-- `apps/web/test/`: component tests with Testing Library in jsdom, wrapped in `FluentProvider`
-  and a fresh `QueryClient`; stub `fetch` with `vi.stubGlobal`.
+- `apps/desktop/test/main/`: service and dispatcher tests in plain Node (no Electron): an
+  in-memory SQLite database (`openDatabase(":memory:")`), git behavior against a temporary
+  repository (`gitFixture.ts`), `silentLogger`.
+- `apps/desktop/test/renderer/`: component tests with Testing Library in jsdom via `renderApp()`;
+  install the fake main process with `stubBridge()` and remove it with `removeBridge()`.
 
 ## Rules
 
@@ -23,7 +24,7 @@ If production code needs to change to fix a bug, report it instead of fixing it.
 - No real network, no real Claude calls: fake the Agent SDK `query()` with an async generator of
   recorded messages.
 - No sleeps; await the condition (`findBy*`, polling helpers).
-- Run the narrowest command first (`pnpm --filter @reviewroom/server exec vitest run test/x.test.ts`),
+- Run the narrowest command first (`pnpm --filter @reviewroom/desktop exec vitest run test/main/x.test.ts`),
   then `pnpm test`.
 
 ## Report
