@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { IpcChannel } from "./channels.ts";
-import { ProjectSchema } from "./domain.ts";
+import { ProjectSchema, ReviewSchema } from "./domain.ts";
 import type { AppEvent } from "./events.ts";
 
 /**
@@ -24,6 +24,19 @@ export const AppErrorCodeSchema = z.enum([
   "git_unavailable",
   "project_exists",
   "project_not_found",
+  "invalid_source",
+  "pr_repo_mismatch",
+  "gh_unavailable",
+  "gh_failed",
+  "branch_not_found",
+  "base_not_found",
+  "fetch_failed",
+  "local_changes",
+  "checkout_busy",
+  "checkout_failed",
+  "review_not_found",
+  "project_has_reviews",
+  "ignored_files_at_risk",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -65,6 +78,31 @@ export const UpdateProjectRequestSchema = z
 export type UpdateProjectRequest = z.infer<typeof UpdateProjectRequestSchema>;
 
 const ProjectIdSchema = z.string().min(1);
+const ReviewIdSchema = z.string().min(1);
+
+export const REVIEW_SOURCE_MAX = 2048;
+
+export const CreateReviewRequestSchema = z.strictObject({
+  projectId: ProjectIdSchema,
+  /** A branch name, or a GitHub pull request URL. */
+  source: z
+    .string()
+    .trim()
+    .min(1, "Enter a branch name or a pull request URL.")
+    .max(REVIEW_SOURCE_MAX),
+  /** Base branch; omitted = the PR's base, or the remote's default branch. */
+  base: z.string().trim().min(1).max(REVIEW_SOURCE_MAX).optional(),
+  /** `true`: a separate worktree. `false`: check out in the project folder (in-place). */
+  isolated: z.boolean(),
+  prompt: ReviewPromptSchema,
+});
+export type CreateReviewRequest = z.infer<typeof CreateReviewRequestSchema>;
+
+export const CloseReviewResultSchema = z.object({
+  /** What happened to the project checkout of an in-place review, for the user. */
+  note: z.string().nullable(),
+});
+export type CloseReviewResult = z.infer<typeof CloseReviewResultSchema>;
 
 export const ipcContract = {
   "projects:list": { input: z.undefined(), output: z.array(ProjectSchema) },
@@ -74,6 +112,18 @@ export const ipcContract = {
     output: ProjectSchema,
   },
   "projects:remove": { input: z.strictObject({ id: ProjectIdSchema }), output: z.null() },
+  /** Local and remote branch names of a project, for autocomplete. */
+  "projects:branches": {
+    input: z.strictObject({ id: ProjectIdSchema }),
+    output: z.array(z.string()),
+  },
+  /** Open reviews of all projects, newest first. */
+  "reviews:list": { input: z.undefined(), output: z.array(ReviewSchema) },
+  "reviews:create": { input: CreateReviewRequestSchema, output: ReviewSchema },
+  "reviews:close": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: CloseReviewResultSchema,
+  },
   /** Opens the native folder picker; `null` when the user cancels. */
   "dialog:pickFolder": { input: z.undefined(), output: z.string().nullable() },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;

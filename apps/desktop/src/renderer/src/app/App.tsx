@@ -1,9 +1,18 @@
-import { makeStyles } from "@fluentui/react-components";
-import { useMemo, useState } from "react";
+import {
+  makeStyles,
+  Toast,
+  ToastBody,
+  Toaster,
+  ToastTitle,
+  useId,
+  useToastController,
+} from "@fluentui/react-components";
+import { useState } from "react";
 import { ProjectDetail } from "../features/projects/ProjectDetail.tsx";
 import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
 import { useProjects } from "../features/projects/queries.ts";
-import { placeholderReviewsFor } from "../features/reviews/placeholder.ts";
+import { NewReviewDialog } from "../features/reviews/NewReviewDialog.tsx";
+import { useReviews } from "../features/reviews/queries.ts";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
@@ -13,8 +22,8 @@ const useStyles = makeStyles({
   shell: {
     display: "grid",
     height: "100%",
-    gridTemplateColumns: "68px 320px 1fr",
-    gridTemplateRows: "48px 1fr",
+    gridTemplateColumns: "68px 320px minmax(0, 1fr)",
+    gridTemplateRows: "48px minmax(0, 1fr)",
     gridTemplateAreas: `"title title title" "rail list main"`,
   },
 });
@@ -24,14 +33,33 @@ export function App() {
   const styles = useStyles();
   const [section, setSection] = useState<RailSection>("reviews");
   const projects = useProjects();
-  const reviews = useMemo(() => placeholderReviewsFor(projects.data ?? []), [projects.data]);
+  const reviews = useReviews();
+  const [creating, setCreating] = useState(false);
+  const toasterId = useId("toaster");
+  const { dispatchToast } = useToastController(toasterId);
 
-  // Selections fall back to the first item, so a removed project or review never leaves a blank.
+  // Selections fall back to the first item, so a closed review or removed project never leaves a blank.
   const [reviewId, setReviewId] = useState<string>();
-  const selectedReview = reviews.find((review) => review.id === reviewId) ?? reviews[0];
+  const reviewList = reviews.data ?? [];
+  const selectedReview = reviewList.find((review) => review.id === reviewId) ?? reviewList[0];
   const [projectId, setProjectId] = useState<string>();
   const selectedProject =
     projects.data?.find((project) => project.id === projectId) ?? projects.data?.[0];
+
+  const loadError = projects.isError
+    ? `Could not load projects: ${projects.error.message}`
+    : reviews.isError
+      ? `Could not load reviews: ${reviews.error.message}`
+      : undefined;
+
+  const reviewClosed = (note: string | null) =>
+    dispatchToast(
+      <Toast>
+        <ToastTitle>Review closed</ToastTitle>
+        {note && <ToastBody>{note}</ToastBody>}
+      </Toast>,
+      { intent: "success" },
+    );
 
   return (
     <div className={styles.shell}>
@@ -46,15 +74,29 @@ export function App() {
         <>
           <ListPane
             projects={projects.data}
-            error={projects.isError ? projects.error.message : undefined}
-            reviews={reviews}
+            error={loadError}
+            reviews={reviewList}
             selectedId={selectedReview?.id}
             onSelect={setReviewId}
             onAddProject={() => setSection("projects")}
+            onNewReview={() => setCreating(true)}
           />
-          <MainPane review={selectedReview} />
+          <MainPane review={selectedReview} onClosed={reviewClosed} />
         </>
       )}
+      {creating && projects.data && (
+        <NewReviewDialog
+          open
+          projects={projects.data}
+          initialProjectId={selectedReview?.projectId ?? selectedProject?.id}
+          onClose={() => setCreating(false)}
+          onCreated={(review) => {
+            setCreating(false);
+            setReviewId(review.id);
+          }}
+        />
+      )}
+      <Toaster toasterId={toasterId} position="bottom-end" />
     </div>
   );
 }

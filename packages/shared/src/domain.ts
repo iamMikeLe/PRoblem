@@ -20,24 +20,40 @@ export type Project = z.infer<typeof ProjectSchema>;
 export const ReviewStatusSchema = z.enum(["queued", "running", "needs-input", "idle", "failed"]);
 export type ReviewStatus = z.infer<typeof ReviewStatusSchema>;
 
+/** What a review looks at: a branch of the project, or a GitHub pull request. */
 export const ReviewSourceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("branch"), branch: z.string().min(1) }),
-  z.object({ kind: z.literal("pull-request"), url: z.url(), number: z.number().int().positive() }),
+  z.object({
+    kind: z.literal("pull-request"),
+    url: z.url(),
+    number: z.number().int().positive(),
+    /** `owner/repo`, lowercase. */
+    repo: z.string().min(1),
+  }),
 ]);
 export type ReviewSource = z.infer<typeof ReviewSourceSchema>;
+
+const ShaSchema = z.string().regex(/^[0-9a-f]{40,64}$/);
 
 export const ReviewSchema = z.object({
   id: z.string(),
   projectId: z.string(),
+  /** PR title, or the branch name. */
   title: z.string(),
   source: ReviewSourceSchema,
-  baseRef: z.string(),
-  headSha: z.string(),
-  /** Directory Claude works in: an isolated worktree or the project checkout. */
+  /** Branch under review (the PR's head branch for a pull request). */
+  headBranch: z.string(),
+  headSha: ShaSchema,
+  /** Branch the changes are compared with. */
+  baseBranch: z.string(),
+  baseSha: ShaSchema,
+  /** Newest commit shared by head and base; `null` for unrelated histories. */
+  mergeBaseSha: ShaSchema.nullable(),
+  /** Folder Claude works in: an isolated worktree, or the project checkout (in-place). */
   workdir: z.string(),
   isolated: z.boolean(),
-  model: z.string().optional(),
-  sessionId: z.string().optional(),
+  /** The review prompt for this review, copied from the project and possibly edited. */
+  prompt: z.string(),
   status: ReviewStatusSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
@@ -52,7 +68,7 @@ export type Verdict = z.infer<typeof VerdictSchema>;
 
 /**
  * A finding keeps its `number` for the life of the review. Claude reports findings through the
- * `report_findings` MCP tool; the server owns numbering, so a number never changes meaning.
+ * `report_findings` MCP tool; the main process owns numbering, so a number never changes meaning.
  */
 export const FindingSchema = z.object({
   reviewId: z.string(),

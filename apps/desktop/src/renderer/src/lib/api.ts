@@ -1,10 +1,13 @@
 import {
+  type CloseReviewResult,
   type CreateProjectRequest,
+  type CreateReviewRequest,
   type IpcChannel,
   type IpcInput,
   type IpcOutput,
   ipcSchemas,
   type Project,
+  type Review,
   type ReviewRoomBridge,
   type UpdateProjectRequest,
 } from "@reviewroom/shared";
@@ -49,6 +52,12 @@ export const api = {
     remove: async (id: string): Promise<void> => {
       await call("projects:remove", { id });
     },
+    branches: (id: string): Promise<string[]> => call("projects:branches", { id }),
+  },
+  reviews: {
+    list: (): Promise<Review[]> => call("reviews:list", undefined),
+    create: (body: CreateReviewRequest): Promise<Review> => call("reviews:create", body),
+    close: (id: string): Promise<CloseReviewResult> => call("reviews:close", { id }),
   },
   dialog: {
     pickFolder: (): Promise<string | null> => call("dialog:pickFolder", undefined),

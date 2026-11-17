@@ -9,6 +9,7 @@ import {
 } from "@reviewroom/shared";
 import { AppFailure, type Logger } from "../errors.ts";
 import { GitUnavailableError, NotAGitRepoError, resolveRepoRoot } from "../git/repo.ts";
+import { countOpenReviews } from "../reviews/repository.ts";
 import { checkFolder, isInside } from "./paths.ts";
 import {
   deleteProject,
@@ -93,6 +94,13 @@ export function createProjectService({ db, home, log }: ProjectServiceDeps): Pro
     },
 
     remove(id) {
+      const open = countOpenReviews(db, id);
+      if (open > 0) {
+        throw new AppFailure(
+          "project_has_reviews",
+          `Close the project's ${open === 1 ? "open review" : `${open} open reviews`} first`,
+        );
+      }
       if (!deleteProject(db, id)) throw new AppFailure("project_not_found", "Project not found");
     },
   };

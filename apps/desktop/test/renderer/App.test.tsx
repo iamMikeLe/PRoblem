@@ -1,7 +1,7 @@
-import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderApp } from "./renderApp.tsx";
-import { makeProject, removeBridge, stubBridge } from "./stubBridge.ts";
+import { makeProject, makeReview, removeBridge, stubBridge } from "./stubBridge.ts";
 
 describe("App shell", () => {
   afterEach(() => {
@@ -10,7 +10,8 @@ describe("App shell", () => {
   });
 
   it("renders the title bar, rail and review list", async () => {
-    stubBridge([makeProject("p1", "payments-api")]);
+    const project = makeProject("p1", "payments-api");
+    stubBridge([project], [makeReview("r1", project)]);
     renderApp();
     expect(screen.getByRole("banner")).toBeTruthy();
     expect(screen.getByRole("navigation", { name: "Main" })).toBeTruthy();
@@ -18,54 +19,58 @@ describe("App shell", () => {
     expect(await screen.findByRole("heading", { level: 3, name: "payments-api" })).toBeTruthy();
   });
 
-  it("groups placeholder reviews under each project, in API order", async () => {
-    stubBridge([makeProject("p1", "payments-api"), makeProject("p2", "web-portal")]);
+  it("groups reviews under their project and hides projects without reviews", async () => {
+    const payments = makeProject("p1", "payments-api");
+    const portal = makeProject("p2", "web-portal");
+    const idle = makeProject("p3", "idle-project");
+    stubBridge(
+      [payments, portal, idle],
+      [makeReview("r1", payments), makeReview("r2", portal), makeReview("r3", payments)],
+    );
     renderApp();
     const headings = await screen.findAllByRole("heading", { level: 3 });
     expect(headings.map((h) => h.textContent)).toEqual(["payments-api", "web-portal"]);
-
-    const list = screen.getByRole("complementary", { name: "Reviews" });
-    // Two placeholder reviews per project; the disabled "New review" button is the fifth.
-    expect(within(list).getAllByRole("button", { current: false })).toHaveLength(4);
   });
 
-  it("opens a review when it is clicked in the list", async () => {
-    stubBridge([makeProject("p1", "payments-api"), makeProject("p2", "web-portal")]);
+  it("describes each review by its branches and opens it on click", async () => {
+    const project = makeProject("p1", "payments-api");
+    stubBridge(
+      [project],
+      [
+        makeReview("r1", project),
+        makeReview("r2", project, {
+          title: "Retry idempotent webhooks",
+          source: {
+            kind: "pull-request",
+            url: "https://github.com/acme/p/pull/12",
+            number: 12,
+            repo: "acme/p",
+          },
+          headBranch: "webhooks",
+          isolated: false,
+          workdir: "/repos/payments-api",
+        }),
+      ],
+    );
     renderApp();
-    fireEvent.click(await screen.findByRole("button", { name: /Dark mode for settings/ }));
-    expect(screen.getByRole("heading", { name: "#1290 Dark mode for settings" })).toBeTruthy();
+    const list = await screen.findByRole("complementary", { name: "Reviews" });
+    expect(
+      await within(list).findByText("PR #12 · webhooks → main · in project folder"),
+    ).toBeTruthy();
+
+    fireEvent.click(within(list).getByRole("button", { name: /Retry idempotent webhooks/ }));
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("heading", { name: "Retry idempotent webhooks" })).toBeTruthy();
+    expect(within(main).getByText("In project folder")).toBeTruthy();
+    expect(within(main).getByText("/repos/payments-api")).toBeTruthy();
   });
 
   it("shows an error in the Reviews pane when projects cannot be loaded", async () => {
     const api = stubBridge([]);
-    api.listError = {
-      code: "internal",
-      message: "Something went wrong in the app",
-    };
+    api.listError = { code: "internal", message: "Something went wrong in the app" };
     renderApp();
     const list = screen.getByRole("complementary", { name: "Reviews" });
     expect(await within(list).findByText(/Could not load projects/)).toBeTruthy();
-  });
-
-  it("drops a removed project's reviews from the Reviews list", async () => {
-    stubBridge([makeProject("p1", "payments-api"), makeProject("p2", "web-portal")]);
-    renderApp();
-    await screen.findByRole("heading", { level: 3, name: "web-portal" });
-
-    fireEvent.click(screen.getByRole("button", { name: "Projects" }));
-    const pane = await screen.findByRole("complementary", { name: "Projects" });
-    fireEvent.click(within(pane).getByRole("button", { name: /web-portal/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    fireEvent.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", {
-        name: "Remove project",
-      }),
-    );
-    await waitFor(() => expect(within(pane).queryByText("web-portal")).toBeNull());
-
-    fireEvent.click(screen.getByRole("button", { name: "Reviews" }));
-    const headings = await screen.findAllByRole("heading", { level: 3 });
-    expect(headings.map((h) => h.textContent)).toEqual(["payments-api"]);
   });
 
   it("invites adding a project when there are none, and opens the Projects section", async () => {
@@ -74,5 +79,12 @@ describe("App shell", () => {
     expect(await screen.findByText("Add a project to start reviewing.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
     expect(screen.getByRole("complementary", { name: "Projects" })).toBeTruthy();
+  });
+
+  it("invites starting a review when projects have none", async () => {
+    stubBridge([makeProject("p1", "payments-api")]);
+    renderApp();
+    expect(await screen.findByText("No open reviews.")).toBeTruthy();
+    expect(screen.getByText("Select a review or start a new one.")).toBeTruthy();
   });
 });

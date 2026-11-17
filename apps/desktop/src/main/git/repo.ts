@@ -50,16 +50,45 @@ export function gitEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv 
   return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith("GIT_")));
 }
 
+export interface RunGitOptions {
+  /** Kill git after this long (default 5 s). Network operations pass a longer timeout. */
+  timeoutMs?: number;
+  /**
+   * Disable every git hook for this command. Required for anything that checks out code under
+   * review: with `core.hooksPath` set to a folder inside the repository (husky and friends), the
+   * hooks would come from the pull request itself and run on checkout. Also disables submodule
+   * recursion and Git LFS downloads (ADR 0009).
+   */
+  noHooks?: boolean;
+}
+
+/**
+ * Settings for commands that touch code under review: no hooks (`core.hooksPath` pointing
+ * nowhere) and no recursion into submodules the PR may declare.
+ */
+const NO_HOOKS = ["-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false"] as const;
+
 /**
  * Runs git with an argument array (never a shell) and resolves with its stdout minus the final
  * newline. Only the newline is removed: paths may legitimately end in spaces.
  */
-export function runGit(cwd: string, args: readonly string[]): Promise<string> {
+export function runGit(
+  cwd: string,
+  args: readonly string[],
+  { timeoutMs = GIT_TIMEOUT_MS, noHooks = false }: RunGitOptions = {},
+): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
-      [...args],
-      { cwd, env: gitEnv(), timeout: GIT_TIMEOUT_MS, killSignal: "SIGKILL", encoding: "utf8" },
+      noHooks ? [...NO_HOOKS, ...args] : [...args],
+      {
+        cwd,
+        // Git LFS would download objects from a URL the PR can set in `.lfsconfig`; keep pointers.
+        env: noHooks ? { ...gitEnv(), GIT_LFS_SKIP_SMUDGE: "1" } : gitEnv(),
+        timeout: timeoutMs,
+        killSignal: "SIGKILL",
+        encoding: "utf8",
+      },
       (error, stdout, stderr) => {
         if (error) {
           reject(new GitCommandError(error, stderr));

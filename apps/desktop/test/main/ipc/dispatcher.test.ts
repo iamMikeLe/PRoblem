@@ -18,6 +18,12 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "projects:create": () => project,
     "projects:update": () => project,
     "projects:remove": () => null,
+    "projects:branches": () => [],
+    "reviews:list": () => [],
+    "reviews:create": () => {
+      throw new Error("not used");
+    },
+    "reviews:close": () => ({ note: null }),
     "dialog:pickFolder": async () => null,
     ...overrides,
   };

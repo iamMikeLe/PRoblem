@@ -3,12 +3,15 @@ import { join } from "node:path";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { dataDir } from "./config.ts";
 import { openDatabase } from "./db/database.ts";
+import { absolutePathOnly, loginShellPath } from "./env.ts";
 import type { Logger } from "./errors.ts";
+import { createGhClient } from "./git/gh.ts";
 import { createDispatcher } from "./ipc/dispatcher.ts";
 import { createHandlers } from "./ipc/handlers.ts";
 import { registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
 import { createProjectService } from "./projects/service.ts";
+import { createReviewService } from "./reviews/service.ts";
 import { createMainWindow } from "./window.ts";
 
 const log: Logger = {
@@ -25,6 +28,14 @@ if (!app.requestSingleInstanceLock()) {
 
 async function start(): Promise<void> {
   await app.whenReady();
+
+  // Started from Finder, the app would not find gh, git or claude installed outside /usr/bin.
+  if (app.isPackaged && process.platform === "darwin") {
+    const path = await loginShellPath();
+    if (path) process.env.PATH = path;
+  }
+  // Never resolve git or gh relative to a review's folder (see absolutePathOnly).
+  if (process.platform !== "win32") process.env.PATH = absolutePathOnly(process.env.PATH);
 
   const home = app.getPath("home");
   const dir = dataDir(process.env, home);
@@ -52,7 +63,17 @@ async function start(): Promise<void> {
   };
 
   const projects = createProjectService({ db, home, log });
-  registerIpc(ipcMain, createDispatcher(createHandlers({ projects, pickFolder }), log), source);
+  const reviews = createReviewService({
+    db,
+    worktreesDir: join(dir, "worktrees"),
+    gh: createGhClient(),
+    log,
+  });
+  registerIpc(
+    ipcMain,
+    createDispatcher(createHandlers({ projects, reviews, pickFolder }), log),
+    source,
+  );
 
   let window = createMainWindow(preload, source);
 

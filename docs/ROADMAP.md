@@ -34,12 +34,15 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 2: Review lifecycle (no Claude yet)
 
-- [ ] Git module: fetch, resolve branch/PR head, default base, merge base (argument-array spawns)
-- [ ] Create a review from a branch name or a GitHub PR URL (`gh pr view`), in an isolated
-      worktree or in the project checkout (refuse a dirty tree)
-- [ ] `reviews` table and IPC channels; list pane shows real reviews with status dots; delete placeholders
-- [ ] New review dialog (source, base, isolated checkbox remembered per project, prompt)
-- [ ] Close a review: confirm, remove its worktree, archive the record
+- [x] Git module: fetch, resolve branch/PR head, default base, merge base (argument-array spawns,
+      hooks disabled on checkout, ADR 0009)
+- [x] Create a review from a branch name or a GitHub PR URL (`gh pr view`), in an isolated
+      worktree or in the project checkout (detached; refuse a dirty tree; one per project)
+- [x] `reviews` table and IPC channels; list pane shows real reviews with status dots; delete placeholders
+- [x] New review dialog (source with branch autocomplete, base, isolated switch remembered per project, prompt)
+- [x] Close a review: confirm, remove its worktree or restore the project branch, archive the record
+- [x] Login-shell PATH for the packaged app, so `gh`/`git` from Homebrew are found
+- [ ] Link a branch review to its open PR automatically (moved to Phase 7)
 
 ## Phase 3: Claude sessions
 

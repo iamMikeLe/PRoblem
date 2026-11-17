@@ -39,7 +39,9 @@ flowchart LR
 | `src/main/ipc/dispatcher.ts` | Validate input → handler → `IpcResult` | no |
 | `src/main/ipc/handlers.ts` | Channel → use case | no |
 | `src/main/ipc/trust.ts` | Is this URL our own UI? | no |
-| `src/main/projects/`, `db/`, `git/` | Services, SQLite, git | no |
+| `src/main/projects/`, `reviews/` | Services (use cases) and their repositories | no |
+| `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
+| `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
 | `src/preload/index.ts` | `window.reviewroom` bridge | yes |
 | `src/renderer/` | React app | no (browser APIs) |
 
@@ -86,7 +88,9 @@ Single user, local machine, untrusted input (PR contents):
 - IPC: only contract channels; inputs validated; only our own frame may call.
 - Claude is read-only by default; the gate decides every tool call (ADR 0005).
 - PR checkouts never load their own Claude settings or MCP config.
-- No shell strings: every `git`/`gh` call is an argument array.
+- No shell strings: every `git`/`gh` call is an argument array; user input never reaches git as
+  an option (ADR 0009).
+- Checkouts of review code run with all git hooks disabled (ADR 0009).
 - Writing to a git host needs an explicit click per review.
 
 ## Decisions
@@ -101,3 +105,4 @@ Single user, local machine, untrusted input (PR contents):
 | [0006](adr/0006-sqlite-storage.md) | `node:sqlite` for persistence |
 | [0007](adr/0007-project-identity-and-review-prompt.md) | A project is its repository root; its review prompt is stored as text |
 | [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |
+| [0009](adr/0009-review-checkouts.md) | Isolated worktrees by default, detached in-place opt-in, no hooks on checkout |

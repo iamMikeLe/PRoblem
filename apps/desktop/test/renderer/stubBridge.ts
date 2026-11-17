@@ -9,6 +9,7 @@ import {
   ipcContract,
   ipcSchemas,
   type Project,
+  type Review,
   type ReviewRoomBridge,
 } from "@reviewroom/shared";
 
@@ -30,6 +31,30 @@ export function makeProject(id: string, name: string, overrides: Partial<Project
   };
 }
 
+const SHA = (c: string) => c.repeat(40);
+
+/** A review as the main process would return it, for seeding the stub. */
+export function makeReview(id: string, project: Project, overrides: Partial<Review> = {}): Review {
+  return {
+    id,
+    projectId: project.id,
+    title: `feature/${id}`,
+    source: { kind: "branch", branch: `feature/${id}` },
+    headBranch: `feature/${id}`,
+    headSha: SHA("a"),
+    baseBranch: "main",
+    baseSha: SHA("b"),
+    mergeBaseSha: SHA("c"),
+    workdir: `/home/me/.reviewroom/worktrees/${project.id}/${id}`,
+    isolated: true,
+    prompt: project.reviewPrompt,
+    status: "idle",
+    createdAt: "2026-11-17T10:00:00.000Z",
+    updatedAt: "2026-11-17T10:00:00.000Z",
+    ...overrides,
+  };
+}
+
 interface StubError {
   code: AppErrorCode;
   message: string;
@@ -37,6 +62,12 @@ interface StubError {
 
 interface StubState {
   projects: Project[];
+  reviews: Review[];
+  branches: string[];
+  /** Note returned when a review is closed. */
+  closeNote: string | null;
+  createReviewError?: StubError | undefined;
+  closeReviewError?: StubError | undefined;
   calls: StubCall[];
   /** What the native folder picker "chooses"; `null` = the user cancels. */
   pickedFolder: string | null;
@@ -57,11 +88,14 @@ const fail = (error: StubError): IpcResult<never> => ({ ok: false, error });
  * shared contract, so a test also fails when the UI sends something main would reject.
  * Remove it in `afterEach` with `removeBridge()`.
  */
-export function stubBridge(initial: Project[] = []): StubState {
+export function stubBridge(initial: Project[] = [], reviews: Review[] = []): StubState {
   const listeners = new Set<(event: AppEvent) => void>();
   let nextId = 1;
   const state: StubState = {
     projects: [...initial],
+    reviews: [...reviews],
+    branches: ["feature/login", "main", "release/1.0"],
+    closeNote: null,
     calls: [],
     pickedFolder: null,
     emit: (event) => {
@@ -108,6 +142,35 @@ export function stubBridge(initial: Project[] = []): StubState {
       }
       case "dialog:pickFolder":
         return ok(state.pickedFolder);
+      case "projects:branches":
+        return ok(state.branches);
+      case "reviews:list":
+        return ok([...state.reviews]);
+      case "reviews:create": {
+        if (state.createReviewError) return fail(state.createReviewError);
+        const input = ipcContract[channel].input.parse(raw);
+        const project = projects.find((p) => p.id === input.projectId);
+        if (!project) return fail({ code: "project_not_found", message: "Project not found" });
+        const review = makeReview(`r${nextId++}`, project, {
+          title: input.source,
+          headBranch: input.source,
+          source: { kind: "branch", branch: input.source },
+          baseBranch: input.base ?? "main",
+          isolated: input.isolated,
+          prompt: input.prompt,
+          createdAt: new Date().toISOString(),
+        });
+        state.reviews.unshift(review);
+        return ok(review);
+      }
+      case "reviews:close": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        const index = state.reviews.findIndex((r) => r.id === id);
+        if (index < 0) return fail({ code: "review_not_found", message: "Review not found" });
+        if (state.closeReviewError) return fail(state.closeReviewError);
+        state.reviews.splice(index, 1);
+        return ok({ note: state.closeNote });
+      }
     }
   }
 
