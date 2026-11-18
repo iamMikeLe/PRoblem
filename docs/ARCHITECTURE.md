@@ -40,7 +40,9 @@ flowchart LR
 | `src/main/ipc/handlers.ts` | Channel → use case | no |
 | `src/main/ipc/trust.ts` | Is this URL our own UI? | no |
 | `src/main/projects/`, `reviews/` | Services (use cases) and their repositories | no |
-| `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy | no |
+| `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy, `report_findings` MCP server | no |
+| `src/main/findings/` | Findings repository, report validation, verdicts and the note to Claude (ADR 0004) | no |
+| `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
 | `src/preload/index.ts` | `window.reviewroom` bridge | yes |
@@ -79,13 +81,16 @@ channel, validated by `AppEventSchema`.
    allows only read-only calls and denies the rest. Phase 5 adds approval cards and `needs-input`.
 6. The result message becomes a `turn-end` entry (cost, duration, error). The status becomes
    `idle`, or `failed`. Stop calls `interrupt()` and kills the turn if it does not end in 10 s.
-7. Phase 4: Claude calls `report_findings`; main assigns stable numbers, stores and broadcasts them.
+7. Claude calls `report_findings` (in-process MCP server, one per turn). Main checks the whole
+   report, assigns stable numbers, saves it in one transaction and broadcasts `review.findings`.
+   Verdicts the user changes go into the next message as a `[ReviewRoom]` note (ADR 0004).
 
 ## Storage
 
 `~/.reviewroom/` (override with `REVIEWROOM_HOME`):
 
-- `reviewroom.db`: projects, reviews, conversation entries (later findings, approvals); WAL mode
+- `reviewroom.db`: projects, reviews, conversation entries, findings, app settings (later
+  approvals); WAL mode
 - `worktrees/<project>/<review-id>/`: isolated checkouts
 
 ## Security model
@@ -97,6 +102,9 @@ Single user, local machine, untrusted input (PR contents):
 - Claude is read-only by default; the gate decides every tool call (ADR 0005, ADR 0010).
 - Claude sessions load only the user's settings: never a checkout's `.claude/`, `.mcp.json` or
   `CLAUDE.md` (a PR's hooks would run as shell commands).
+- What Claude reports is untrusted: finding paths must stay inside the checkout. The editor gets
+  only an absolute file path in a word of its own, with no shell. Presets never open the checkout
+  as a workspace (ADR 0011).
 - No shell strings: every `git`/`gh` call is an argument array; user input never reaches git as
   an option (ADR 0009).
 - Checkouts of review code run with all git hooks disabled (ADR 0009).
@@ -116,3 +124,4 @@ Single user, local machine, untrusted input (PR contents):
 | [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |
 | [0009](adr/0009-review-checkouts.md) | Isolated worktrees by default, detached in-place opt-in, no hooks on checkout |
 | [0010](adr/0010-claude-sessions.md) | Reviews drive the user's `claude`, one query per turn, read-only until Phase 5 |
+| [0011](adr/0011-open-in-editor.md) | Open `file:line` with an editor preset or template, split into words, no shell |

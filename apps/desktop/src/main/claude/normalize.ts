@@ -1,6 +1,7 @@
 import { isAbsolute, relative } from "node:path";
 import { type ConversationEntry, TOOL_TEXT_MAX } from "@reviewroom/shared";
 import { z } from "zod";
+import { REPORT_TOOL_NAME } from "./names.ts";
 
 /**
  * Turns Claude Agent SDK messages into what the app stores and shows. The SDK's message types are
@@ -101,6 +102,17 @@ export function summarizeToolCall(name: string, input: unknown, cwd: string): st
       return str(args.pattern) ?? name;
     case "Bash":
       return str(args.command)?.split("\n")[0] ?? name;
+    case REPORT_TOOL_NAME: {
+      const count = (key: string) => (Array.isArray(args[key]) ? args[key].length : 0);
+      const parts = [
+        [count("add"), "new"],
+        [count("update"), "updated"],
+        [count("withdraw"), "withdrawn"],
+      ]
+        .filter(([n]) => n !== 0)
+        .map(([n, word]) => `${n} ${word}`);
+      return `Findings: ${parts.length > 0 ? parts.join(", ") : "none"}`;
+    }
     default:
       return name;
   }

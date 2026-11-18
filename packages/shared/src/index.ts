@@ -4,3 +4,4 @@ export * from "./domain.ts";
 export * from "./events.ts";
 export * from "./ipc.ts";
 export * from "./prompts.ts";
+export * from "./settings.ts";

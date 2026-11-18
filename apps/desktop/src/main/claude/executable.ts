@@ -10,13 +10,17 @@ export function findExecutable(name: string, path: string | undefined): string |
   for (const dir of path.split(delimiter)) {
     if (!isAbsolute(dir)) continue;
     const candidate = join(dir, name);
-    try {
-      if (!statSync(candidate).isFile()) continue;
-      accessSync(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      // Not there or not executable: keep looking.
-    }
+    if (isExecutableFile(candidate)) return candidate;
   }
   return undefined;
+}
+
+export function isExecutableFile(path: string): boolean {
+  try {
+    if (!statSync(path).isFile()) return false;
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
 }

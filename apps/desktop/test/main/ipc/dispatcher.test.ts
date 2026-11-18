@@ -1,4 +1,4 @@
-import type { Project } from "@reviewroom/shared";
+import { DEFAULT_SETTINGS, type Project } from "@reviewroom/shared";
 import { describe, expect, it, vi } from "vitest";
 import { AppFailure, type Logger, silentLogger } from "../../../src/main/errors.ts";
 import { createDispatcher, type IpcHandlers } from "../../../src/main/ipc/dispatcher.ts";
@@ -28,6 +28,14 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "reviews:send": () => null,
     "reviews:stop": () => null,
     "claude:catalog": () => ({ models: [], commands: [] }),
+    "findings:list": () => [],
+    "findings:counts": () => ({}),
+    "findings:setVerdict": () => {
+      throw new Error("not used");
+    },
+    "settings:get": () => DEFAULT_SETTINGS,
+    "settings:update": () => DEFAULT_SETTINGS,
+    "editor:open": () => null,
     "dialog:pickFolder": async () => null,
     ...overrides,
   };

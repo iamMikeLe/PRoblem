@@ -13,7 +13,8 @@ import {
 } from "@fluentui/react-components";
 import { SendRegular, StopRegular } from "@fluentui/react-icons";
 import type { ClaudeCatalog, Review, ReviewStatus } from "@reviewroom/shared";
-import { type KeyboardEvent, useId, useState } from "react";
+import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
+import { useDraft } from "./drafts.ts";
 import { useCatalog, useSendMessage, useStopReview } from "./queries.ts";
 import { isBusy } from "./store.ts";
 
@@ -76,13 +77,18 @@ export function matchCommands(text: string, catalog: ClaudeCatalog | undefined) 
 interface Props {
   review: Pick<Review, "id" | "model">;
   status: ReviewStatus;
+  /** Focus the message box when mounted (after "Ask about #N"), with the cursor at the end. */
+  autoFocus?: boolean;
+  /** Called once the message box took focus because of `autoFocus`. */
+  onFocused?: () => void;
 }
 
 /** Message box under the conversation. Enter sends, Shift+Enter adds a line, `/` lists commands. */
-export function Composer({ review, status }: Props) {
+export function Composer({ review, status, autoFocus = false, onFocused }: Props) {
   const styles = useStyles();
   const listId = useId();
-  const [text, setText] = useState("");
+  const input = useRef<HTMLTextAreaElement>(null);
+  const [text, setText] = useDraft(review.id);
   const [model, setModel] = useState<string | null>(review.model);
   const [active, setActive] = useState(0);
   const [dismissed, setDismissed] = useState<string>();
@@ -90,6 +96,15 @@ export function Composer({ review, status }: Props) {
   const send = useSendMessage();
   const stop = useStopReview();
   const busy = isBusy(status);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the composer mounts
+  useEffect(() => {
+    const element = input.current;
+    if (!autoFocus || !element) return;
+    element.focus();
+    element.setSelectionRange(element.value.length, element.value.length);
+    onFocused?.();
+  }, []);
 
   const suggestions = dismissed === text ? [] : matchCommands(text, catalog.data);
   const activeIndex = Math.min(active, Math.max(suggestions.length - 1, 0));
@@ -171,6 +186,7 @@ export function Composer({ review, status }: Props) {
       )}
       <div className={styles.row}>
         <Textarea
+          textarea={{ ref: input }}
           className={styles.input}
           resize="vertical"
           value={text}

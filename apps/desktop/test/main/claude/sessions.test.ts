@@ -14,6 +14,8 @@ import {
 } from "../../../src/main/claude/sessions.ts";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
+import { insertFinding, setVerdict } from "../../../src/main/findings/repository.ts";
+import { createFindingsService } from "../../../src/main/findings/service.ts";
 import { insertProject } from "../../../src/main/projects/repository.ts";
 import { getReviewRecord, insertReview } from "../../../src/main/reviews/repository.ts";
 
@@ -156,6 +158,7 @@ describe("session service", () => {
       db,
       runQuery,
       broadcast: (event) => events.push(event),
+      findings: createFindingsService({ db, broadcast: (event) => events.push(event) }),
       claudePath: () => "/usr/local/bin/claude",
       log: silentLogger,
       ...overrides,
@@ -237,7 +240,7 @@ describe("session service", () => {
     expect(getReviewRecord(db, review.id)?.review.model).toBe("opus");
   });
 
-  it("runs every turn read-only: own tools only, no project settings, no MCP, gate on every call", async () => {
+  it("runs every turn read-only: own tools only, no project settings, only the app's MCP server, gate on every call", async () => {
     const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()] }));
     service(claude.runQuery).start(review);
     await settle();
@@ -250,9 +253,10 @@ describe("session service", () => {
       permissionMode: "default",
       settingSources: ["user"],
       strictMcpConfig: true,
-      mcpServers: {},
       settings: { disableAllHooks: false },
     });
+    expect(Object.keys(options?.mcpServers ?? {})).toEqual(["reviewroom"]);
+    expect(options?.mcpServers?.reviewroom).toMatchObject({ type: "sdk", name: "reviewroom" });
     expect(options?.env?.GIT_LFS_SKIP_SMUDGE).toBe("1");
 
     const gate: HookCallback | undefined = options?.hooks?.PreToolUse?.[0]?.hooks[0];
@@ -280,6 +284,12 @@ describe("session service", () => {
     expect(await ask("Bash", { command: "rm -rf ." })).toMatchObject({
       hookSpecificOutput: { permissionDecision: "deny" },
     });
+    expect(await ask("mcp__reviewroom__report_findings", { add: [] })).toMatchObject({
+      hookSpecificOutput: { permissionDecision: "allow" },
+    });
+    expect(await ask("mcp__other__report_findings", {})).toMatchObject({
+      hookSpecificOutput: { permissionDecision: "deny" },
+    });
     expect(await ask("Write", { file_path: join(dir, "x"), content: "" })).toMatchObject({
       hookSpecificOutput: { permissionDecision: "deny" },
     });
@@ -290,6 +300,90 @@ describe("session service", () => {
         { signal: new AbortController().signal, toolUseID: "t", requestId: "r" },
       ),
     ).toMatchObject({ behavior: "deny" });
+  });
+
+  it("tells Claude about verdicts changed since the last message, once", async () => {
+    const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()] }));
+    const sessions = service(claude.runQuery);
+    sessions.start(review);
+    await settle();
+    const at = new Date("2026-11-18T10:00:00.000Z");
+    const content = {
+      severity: "major",
+      file: null,
+      line: null,
+      problem: "p",
+      suggestion: "s",
+    } as const;
+    insertFinding(db, review.id, { ...content, title: "Retries never stop" }, at);
+    insertFinding(db, review.id, { ...content, title: "Missing test" }, at);
+    insertFinding(db, review.id, { ...content, title: "Unchanged" }, at);
+    setVerdict(db, review.id, 1, "dismissed", at);
+    setVerdict(db, review.id, 2, "accepted", at);
+
+    sessions.send({ id: review.id, text: "Anything else?", model: null });
+    await settle();
+    sessions.send({ id: review.id, text: "Thanks", model: null });
+    await settle();
+
+    expect(claude.turns[1]?.prompt).toBe(
+      '[ReviewRoom] Since my last message I have:\n- dismissed #1 "Retries never stop"\n- accepted #2 "Missing test"\n\nAnything else?',
+    );
+    expect(claude.turns[2]?.prompt).toBe("Thanks");
+  });
+
+  it("keeps an untold verdict when the message is refused as busy", async () => {
+    const claude = fakeClaude((turn) => ({
+      messages: [sdk.init(), sdk.success()],
+      hold: turn === 0,
+    }));
+    const sessions = service(claude.runQuery);
+    sessions.start(review);
+    await vi.waitFor(() => expect(claude.turns).toHaveLength(1));
+    const at = new Date("2026-11-18T10:00:00.000Z");
+    insertFinding(
+      db,
+      review.id,
+      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      at,
+    );
+    setVerdict(db, review.id, 1, "dismissed", at);
+
+    expect(() => sessions.send({ id: review.id, text: "Hi", model: null })).toThrow(AppFailure);
+    claude.turns[0]?.release();
+    await settle();
+    sessions.send({ id: review.id, text: "Hi", model: null });
+    await settle();
+    expect(claude.turns[1]?.prompt).toContain('dismissed #1 "Typo"');
+  });
+
+  it("tells Claude again when the message with the note was stopped before Claude started", async () => {
+    const claude = fakeClaude((turn) => ({
+      messages: [sdk.init(), sdk.success()],
+      hold: turn === 0,
+    }));
+    const sessions = service(claude.runQuery, { maxConcurrent: 1 });
+    const other = addReview("r2");
+    sessions.start(other); // occupies the only slot, so r1's next turn waits in the queue
+    await vi.waitFor(() => expect(claude.turns).toHaveLength(1));
+    const at = new Date("2026-11-18T10:00:00.000Z");
+    insertFinding(
+      db,
+      review.id,
+      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      at,
+    );
+    setVerdict(db, review.id, 1, "dismissed", at);
+
+    sessions.send({ id: review.id, text: "First", model: null });
+    await sessions.stop(review.id);
+    claude.turns[0]?.release();
+    await vi.waitFor(() => expect(status(other.id)).toBe("idle"));
+
+    sessions.send({ id: review.id, text: "Second", model: null });
+    await settle();
+    expect(claude.turns[1]?.prompt).toContain('dismissed #1 "Typo"');
+    expect(claude.turns[1]?.prompt).toContain("Second");
   });
 
   it("refuses a message while a turn is running", async () => {
@@ -351,6 +445,7 @@ describe("session service", () => {
       db,
       runQuery: claude.runQuery,
       broadcast: () => {},
+      findings: createFindingsService({ db, broadcast: () => {} }),
       claudePath: () => undefined,
       log: silentLogger,
     });

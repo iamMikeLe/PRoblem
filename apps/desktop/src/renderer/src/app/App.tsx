@@ -14,6 +14,7 @@ import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
 import { useProjects } from "../features/projects/queries.ts";
 import { NewReviewDialog } from "../features/reviews/NewReviewDialog.tsx";
 import { useReviews } from "../features/reviews/queries.ts";
+import { SettingsPage } from "../features/settings/SettingsPage.tsx";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
@@ -72,6 +73,8 @@ export function App() {
           <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
           <ProjectDetail project={selectedProject} onRemoved={() => setProjectId(undefined)} />
         </>
+      ) : section === "settings" ? (
+        <SettingsPage />
       ) : (
         <>
           <ListPane

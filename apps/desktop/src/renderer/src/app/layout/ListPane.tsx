@@ -12,7 +12,8 @@ import {
   useArrowNavigationGroup,
 } from "@fluentui/react-components";
 import { ComposeRegular, FolderAddRegular } from "@fluentui/react-icons";
-import type { Project, Review } from "@reviewroom/shared";
+import type { FindingCounts, Project, Review } from "@reviewroom/shared";
+import { useFindingCounts } from "../../features/findings/queries.ts";
 import { describeReview, formatAge } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
 import { useListItemStyles } from "./listItemStyles.ts";
@@ -46,6 +47,7 @@ const useStyles = makeStyles({
     columnGap: tokens.spacingHorizontalM,
   },
   text: { display: "flex", flexDirection: "column", minWidth: 0 },
+  blockers: { color: tokens.colorPaletteRedForeground1 },
   status: { padding: tokens.spacingHorizontalL },
   empty: {
     display: "flex",
@@ -82,6 +84,7 @@ export function ListPane({
   const item = useListItemStyles();
   const arrowNavigation = useArrowNavigationGroup({ axis: "vertical", memorizeCurrent: true });
   const byProject = Map.groupBy(reviews, (review) => review.projectId);
+  const counts = useFindingCounts();
 
   return (
     <aside className={styles.root} aria-label="Reviews">
@@ -148,6 +151,7 @@ export function ListPane({
                     <Text size={200} className={mergeClasses(item.ellipsis, item.muted)}>
                       {describeReview(review)}
                     </Text>
+                    <FindingsLine counts={counts.data?.[review.id]} />
                   </span>
                   <Text size={200} className={item.muted}>
                     {formatAge(review.createdAt)}
@@ -159,5 +163,23 @@ export function ListPane({
         })}
       </div>
     </aside>
+  );
+}
+
+/** "4 open · 1 blocker" under a review; nothing when it has no open findings. */
+function FindingsLine({ counts }: { counts: FindingCounts | undefined }) {
+  const styles = useStyles();
+  const item = useListItemStyles();
+  if (!counts || counts.open === 0) return null;
+  return (
+    <Text size={200} className={mergeClasses(item.ellipsis, item.muted)}>
+      {counts.open} open
+      {counts.blockers > 0 && (
+        <span className={styles.blockers}>
+          {" "}
+          · {counts.blockers} {counts.blockers === 1 ? "blocker" : "blockers"}
+        </span>
+      )}
+    </Text>
   );
 }

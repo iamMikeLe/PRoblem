@@ -10,6 +10,9 @@ import {
   type SendMessageRequest,
 } from "@reviewroom/shared";
 import { AppFailure, type Logger } from "../errors.ts";
+import { verdictNote } from "../findings/report.ts";
+import { markVerdictsTold, untoldVerdicts, type VerdictChange } from "../findings/repository.ts";
+import type { FindingsService } from "../findings/service.ts";
 import {
   getReviewRecord,
   listInterruptedReviews,
@@ -17,6 +20,8 @@ import {
   updateOpenReview,
 } from "../reviews/repository.ts";
 import { appendEntry, listEntries } from "./entries.ts";
+import { findingsServer } from "./findingsTool.ts";
+import { FINDINGS_SERVER } from "./names.ts";
 import { toSignals } from "./normalize.ts";
 import { decideToolUse, REVIEW_TOOLS } from "./policy.ts";
 import { firstTurnPrompt, REVIEW_SYSTEM_APPEND } from "./prompt.ts";
@@ -35,6 +40,8 @@ export interface SessionServiceDeps {
   db: DatabaseSync;
   runQuery: RunQuery;
   broadcast: (event: AppEvent) => void;
+  /** Saves what Claude reports through `report_findings`. */
+  findings: Pick<FindingsService, "report">;
   /** Path of the `claude` executable, or `undefined` when Claude Code is not installed. */
   claudePath: () => string | undefined;
   log: Logger;
@@ -105,7 +112,13 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
   const stopTimeoutMs = deps.stopTimeoutMs ?? 10_000;
 
   const running = new Map<string, Turn>();
-  const queue: { reviewId: string; prompt: string }[] = [];
+  /** `told`: verdicts the prompt tells Claude about, marked as told once the turn has started. */
+  interface QueuedTurn {
+    reviewId: string;
+    prompt: string;
+    told: readonly VerdictChange[];
+  }
+  const queue: QueuedTurn[] = [];
   let catalog = FALLBACK_CATALOG;
   let catalogRequested = false;
   /** Set by `shutdown()`: the database is about to close, `recover()` handles the rest next start. */
@@ -189,8 +202,13 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       // settings: a pull request could ship `.claude/settings.json` with hooks that run commands.
       permissionMode: "default",
       settingSources: ["user"],
+      // Only the app's own server: report_findings, bound to this review (ADR 0004).
       strictMcpConfig: true,
-      mcpServers: {},
+      mcpServers: {
+        [FINDINGS_SERVER]: findingsServer((input) =>
+          deps.findings.report(review.id, review.workdir, input),
+        ),
+      },
       hooks: { PreToolUse: [{ hooks: [gate] }] },
       // Anything that still reaches a permission prompt is refused: there is nobody to ask yet.
       canUseTool: async () => ({
@@ -216,7 +234,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     message,
   });
 
-  async function runTurn(reviewId: string, prompt: string): Promise<void> {
+  async function runTurn({ reviewId, prompt, told }: QueuedTurn): Promise<void> {
     let finish!: () => void;
     const turn: Turn = {
       abort: new AbortController(),
@@ -244,6 +262,8 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       for await (const message of query) {
         for (const signal of toSignals(message, review.workdir)) {
           if (signal.type === "session") {
+            // Claude has the message now; a stopped or failed start keeps the note for next time.
+            if (told.length > 0 && !closing) markVerdictsTold(db, reviewId, told);
             if (signal.sessionId !== review.sessionId) {
               patch(reviewId, { sessionId: signal.sessionId });
               broadcast({ type: "review.session", reviewId, sessionId: signal.sessionId });
@@ -299,7 +319,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     while (running.size < maxConcurrent) {
       const next = queue.shift();
       if (!next) return;
-      void runTurn(next.reviewId, next.prompt);
+      void runTurn(next);
     }
   }
 
@@ -312,11 +332,11 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     }
   }
 
-  function enqueue(reviewId: string, text: string): void {
+  function enqueue(reviewId: string, text: string, told: readonly VerdictChange[] = []): void {
     assertIdle(reviewId);
     record(reviewId, { kind: "user", text });
     setStatus(reviewId, "queued");
-    queue.push({ reviewId, prompt: text });
+    queue.push({ reviewId, prompt: text, told });
     pump();
   }
 
@@ -336,7 +356,10 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       const review = openReview(id);
       assertIdle(id);
       if (model !== review.model) patch(id, { model });
-      enqueue(id, text);
+      // Tell Claude which findings the user accepted or dismissed since the last message.
+      const told = untoldVerdicts(db, id);
+      const note = verdictNote(told);
+      enqueue(id, note ? `${note}\n\n${text}` : text, told);
     },
 
     async stop(reviewId) {

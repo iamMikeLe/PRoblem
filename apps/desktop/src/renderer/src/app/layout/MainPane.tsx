@@ -11,12 +11,15 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DismissRegular } from "@fluentui/react-icons";
-import type { Review } from "@reviewroom/shared";
+import type { Finding, Review } from "@reviewroom/shared";
 import { useState } from "react";
 import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";
+import { useDrafts } from "../../features/conversation/drafts.ts";
 import { useConversation } from "../../features/conversation/queries.ts";
 import { useReviewStatus } from "../../features/conversation/store.ts";
+import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
+import { useFindingCounts } from "../../features/findings/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
@@ -64,6 +67,7 @@ const useStyles = makeStyles({
     borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
   mono: { fontFamily: tokens.fontFamilyMonospace },
+  count: { marginInlineStart: tokens.spacingHorizontalXS },
   path: {
     fontFamily: tokens.fontFamilyMonospace,
     overflow: "hidden",
@@ -80,7 +84,15 @@ const useStyles = makeStyles({
 });
 
 /** The Conversation tab: transcript plus composer. Keyed by review, so drafts and scroll reset. */
-function ConversationTab({ review }: { review: Review }) {
+function ConversationTab({
+  review,
+  autoFocus,
+  onFocused,
+}: {
+  review: Review;
+  autoFocus: boolean;
+  onFocused: () => void;
+}) {
   const status = useReviewStatus(review);
   const { entries, live, error, isLoading } = useConversation(review.id);
   return (
@@ -90,7 +102,7 @@ function ConversationTab({ review }: { review: Review }) {
       ) : (
         <Conversation entries={entries} live={live} status={status} loading={isLoading} />
       )}
-      <Composer review={review} status={status} />
+      <Composer review={review} status={status} autoFocus={autoFocus} onFocused={onFocused} />
     </>
   );
 }
@@ -104,6 +116,10 @@ export function MainPane({ review, onClosed }: Props) {
   const styles = useStyles();
   const [tab, setTab] = useState<ReviewTab>("conversation");
   const [closing, setClosing] = useState(false);
+  // The review of an "Ask about #N": its composer takes focus once, then this is cleared.
+  const [asking, setAsking] = useState<string>();
+  const setDraft = useDrafts((state) => state.setDraft);
+  const counts = useFindingCounts();
 
   if (!review) {
     return (
@@ -117,6 +133,16 @@ export function MainPane({ review, onClosed }: Props) {
     );
   }
 
+  const openCount = counts.data?.[review.id]?.open ?? 0;
+  const ask = (finding: Finding) => {
+    const prefix = `About #${finding.number} (${finding.title}): `;
+    setDraft(review.id, (current) =>
+      current.startsWith(prefix) ? current : `${prefix}${current}`,
+    );
+    setAsking(review.id);
+    setTab("conversation");
+  };
+
   return (
     <main className={styles.root}>
       <div className={styles.header}>
@@ -128,11 +154,21 @@ export function MainPane({ review, onClosed }: Props) {
           className={styles.tabs}
           selectedValue={tab}
           onTabSelect={(_, data) => {
-            if (isReviewTab(data.value)) setTab(data.value);
+            if (isReviewTab(data.value)) {
+              setAsking(undefined);
+              setTab(data.value);
+            }
           }}
         >
           <Tab value="conversation">Conversation</Tab>
-          <Tab value="findings">Findings</Tab>
+          <Tab value="findings">
+            Findings
+            {openCount > 0 && (
+              <Badge className={styles.count} size="small" appearance="tint" color="brand">
+                {openCount}
+              </Badge>
+            )}
+          </Tab>
           <Tab value="changes">Changes</Tab>
           <Tab value="comments">PR comments</Tab>
         </TabList>
@@ -156,7 +192,18 @@ export function MainPane({ review, onClosed }: Props) {
         </Tooltip>
       </div>
       {tab === "conversation" ? (
-        <ConversationTab key={review.id} review={review} />
+        <ConversationTab
+          key={review.id}
+          review={review}
+          autoFocus={asking === review.id}
+          onFocused={() => setAsking(undefined)}
+        />
+      ) : tab === "findings" ? (
+        <>
+          <FindingsTab key={review.id} reviewId={review.id} onAsk={ask} />
+          {/* The last grid row holds the composer on the Conversation tab. */}
+          <div />
+        </>
       ) : (
         <>
           <div className={styles.body}>

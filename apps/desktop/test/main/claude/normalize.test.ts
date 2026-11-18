@@ -155,6 +155,11 @@ describe("SDK message normalization", () => {
       "retry in src",
     );
     expect(summarizeToolCall("Bash", { command: "git log\n--stat" }, CWD)).toBe("git log");
+    const report = "mcp__reviewroom__report_findings";
+    expect(summarizeToolCall(report, { add: [{}, {}], withdraw: [{}] }, CWD)).toBe(
+      "Findings: 2 new, 1 withdrawn",
+    );
+    expect(summarizeToolCall(report, {}, CWD)).toBe("Findings: none");
     expect(summarizeToolCall("Read", { file_path: "/etc/hosts" }, CWD)).toBe("/etc/hosts");
     expect(summarizeToolCall("Mystery", {}, CWD)).toBe("Mystery");
   });

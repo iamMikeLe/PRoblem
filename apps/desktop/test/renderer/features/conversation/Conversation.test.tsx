@@ -1,6 +1,7 @@
 import type { ConversationEntry, StoredEntry } from "@reviewroom/shared";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { useDrafts } from "../../../../src/renderer/src/features/conversation/drafts.ts";
 import { useConversationStore } from "../../../../src/renderer/src/features/conversation/store.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "../../stubBridge.ts";
@@ -48,6 +49,7 @@ describe("Conversation", () => {
     cleanup();
     removeBridge();
     useConversationStore.setState({ entries: {}, live: {}, statuses: {} });
+    useDrafts.setState({ drafts: {} });
   });
 
   it("shows the stored transcript: messages, markdown, tool cards and the turn summary", async () => {

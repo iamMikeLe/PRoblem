@@ -1,8 +1,15 @@
 import { z } from "zod";
 import type { IpcChannel } from "./channels.ts";
 import { ClaudeCatalogSchema, StoredEntrySchema } from "./conversation.ts";
-import { ProjectSchema, ReviewSchema } from "./domain.ts";
+import {
+  FindingCountsSchema,
+  FindingSchema,
+  ProjectSchema,
+  ReviewSchema,
+  VerdictSchema,
+} from "./domain.ts";
 import type { AppEvent } from "./events.ts";
+import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
 /**
  * The contract between the renderer and the Electron main process (ADR 0008).
@@ -40,6 +47,10 @@ export const AppErrorCodeSchema = z.enum([
   "ignored_files_at_risk",
   "review_busy",
   "claude_unavailable",
+  "finding_not_found",
+  "file_not_found",
+  "editor_not_found",
+  "editor_failed",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -121,6 +132,22 @@ export const SendMessageRequestSchema = z.strictObject({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 
+export const SetVerdictRequestSchema = z.strictObject({
+  id: ReviewIdSchema,
+  number: z.number().int().positive(),
+  verdict: VerdictSchema,
+});
+export type SetVerdictRequest = z.infer<typeof SetVerdictRequestSchema>;
+
+export const OpenInEditorRequestSchema = z.strictObject({
+  /** The review whose folder the file is in. */
+  id: ReviewIdSchema,
+  /** Relative to the review's folder. */
+  file: z.string().min(1).max(PROJECT_PATH_MAX),
+  line: z.number().int().positive().nullable(),
+});
+export type OpenInEditorRequest = z.infer<typeof OpenInEditorRequestSchema>;
+
 export const ipcContract = {
   "projects:list": { input: z.undefined(), output: z.array(ProjectSchema) },
   "projects:create": { input: CreateProjectRequestSchema, output: ProjectSchema },
@@ -152,6 +179,22 @@ export const ipcContract = {
   "reviews:stop": { input: z.strictObject({ id: ReviewIdSchema }), output: z.null() },
   /** Models and slash commands for the composer (known after the first turn of any review). */
   "claude:catalog": { input: z.undefined(), output: ClaudeCatalogSchema },
+  /** Findings of a review, by number (withdrawn ones included). */
+  "findings:list": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: z.array(FindingSchema),
+  },
+  /** Open findings and blockers of every open review, by review id (for the list pane). */
+  "findings:counts": {
+    input: z.undefined(),
+    output: z.record(z.string(), FindingCountsSchema),
+  },
+  /** The user accepts, dismisses or reopens a finding. */
+  "findings:setVerdict": { input: SetVerdictRequestSchema, output: FindingSchema },
+  "settings:get": { input: z.undefined(), output: AppSettingsSchema },
+  "settings:update": { input: UpdateSettingsRequestSchema, output: AppSettingsSchema },
+  /** Opens a file of a review in the user's editor (the command from the settings). */
+  "editor:open": { input: OpenInEditorRequestSchema, output: z.null() },
   /** Opens the native folder picker; `null` when the user cancels. */
   "dialog:pickFolder": { input: z.undefined(), output: z.string().nullable() },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;

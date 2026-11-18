@@ -1,18 +1,24 @@
 import {
+  type AppSettings,
   type ClaudeCatalog,
   type CloseReviewResult,
   type CreateProjectRequest,
   type CreateReviewRequest,
+  type Finding,
+  type FindingCounts,
   type IpcChannel,
   type IpcInput,
   type IpcOutput,
   ipcSchemas,
+  type OpenInEditorRequest,
   type Project,
   type Review,
   type ReviewRoomBridge,
   type SendMessageRequest,
+  type SetVerdictRequest,
   type StoredEntry,
   type UpdateProjectRequest,
+  type UpdateSettingsRequest,
 } from "@reviewroom/shared";
 
 /** A failed call to the main process, with the contract's error code. */
@@ -71,6 +77,22 @@ export const api = {
   },
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
+  },
+  findings: {
+    list: (id: string): Promise<Finding[]> => call("findings:list", { id }),
+    counts: (): Promise<Record<string, FindingCounts>> => call("findings:counts", undefined),
+    setVerdict: (request: SetVerdictRequest): Promise<Finding> =>
+      call("findings:setVerdict", request),
+  },
+  settings: {
+    get: (): Promise<AppSettings> => call("settings:get", undefined),
+    update: (request: UpdateSettingsRequest): Promise<AppSettings> =>
+      call("settings:update", request),
+  },
+  editor: {
+    open: async (request: OpenInEditorRequest): Promise<void> => {
+      await call("editor:open", request);
+    },
   },
   dialog: {
     pickFolder: (): Promise<string | null> => call("dialog:pickFolder", undefined),

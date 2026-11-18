@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
+import { REPORT_TOOL_NAME } from "./names.ts";
 
 /**
  * The read-only review policy (ADR 0005, interim form until approvals arrive in Phase 5).
@@ -413,6 +414,9 @@ export function decideToolUse(toolName: string, input: unknown, workdir: string)
         ? { allow: true, updatedInput: { ...args, ...decision.updatedInput } }
         : decision;
     }
+    case REPORT_TOOL_NAME:
+      // The app's own tool: it only saves findings, and checks its input itself (ADR 0004).
+      return { allow: true };
     default:
       return deny(`${toolName} is not available in a review. ${READ_ONLY_HINT}`);
   }

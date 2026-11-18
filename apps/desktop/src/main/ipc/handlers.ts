@@ -1,4 +1,7 @@
+import type { AppSettings, UpdateSettingsRequest } from "@reviewroom/shared";
 import type { SessionService } from "../claude/sessions.ts";
+import type { EditorOpener } from "../editor/open.ts";
+import type { FindingsService } from "../findings/service.ts";
 import type { ProjectService } from "../projects/service.ts";
 import type { ReviewService } from "../reviews/service.ts";
 import type { IpcHandlers } from "./dispatcher.ts";
@@ -7,6 +10,9 @@ export interface HandlerDeps {
   projects: ProjectService;
   reviews: ReviewService;
   sessions: SessionService;
+  findings: FindingsService;
+  settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
+  editor: EditorOpener;
   /** Shows the native folder picker; resolves with the chosen folder or `null`. */
   pickFolder: () => Promise<string | null>;
 }
@@ -16,6 +22,9 @@ export function createHandlers({
   projects,
   reviews,
   sessions,
+  findings,
+  settings,
+  editor,
   pickFolder,
 }: HandlerDeps): IpcHandlers {
   return {
@@ -52,6 +61,15 @@ export function createHandlers({
       return null;
     },
     "claude:catalog": () => sessions.catalog(),
+    "findings:list": ({ id }) => findings.list(id),
+    "findings:counts": () => findings.counts(),
+    "findings:setVerdict": (input) => findings.setVerdict(input),
+    "settings:get": () => settings.get(),
+    "settings:update": (input) => settings.update(input),
+    "editor:open": async (input) => {
+      await editor.open(input);
+      return null;
+    },
     "dialog:pickFolder": () => pickFolder(),
   };
 }

@@ -80,4 +80,33 @@ export const migrations: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    version: 5,
+    name: "findings_and_settings",
+    sql: `
+      -- Findings Claude reported through report_findings; \`number\` is assigned by the app (ADR 0004).
+      CREATE TABLE findings (
+        review_id      TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+        number         INTEGER NOT NULL CHECK (number > 0),
+        severity       TEXT NOT NULL CHECK (severity IN ('blocker', 'major', 'minor', 'nit')),
+        title          TEXT NOT NULL,
+        file           TEXT,
+        line           INTEGER CHECK (line > 0),
+        problem        TEXT NOT NULL,
+        suggestion     TEXT NOT NULL,
+        verdict        TEXT NOT NULL DEFAULT 'open' CHECK (verdict IN ('open', 'accepted', 'dismissed')),
+        changed_since_verdict INTEGER NOT NULL DEFAULT 0,
+        withdrawn_reason TEXT,
+        -- The verdict Claude was last told about; differs from \`verdict\` until the next message.
+        verdict_told   TEXT NOT NULL DEFAULT 'open',
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        PRIMARY KEY (review_id, number)
+      ) WITHOUT ROWID;
+      CREATE TABLE app_settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

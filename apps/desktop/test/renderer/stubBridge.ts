@@ -1,8 +1,11 @@
 import {
   type AppErrorCode,
   type AppEvent,
+  type AppSettings,
   type ClaudeCatalog,
   DEFAULT_REVIEW_PROMPT,
+  DEFAULT_SETTINGS,
+  type Finding,
   type IpcChannel,
   type IpcInput,
   type IpcOutput,
@@ -34,6 +37,30 @@ export function makeProject(id: string, name: string, overrides: Partial<Project
 }
 
 const SHA = (c: string) => c.repeat(40);
+
+/** A finding as the main process would return it, for seeding the stub. */
+export function makeFinding(
+  reviewId: string,
+  number: number,
+  overrides: Partial<Finding> = {},
+): Finding {
+  return {
+    reviewId,
+    number,
+    severity: "major",
+    title: `Finding ${number}`,
+    file: "src/app.ts",
+    line: 10 * number,
+    problem: `Problem of finding ${number}.`,
+    suggestion: `Fix finding ${number}.`,
+    verdict: "open",
+    changedSinceVerdict: false,
+    withdrawnReason: null,
+    createdAt: "2026-11-18T10:00:00.000Z",
+    updatedAt: "2026-11-18T10:00:00.000Z",
+    ...overrides,
+  };
+}
 
 /** A review as the main process would return it, for seeding the stub. */
 export function makeReview(id: string, project: Project, overrides: Partial<Review> = {}): Review {
@@ -77,6 +104,10 @@ interface StubState {
   entries: Record<string, StoredEntry[]>;
   catalog: ClaudeCatalog;
   sendError?: StubError | undefined;
+  /** Findings by review id. */
+  findings: Record<string, Finding[]>;
+  settings: AppSettings;
+  editorError?: StubError | undefined;
   /** What the native folder picker "chooses"; `null` = the user cancels. */
   pickedFolder: string | null;
   /** When set, the matching call fails with this error. */
@@ -106,6 +137,8 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     closeNote: null,
     calls: [],
     entries: {},
+    findings: {},
+    settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
         { value: "opus", displayName: "Opus", description: "Most capable" },
@@ -209,6 +242,37 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         return ok(null);
       case "claude:catalog":
         return ok(state.catalog);
+      case "findings:list": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(state.findings[id] ?? []);
+      }
+      case "findings:counts": {
+        const counts = Object.entries(state.findings).map(([id, list]) => {
+          const open = list.filter((f) => f.verdict === "open" && f.withdrawnReason === null);
+          return [
+            id,
+            { open: open.length, blockers: open.filter((f) => f.severity === "blocker").length },
+          ];
+        });
+        return ok(Object.fromEntries(counts));
+      }
+      case "findings:setVerdict": {
+        const { id, number, verdict } = ipcContract[channel].input.parse(raw);
+        const list = state.findings[id] ?? [];
+        const current = list.find((f) => f.number === number);
+        if (!current) return fail({ code: "finding_not_found", message: "Finding not found" });
+        const updated = { ...current, verdict, changedSinceVerdict: false };
+        state.findings[id] = list.map((f) => (f.number === number ? updated : f));
+        return ok(updated);
+      }
+      case "settings:get":
+        return ok(state.settings);
+      case "settings:update":
+        state.settings = ipcContract[channel].input.parse(raw);
+        return ok(state.settings);
+      case "editor:open":
+        ipcContract[channel].input.parse(raw);
+        return state.editorError ? fail(state.editorError) : ok(null);
     }
   }
 

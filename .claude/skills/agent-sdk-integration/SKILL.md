@@ -56,25 +56,22 @@ it is out of date. Decisions are in ADR 0010.
 
 Claude reports findings by calling a tool, not by printing JSON:
 
-```ts
-const findingsServer = createSdkMcpServer({
-  name: "reviewroom",
-  version: "1.0.0",
-  tools: [
-    tool("report_findings", "Create, update or withdraw review findings.", ReportFindingsInputShape,
-      async (input) => {
-        const saved = upsertFindings(db, reviewId, input); // main assigns stable numbers
-        broadcast({ type: "review.findings", reviewId, findings: saved });
-        return { content: [{ type: "text", text: summarize(saved) }] };
-      }),
-  ],
-});
-```
-
-- New findings get the next free number from the main process; updates reference an existing number.
-  Claude never chooses a number, so `#3` always means the same finding.
-- The system prompt appendix tells Claude to call `report_findings` at the end of every turn in
-  which its view of the findings changed.
+- `claude/findingsTool.ts`: `findingsServer(report)` = `createSdkMcpServer` with one
+  `tool("report_findings", …, ReportShape, handler)`. It is created per turn in `optionsFor`,
+  bound to the review, and is the only entry in `mcpServers` (`strictMcpConfig: true`). Its
+  tool name `mcp__reviewroom__report_findings` (`claude/names.ts`) is allowed by the policy.
+  Needs the peer `@modelcontextprotocol/sdk`.
+- `findings/report.ts`: `ReportShape` (`add` / `update` by number / `withdraw` with reason) and
+  `applyReport`. It checks everything first, then saves in one transaction, or saves nothing and
+  returns a text that tells Claude what to fix. Numbers are `MAX+1` per review; Claude never
+  picks one. Paths are relative to the repository root, at most 200 findings per review, and
+  titles are one line.
+- Verdicts belong to the user. When Claude updates a finding that already has a verdict, it is
+  marked `changedSinceVerdict`. Verdicts changed since the last message are prepended to the next
+  message (`verdictNote`). The queue item carries them, and they are marked as told on the turn's
+  `session` signal.
+- The system prompt appendix (`REVIEW_SYSTEM_APPEND`) tells Claude when to call the tool.
+- Test the handler directly: `reportFindingsTool(report).handler(input, {})`.
 
 ## Permission gate (ADR 0005)
 

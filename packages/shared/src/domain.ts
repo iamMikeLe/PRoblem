@@ -67,25 +67,40 @@ export type Review = z.infer<typeof ReviewSchema>;
 export const SeveritySchema = z.enum(["blocker", "major", "minor", "nit"]);
 export type Severity = z.infer<typeof SeveritySchema>;
 
+/** The user's decision on a finding. */
 export const VerdictSchema = z.enum(["open", "accepted", "dismissed"]);
 export type Verdict = z.infer<typeof VerdictSchema>;
 
 /**
  * A finding keeps its `number` for the life of the review. Claude reports findings through the
- * `report_findings` MCP tool; the main process owns numbering, so a number never changes meaning.
+ * `report_findings` MCP tool; the main process owns numbering, so a number never changes meaning
+ * (ADR 0004).
  */
 export const FindingSchema = z.object({
   reviewId: z.string(),
   number: z.number().int().positive(),
   severity: SeveritySchema,
   title: z.string().min(1),
-  file: z.string().optional(),
-  line: z.number().int().positive().optional(),
+  /** Path relative to the review's folder; `null` for a finding about the change as a whole. */
+  file: z.string().nullable(),
+  line: z.number().int().positive().nullable(),
+  /** Markdown. */
   problem: z.string(),
+  /** Markdown. */
   suggestion: z.string(),
   verdict: VerdictSchema,
-  /** Set when Claude itself withdraws the finding (e.g. after new commits). */
-  withdrawn: z.boolean(),
+  /** Claude changed the finding after the user gave a verdict, so it may need another look. */
+  changedSinceVerdict: z.boolean(),
+  /** Set when Claude withdrew the finding (for example after new commits), with its reason. */
+  withdrawnReason: z.string().nullable(),
+  createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
 export type Finding = z.infer<typeof FindingSchema>;
+
+/** Counts for the list pane: findings still open (not withdrawn), and open blockers. */
+export const FindingCountsSchema = z.object({
+  open: z.number().int().nonnegative(),
+  blockers: z.number().int().nonnegative(),
+});
+export type FindingCounts = z.infer<typeof FindingCountsSchema>;

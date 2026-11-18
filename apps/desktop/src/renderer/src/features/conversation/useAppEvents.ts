@@ -1,6 +1,7 @@
 import { parseAppEvent } from "@reviewroom/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { findingCountsKey, findingsKey } from "../findings/queries.ts";
 import { reviewsKey } from "../reviews/queries.ts";
 import { catalogKey } from "./queries.ts";
 import { useConversationStore } from "./store.ts";
@@ -18,6 +19,10 @@ export function useAppEvents(): void {
       if (!event) return;
       receive(event);
       if (event.type === "review.session") void client.invalidateQueries({ queryKey: reviewsKey });
+      if (event.type === "review.findings") {
+        client.setQueryData(findingsKey(event.reviewId), event.findings);
+        void client.invalidateQueries({ queryKey: findingCountsKey });
+      }
       // Models and commands load during a turn; pick them up once one has ended.
       if (event.type === "review.entry" && event.entry.entry.kind === "turn-end") {
         void client.invalidateQueries({ queryKey: catalogKey });

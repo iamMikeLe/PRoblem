@@ -57,11 +57,12 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 4: Findings
 
-- [ ] `report_findings` MCP tool with stable numbers assigned by the main process (ADR 0004)
-- [ ] Findings tab: Fluent DataGrid with severity, title, location, verdict; filter by verdict
-- [ ] Accept / dismiss / reopen; "Ask about #N" prefills the composer
-- [ ] Open `file:line` in the editor (configurable command template), in the review's workdir
-- [ ] Findings count and blockers in the list pane subtitle
+- [x] `report_findings` MCP tool with stable numbers assigned by the main process (ADR 0004)
+- [x] Findings tab: Fluent DataGrid with severity, title, location, verdict; filter by verdict
+- [x] Accept / dismiss / reopen; "Ask about #N" prefills the composer
+- [x] Open `file:line` in the editor: presets or a custom command template, no shell (ADR 0011)
+- [x] Claude is told about verdicts on the next message; Settings page for the editor
+- [x] Findings count and blockers in the list pane subtitle
 
 ## Phase 5: Permission gate
 
