@@ -1,4 +1,4 @@
-import type { AppEvent, ReviewStatus, StoredEntry } from "@reviewroom/shared";
+import type { AppEvent, PendingApproval, ReviewStatus, StoredEntry } from "@reviewroom/shared";
 import { create } from "zustand";
 
 /**
@@ -12,6 +12,10 @@ interface ConversationState {
   live: Record<string, string>;
   /** Latest status from events; the review list's status is used until one arrives. */
   statuses: Record<string, ReviewStatus>;
+  /** Tool calls waiting for the user, by review id, oldest first. */
+  approvals: Record<string, PendingApproval[]>;
+  /** Replaces all pending approvals (loaded at startup and after a page reload). */
+  loadApprovals(approvals: PendingApproval[]): void;
   receive(event: AppEvent): void;
   /** Merges a loaded transcript with entries that arrived as events in the meantime. */
   load(reviewId: string, entries: StoredEntry[]): void;
@@ -33,6 +37,7 @@ export const useConversationStore = create<ConversationState>()((set) => ({
   entries: {},
   live: {},
   statuses: {},
+  approvals: {},
 
   receive: (event) =>
     set((state) => {
@@ -62,9 +67,33 @@ export const useConversationStore = create<ConversationState>()((set) => ({
           };
         case "review.status":
           return { statuses: { ...state.statuses, [event.reviewId]: event.status } };
+        case "review.approval": {
+          const { reviewId, id } = event.approval;
+          const current = state.approvals[reviewId] ?? [];
+          if (current.some((approval) => approval.id === id)) return {};
+          return { approvals: { ...state.approvals, [reviewId]: [...current, event.approval] } };
+        }
+        case "review.approvalDone": {
+          const current = state.approvals[event.reviewId] ?? [];
+          return {
+            approvals: {
+              ...state.approvals,
+              [event.reviewId]: current.filter((approval) => approval.id !== event.id),
+            },
+          };
+        }
         default:
           return {};
       }
+    }),
+
+  loadApprovals: (approvals) =>
+    set(() => {
+      const byReview: Record<string, PendingApproval[]> = {};
+      for (const approval of approvals) {
+        byReview[approval.reviewId] = [...(byReview[approval.reviewId] ?? []), approval];
+      }
+      return { approvals: byReview };
     }),
 
   load: (reviewId, entries) =>
@@ -81,3 +110,10 @@ export function useReviewStatus(review: { id: string; status: ReviewStatus }): R
 /** Whether Claude is working on the review (or waiting to). */
 export const isBusy = (status: ReviewStatus): boolean =>
   status === "queued" || status === "running" || status === "needs-input";
+
+const NO_APPROVALS: PendingApproval[] = [];
+
+/** Tool calls of a review that wait for the user. */
+export function usePendingApprovals(reviewId: string): PendingApproval[] {
+  return useConversationStore((state) => state.approvals[reviewId] ?? NO_APPROVALS);
+}

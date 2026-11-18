@@ -1,19 +1,44 @@
-import { realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import type { Grant } from "./grants.ts";
 import { REPORT_TOOL_NAME } from "./names.ts";
 
 /**
- * The read-only review policy (ADR 0005, interim form until approvals arrive in Phase 5).
- * Every tool call goes through `decideToolUse`; anything not explicitly allowed is denied, and the
- * reason is shown to Claude so it can carry on with the tools it has. An allowed call may come
- * back with a rewritten input (`updatedInput`) that adds safety options.
+ * The permission gate of a review (ADR 0005, ADR 0012). Every tool call goes through
+ * `decideToolUse`, which allows it, refuses it, or asks the user through an approval card.
+ * Only reading inside the review's folder, plain read-only git commands and the app's own
+ * `report_findings` run without asking (plus edits in fix mode, and what the user allowed for the
+ * review). An allowed git command may come back rewritten (`updatedInput`) with safety options.
  */
 export type ToolDecision =
   | { allow: true; updatedInput?: Record<string, unknown> }
   | { allow: false; reason: string };
 
-/** Built-in tools a review session gets at all (`tools` option); the policy narrows them further. */
-export const REVIEW_TOOLS = ["Read", "Grep", "Glob", "Bash"] as const;
+export type GateDecision =
+  | { kind: "allow"; updatedInput?: Record<string, unknown> }
+  | { kind: "deny"; reason: string }
+  /** `grant`: what "Allow for this review" would store; `null` = only "Allow once" is offered. */
+  | { kind: "ask"; reason: string; grant: Grant | null };
+
+export interface GateContext {
+  workdir: string;
+  /** Fix mode: edits inside `workdir` run without asking. */
+  fixMode: boolean;
+  /** Whether the user allowed exactly this for the review ("Allow for this review"). */
+  granted: (grant: Grant) => boolean;
+}
+
+/** Built-in tools a review session gets at all (`tools` option); the gate decides each call. */
+export const REVIEW_TOOLS = [
+  "Read",
+  "Grep",
+  "Glob",
+  "Bash",
+  "Edit",
+  "Write",
+  "WebFetch",
+  "WebSearch",
+] as const;
 
 /**
  * What each allowed git subcommand may be given. This is an allowlist on purpose: git accepts
@@ -349,26 +374,50 @@ export function decideBashCommand(command: string): ToolDecision {
   };
 }
 
-/** Resolves symlinks, so a link inside the checkout cannot point Read at a file outside it. */
-function realpathOrSelf(path: string): string {
+/**
+ * Resolves symlinks of the deepest part of `path` that exists, then appends the rest. A file that
+ * does not exist yet (Write) under a symlinked folder is thereby placed where it would really go.
+ */
+function realpathDeep(path: string): string | undefined {
+  let existing = path;
+  const rest: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(existing), ...rest);
+    } catch {
+      // It exists but cannot be resolved: a symlink to nowhere (or a loop). A write through it
+      // would create its target, wherever that is, so it never counts as inside.
+      if (lstatOrUndefined(existing)) return undefined;
+      const parent = dirname(existing);
+      if (parent === existing) return path;
+      rest.unshift(basename(existing));
+      existing = parent;
+    }
+  }
+}
+
+function lstatOrUndefined(path: string) {
   try {
-    return realpathSync(path);
+    return lstatSync(path);
   } catch {
-    return path;
+    return undefined;
   }
 }
 
 /**
  * Whether `path` (absolute, or relative to `workdir`) stays inside `workdir` once resolved, and
- * outside its `.git` (an in-place review's `.git/config` may hold credentials in remote URLs).
+ * outside any `.git` folder (an in-place review's `.git/config` may hold credentials in remote
+ * URLs, and a file in `.git/hooks` would run on the next git command).
  */
 export function isInside(workdir: string, path: string): boolean {
   if (path.startsWith("~")) return false;
-  const root = realpathOrSelf(workdir);
-  const target = realpathOrSelf(resolve(workdir, path));
+  const root = realpathDeep(workdir);
+  const target = realpathDeep(resolve(workdir, path));
+  if (root === undefined || target === undefined) return false;
   const rel = relative(root, target);
+  if (rel === "") return true;
   if (rel.startsWith("..") || isAbsolute(rel)) return false;
-  return rel.split(/[\\/]/)[0] !== ".git";
+  return !rel.split(/[\\/]/).some((part) => part.toLowerCase() === ".git");
 }
 
 /** A glob pattern must be relative and must not climb out of its folder. */
@@ -381,43 +430,105 @@ function stringArgument(input: Record<string, unknown>, key: string): string | u
   return typeof value === "string" && value !== "" ? value : undefined;
 }
 
-export function decideToolUse(toolName: string, input: unknown, workdir: string): ToolDecision {
+const allow = (updatedInput?: Record<string, unknown>): GateDecision =>
+  updatedInput ? { kind: "allow", updatedInput } : { kind: "allow" };
+const refuse = (reason: string): GateDecision => ({ kind: "deny", reason });
+const ask = (reason: string, grant: Grant | null = null): GateDecision => ({
+  kind: "ask",
+  reason,
+  grant,
+});
+
+/** Quotes a value for a POSIX shell. */
+function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+/** `git sub …` → `git -C '<workdir>' sub …`. */
+function pinToFolder(command: string, workdir: string): string {
+  return `git -C ${shellQuote(workdir)} ${command.replace(/^git\s+/, "")}`;
+}
+
+/** Asks, unless the user already allowed exactly this for the review. */
+function askUnlessGranted(context: GateContext, reason: string, grant: Grant): GateDecision {
+  return context.granted(grant) ? allow() : ask(reason, grant);
+}
+
+export function decideToolUse(
+  toolName: string,
+  input: unknown,
+  context: GateContext,
+): GateDecision {
+  const { workdir } = context;
   const args =
     typeof input === "object" && input !== null && !Array.isArray(input)
       ? Object.fromEntries(Object.entries(input))
       : {};
-  const path = (key: string): ToolDecision | undefined => {
+  const outsidePath = (key: string): string | undefined => {
     const value = stringArgument(args, key);
-    return value !== undefined && !isInside(workdir, value)
-      ? deny(`${value} is outside the review's folder.`)
-      : undefined;
+    return value !== undefined && !isInside(workdir, value) ? value : undefined;
   };
-  const pattern = (key: string): ToolDecision | undefined => {
+  const escapingPatternOf = (key: string): string | undefined => {
     const value = stringArgument(args, key);
-    return value !== undefined && escapingPattern(value)
-      ? deny(`The pattern ${value} reaches outside the review's folder; use a relative pattern.`)
-      : undefined;
+    return value !== undefined && escapingPattern(value) ? value : undefined;
   };
+  const OUTSIDE = "It reads outside the review's folder.";
 
   switch (toolName) {
-    case "Read":
-      return path("file_path") ?? { allow: true };
+    case "Read": {
+      const outside = outsidePath("file_path");
+      return outside === undefined
+        ? allow()
+        : askUnlessGranted(context, OUTSIDE, { tool: "Read", scope: outside });
+    }
     case "Grep":
-      return path("path") ?? pattern("glob") ?? { allow: true };
+      return outsidePath("path") === undefined && escapingPatternOf("glob") === undefined
+        ? allow()
+        : ask(OUTSIDE);
     case "Glob":
-      return path("path") ?? pattern("pattern") ?? { allow: true };
+      return outsidePath("path") === undefined && escapingPatternOf("pattern") === undefined
+        ? allow()
+        : ask(OUTSIDE);
     case "Bash": {
       const command = args.command;
-      if (typeof command !== "string") return deny("Missing command.");
+      if (typeof command !== "string" || command.trim() === "") return refuse("Missing command.");
       const decision = decideBashCommand(command);
-      return decision.allow && decision.updatedInput
-        ? { allow: true, updatedInput: { ...args, ...decision.updatedInput } }
-        : decision;
+      if (decision.allow) {
+        // Pinned to the review's folder: an earlier approved `cd` must not move these unasked
+        // git commands into another repository.
+        const checked = decision.updatedInput?.command;
+        const git = typeof checked === "string" ? checked : command.trim();
+        return allow({ ...args, command: pinToFolder(git, workdir) });
+      }
+      return askUnlessGranted(context, "It runs a command that is not a read-only git command.", {
+        tool: "Bash",
+        scope: command,
+      });
     }
+    case "Edit":
+    case "Write": {
+      const path = stringArgument(args, "file_path");
+      if (path === undefined) return refuse("Missing file_path.");
+      if (!isInside(workdir, path)) {
+        return refuse(
+          "Edits are only possible inside the review's folder, and never in .git. The call was refused.",
+        );
+      }
+      if (context.fixMode) return allow();
+      return askUnlessGranted(context, "It changes a file, and fix mode is off.", {
+        tool: toolName,
+        scope: path,
+      });
+    }
+    case "WebFetch":
+      // Always asks: a prompt-injected URL could carry data out of the checkout.
+      return ask("It fetches a web page; the URL can carry data out.");
+    case "WebSearch":
+      return ask("It searches the web; the query can carry data out.");
     case REPORT_TOOL_NAME:
       // The app's own tool: it only saves findings, and checks its input itself (ADR 0004).
-      return { allow: true };
+      return allow();
     default:
-      return deny(`${toolName} is not available in a review. ${READ_ONLY_HINT}`);
+      return refuse(`${toolName} is not available in a review.`);
   }
 }

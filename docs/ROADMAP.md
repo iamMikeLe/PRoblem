@@ -66,12 +66,12 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 5: Permission gate
 
-- [ ] `PreToolUse` gate: read-only tools and allowlisted read-only Bash run; the rest asks (ADR 0005)
-- [ ] Approval cards in the conversation: Allow once / Allow for this review / Deny with message
-- [ ] `needs-input` status, a native notification and dock badge when a review waits for you
-- [ ] Untrusted PR checkouts never load their own `.claude/` or `.mcp.json`
-- [ ] Fix mode per review: allow edits inside the workdir only
-- [ ] Security audit of the whole gate (`security-auditor`)
+- [x] `PreToolUse` gate: read-only tools and allowlisted read-only Bash run; the rest asks (ADR 0005)
+- [x] Approval cards in the conversation: Allow once / Allow for this review / Deny with message
+- [x] `needs-input` status, a native notification and dock badge when a review waits for you
+- [x] Untrusted PR checkouts never load their own `.claude/` or `.mcp.json`
+- [x] Fix mode per review: allow edits inside the workdir only
+- [x] Security audit of the whole gate: 2 high, 1 medium, 3 low found and fixed (ADR 0012)
 
 ## Phase 6: Changes view
 

@@ -83,7 +83,7 @@ export function ToolCallCard({
         <AccordionHeader size="small">
           <span className={styles.header}>
             <ResultIcon result={result} pending={pending} />
-            <span className={styles.name}>{displayName(call.name)}</span>
+            <span className={styles.name}>{toolDisplayName(call.name)}</span>
             <span className={styles.summary} title={call.summary}>
               {call.summary}
             </span>
@@ -105,6 +105,6 @@ export function ToolCallCard({
 }
 
 /** MCP tools are named `mcp__<server>__<tool>`; the card shows the tool's own name. */
-function displayName(name: string): string {
+export function toolDisplayName(name: string): string {
   return name.match(/^mcp__.+?__(.+)$/)?.[1] ?? name;
 }

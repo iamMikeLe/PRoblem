@@ -100,6 +100,15 @@ export function summarizeToolCall(name: string, input: unknown, cwd: string): st
     }
     case "Glob":
       return str(args.pattern) ?? name;
+    case "Edit":
+    case "Write": {
+      const path = str(args.file_path);
+      return path ? shortPath(path) : name;
+    }
+    case "WebFetch":
+      return str(args.url) ?? name;
+    case "WebSearch":
+      return str(args.query) ?? name;
     case "Bash":
       return str(args.command)?.split("\n")[0] ?? name;
     case REPORT_TOOL_NAME: {

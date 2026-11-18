@@ -56,6 +56,12 @@ export function createHandlers({
       sessions.send(input);
       return null;
     },
+    "reviews:setFixMode": ({ id, fixMode }) => sessions.setFixMode(id, fixMode),
+    "approvals:list": () => sessions.approvals(),
+    "approvals:decide": (input) => {
+      sessions.decide(input);
+      return null;
+    },
     "reviews:stop": async ({ id }) => {
       await sessions.stop(id);
       return null;

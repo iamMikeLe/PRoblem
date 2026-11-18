@@ -27,6 +27,11 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "reviews:events": () => [],
     "reviews:send": () => null,
     "reviews:stop": () => null,
+    "reviews:setFixMode": () => {
+      throw new Error("not used");
+    },
+    "approvals:list": () => [],
+    "approvals:decide": () => null,
     "claude:catalog": () => ({ models: [], commands: [] }),
     "findings:list": () => [],
     "findings:counts": () => ({}),

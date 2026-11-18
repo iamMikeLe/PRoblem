@@ -59,6 +59,8 @@ export const ReviewSchema = z.object({
   sessionId: z.string().nullable(),
   /** Model chosen for this review; `null` = Claude Code's default. */
   model: z.string().nullable(),
+  /** Fix mode: Claude may edit files inside `workdir` without asking (ADR 0012). Off by default. */
+  fixMode: z.boolean(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

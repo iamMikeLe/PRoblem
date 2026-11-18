@@ -29,6 +29,7 @@ const RowSchema = z.object({
   status: z.string(),
   session_id: z.string().nullable(),
   model: z.string().nullable(),
+  fix_mode: z.number(),
   restore_branch: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -56,6 +57,7 @@ function toRecord(raw: unknown): ReviewRecord {
     status: row.status,
     sessionId: row.session_id,
     model: row.model,
+    fixMode: row.fix_mode === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -64,7 +66,7 @@ function toRecord(raw: unknown): ReviewRecord {
 
 const COLUMNS = `id, project_id, title, source_kind, pr_url, pr_number, pr_repo, head_branch,
   head_sha, base_branch, base_sha, merge_base_sha, workdir, isolated, prompt, status,
-  session_id, model, restore_branch, created_at, updated_at, closed_at`;
+  session_id, model, fix_mode, restore_branch, created_at, updated_at, closed_at`;
 
 /** Open reviews of all projects, newest first. */
 export function listOpenReviews(db: DatabaseSync): Review[] {
@@ -99,7 +101,7 @@ export function countOpenReviews(db: DatabaseSync, projectId: string): number {
 export function insertReview(db: DatabaseSync, review: Review, restoreBranch: string | null): void {
   const pr = review.source.kind === "pull-request" ? review.source : undefined;
   db.prepare(
-    `INSERT INTO reviews (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    `INSERT INTO reviews (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
   ).run(
     review.id,
     review.projectId,
@@ -119,6 +121,7 @@ export function insertReview(db: DatabaseSync, review: Review, restoreBranch: st
     review.status,
     review.sessionId,
     review.model,
+    review.fixMode ? 1 : 0,
     restoreBranch,
     review.createdAt,
     review.updatedAt,
@@ -139,6 +142,7 @@ export type ReviewSessionPatch = Partial<{
   status: ReviewStatus;
   sessionId: string;
   model: string | null;
+  fixMode: boolean;
 }>;
 
 /** Updates an open review; returns the updated review, or `undefined` if it is closed or gone. */
@@ -149,7 +153,7 @@ export function updateOpenReview(
   now = new Date(),
 ): Review | undefined {
   const sets: string[] = ["updated_at = ?"];
-  const values: (string | null)[] = [now.toISOString()];
+  const values: (string | number | null)[] = [now.toISOString()];
   if (patch.status !== undefined) {
     sets.push("status = ?");
     values.push(patch.status);
@@ -161,6 +165,10 @@ export function updateOpenReview(
   if (patch.model !== undefined) {
     sets.push("model = ?");
     values.push(patch.model);
+  }
+  if (patch.fixMode !== undefined) {
+    sets.push("fix_mode = ?");
+    values.push(patch.fixMode ? 1 : 0);
   }
   const result = db
     .prepare(`UPDATE reviews SET ${sets.join(", ")} WHERE id = ? AND closed_at IS NULL`)

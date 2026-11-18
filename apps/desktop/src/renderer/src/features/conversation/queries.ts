@@ -1,4 +1,4 @@
-import type { SendMessageRequest } from "@reviewroom/shared";
+import type { DecideApprovalRequest, SendMessageRequest } from "@reviewroom/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "../../lib/api.ts";
@@ -39,4 +39,35 @@ export function useStopReview() {
 /** Models and slash commands; refreshed when a session starts (see `useAppEvents`). */
 export function useCatalog() {
   return useQuery({ queryKey: catalogKey, queryFn: () => api.claude.catalog() });
+}
+
+/**
+ * Loads the pending approvals of all reviews into the store (once per page load); events keep
+ * them current after that.
+ */
+export function useLoadApprovals() {
+  const loadApprovals = useConversationStore((state) => state.loadApprovals);
+  const query = useQuery({
+    queryKey: ["approvals"],
+    queryFn: () => api.approvals.list(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  useEffect(() => {
+    if (query.data) loadApprovals(query.data);
+  }, [query.data, loadApprovals]);
+}
+
+export function useDecideApproval() {
+  return useMutation({
+    mutationFn: (request: DecideApprovalRequest) => api.approvals.decide(request),
+  });
+}
+
+export function useSetFixMode() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, fixMode }: { id: string; fixMode: boolean }) =>
+      api.reviews.setFixMode(id, fixMode),
+    onSuccess: () => client.invalidateQueries({ queryKey: reviewsKey }),
+  });
 }

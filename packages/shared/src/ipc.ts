@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { IpcChannel } from "./channels.ts";
-import { ClaudeCatalogSchema, StoredEntrySchema } from "./conversation.ts";
+import {
+  ApprovalDecisionSchema,
+  ClaudeCatalogSchema,
+  PendingApprovalSchema,
+  StoredEntrySchema,
+} from "./conversation.ts";
 import {
   FindingCountsSchema,
   FindingSchema,
@@ -51,6 +56,7 @@ export const AppErrorCodeSchema = z.enum([
   "file_not_found",
   "editor_not_found",
   "editor_failed",
+  "approval_not_found",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -132,6 +138,17 @@ export const SendMessageRequestSchema = z.strictObject({
 });
 export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
 
+export const APPROVAL_MESSAGE_MAX = 2000;
+
+export const DecideApprovalRequestSchema = z.strictObject({
+  reviewId: ReviewIdSchema,
+  id: z.string().min(1),
+  decision: ApprovalDecisionSchema,
+  /** Optional reason sent to Claude with a denial. */
+  message: z.string().trim().max(APPROVAL_MESSAGE_MAX).optional(),
+});
+export type DecideApprovalRequest = z.infer<typeof DecideApprovalRequestSchema>;
+
 export const SetVerdictRequestSchema = z.strictObject({
   id: ReviewIdSchema,
   number: z.number().int().positive(),
@@ -177,6 +194,15 @@ export const ipcContract = {
   "reviews:send": { input: SendMessageRequestSchema, output: z.null() },
   /** Stops the running or queued turn of a review (no-op when idle). */
   "reviews:stop": { input: z.strictObject({ id: ReviewIdSchema }), output: z.null() },
+  /** Turns fix mode on or off; applies from the next tool call. */
+  "reviews:setFixMode": {
+    input: z.strictObject({ id: ReviewIdSchema, fixMode: z.boolean() }),
+    output: ReviewSchema,
+  },
+  /** Tool calls of all reviews that wait for the user. */
+  "approvals:list": { input: z.undefined(), output: z.array(PendingApprovalSchema) },
+  /** Answers an approval card. Fails with `approval_not_found` once it was answered or expired. */
+  "approvals:decide": { input: DecideApprovalRequestSchema, output: z.null() },
   /** Models and slash commands for the composer (known after the first turn of any review). */
   "claude:catalog": { input: z.undefined(), output: ClaudeCatalogSchema },
   /** Findings of a review, by number (withdrawn ones included). */

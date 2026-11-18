@@ -7,6 +7,7 @@ import {
   makeStyles,
   mergeClasses,
   Option,
+  Switch,
   Textarea,
   Tooltip,
   tokens,
@@ -15,7 +16,7 @@ import { SendRegular, StopRegular } from "@fluentui/react-icons";
 import type { ClaudeCatalog, Review, ReviewStatus } from "@reviewroom/shared";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useDraft } from "./drafts.ts";
-import { useCatalog, useSendMessage, useStopReview } from "./queries.ts";
+import { useCatalog, useSendMessage, useSetFixMode, useStopReview } from "./queries.ts";
 import { isBusy } from "./store.ts";
 
 const DEFAULT_MODEL = "__default__";
@@ -75,7 +76,7 @@ export function matchCommands(text: string, catalog: ClaudeCatalog | undefined) 
 }
 
 interface Props {
-  review: Pick<Review, "id" | "model">;
+  review: Pick<Review, "id" | "model" | "fixMode">;
   status: ReviewStatus;
   /** Focus the message box when mounted (after "Ask about #N"), with the cursor at the end. */
   autoFocus?: boolean;
@@ -95,6 +96,9 @@ export function Composer({ review, status, autoFocus = false, onFocused }: Props
   const catalog = useCatalog();
   const send = useSendMessage();
   const stop = useStopReview();
+  const setFixMode = useSetFixMode();
+  // Shown at once; the review list catches up when the call returns.
+  const fixMode = setFixMode.isPending ? setFixMode.variables.fixMode : review.fixMode;
   const busy = isBusy(status);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: only when the composer mounts
@@ -179,6 +183,11 @@ export function Composer({ review, status, autoFocus = false, onFocused }: Props
           ))}
         </div>
       )}
+      {setFixMode.error && (
+        <MessageBar intent="error">
+          <MessageBarBody>{setFixMode.error.message}</MessageBarBody>
+        </MessageBar>
+      )}
       {send.error && (
         <MessageBar intent="error">
           <MessageBarBody>{send.error.message}</MessageBarBody>
@@ -246,7 +255,21 @@ export function Composer({ review, status, autoFocus = false, onFocused }: Props
             </Option>
           ))}
         </Dropdown>
-        <Caption1 className={styles.hint}>Read-only review · Shift+Enter for a new line</Caption1>
+        <Tooltip
+          relationship="description"
+          content="Fix mode: Claude may edit files in this review's folder without asking. Edits outside it are always refused."
+        >
+          <Switch
+            label="Fix mode"
+            checked={fixMode}
+            disabled={setFixMode.isPending}
+            onChange={(_, data) => setFixMode.mutate({ id: review.id, fixMode: data.checked })}
+          />
+        </Tooltip>
+        <Caption1 className={styles.hint}>
+          {fixMode ? "Edits run without asking" : "Edits and commands ask first"} · Shift+Enter for
+          a new line
+        </Caption1>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@reviewroom/shared";
-import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { findExecutable } from "./claude/executable.ts";
 import { createSessionService } from "./claude/sessions.ts";
 import { dataDir } from "./config.ts";
@@ -95,6 +95,23 @@ async function start(): Promise<void> {
     findings,
     claudePath: () => findExecutable("claude", process.env.PATH),
     log,
+    // A review waits for an approval: tell the user if they are looking elsewhere (ADR 0012).
+    notify: (approval, reviewTitle) => {
+      if (BrowserWindow.getFocusedWindow() || !Notification.isSupported()) return;
+      const notification = new Notification({
+        title: `${reviewTitle} needs your approval`,
+        // Not the request itself: that text comes from Claude and is shown in full on the card.
+        body: `Claude wants to use ${approval.toolName}.`,
+      });
+      notification.on("click", () => {
+        if (window.isMinimized()) window.restore();
+        window.show();
+        window.focus();
+        broadcast({ type: "app.showReview", reviewId: approval.reviewId });
+      });
+      notification.show();
+    },
+    attention: (waiting) => app.setBadgeCount(waiting),
   });
   sessions.recover();
   registerIpc(

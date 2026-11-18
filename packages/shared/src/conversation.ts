@@ -8,6 +8,28 @@ import { z } from "zod";
 /** Long tool inputs and outputs are cut to this many characters before they are stored. */
 export const TOOL_TEXT_MAX = 20_000;
 
+/** What the user can answer on an approval card. */
+export const ApprovalDecisionSchema = z.enum(["allow-once", "allow-review", "deny"]);
+export type ApprovalDecision = z.infer<typeof ApprovalDecisionSchema>;
+
+/** A tool call waiting for the user. Lives in memory only: an app restart ends the turn. */
+export const PendingApprovalSchema = z.object({
+  id: z.string(),
+  reviewId: z.string(),
+  toolUseId: z.string(),
+  toolName: z.string(),
+  /** One line, e.g. the command. */
+  summary: z.string(),
+  /** The full input, pretty-printed and cut to `TOOL_TEXT_MAX`. */
+  detail: z.string(),
+  /** Why the app asks, e.g. "Reads a file outside the review's folder." */
+  reason: z.string(),
+  /** Whether "Allow for this review" is offered (exact Bash commands and paths only). */
+  canAllowForReview: z.boolean(),
+  requestedAt: z.iso.datetime(),
+});
+export type PendingApproval = z.infer<typeof PendingApprovalSchema>;
+
 export const ConversationEntrySchema = z.discriminatedUnion("kind", [
   /** A message the user sent (the first one is the filled-in review prompt). */
   z.object({ kind: z.literal("user"), text: z.string() }),
@@ -27,6 +49,16 @@ export const ConversationEntrySchema = z.discriminatedUnion("kind", [
     toolUseId: z.string(),
     isError: z.boolean(),
     output: z.string(),
+  }),
+  /** The user (or the end of the turn) answered an approval card (ADR 0012). */
+  z.object({
+    kind: z.literal("approval"),
+    toolUseId: z.string(),
+    toolName: z.string(),
+    summary: z.string(),
+    decision: ApprovalDecisionSchema.or(z.literal("expired")),
+    /** The user's message to Claude with a denial. */
+    message: z.string().nullable(),
   }),
   /** A turn ended. */
   z.object({

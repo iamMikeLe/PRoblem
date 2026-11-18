@@ -155,6 +155,12 @@ describe("SDK message normalization", () => {
       "retry in src",
     );
     expect(summarizeToolCall("Bash", { command: "git log\n--stat" }, CWD)).toBe("git log");
+    expect(summarizeToolCall("Edit", { file_path: "/work/review/src/a.ts" }, CWD)).toBe("src/a.ts");
+    expect(summarizeToolCall("Write", { file_path: "/etc/x" }, CWD)).toBe("/etc/x");
+    expect(summarizeToolCall("WebFetch", { url: "https://example.com/?q=1" }, CWD)).toBe(
+      "https://example.com/?q=1",
+    );
+    expect(summarizeToolCall("WebSearch", { query: "retry backoff" }, CWD)).toBe("retry backoff");
     const report = "mcp__reviewroom__report_findings";
     expect(summarizeToolCall(report, { add: [{}, {}], withdraw: [{}] }, CWD)).toBe(
       "Findings: 2 new, 1 withdrawn",

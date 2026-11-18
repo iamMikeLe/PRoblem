@@ -8,6 +8,7 @@ import {
   useToastController,
 } from "@fluentui/react-components";
 import { useState } from "react";
+import { useLoadApprovals } from "../features/conversation/queries.ts";
 import { useAppEvents } from "../features/conversation/useAppEvents.ts";
 import { ProjectDetail } from "../features/projects/ProjectDetail.tsx";
 import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
@@ -34,7 +35,12 @@ const useStyles = makeStyles({
 export function App() {
   const styles = useStyles();
   const [section, setSection] = useState<RailSection>("reviews");
-  useAppEvents();
+  const [reviewId, setReviewId] = useState<string>();
+  useAppEvents((id) => {
+    setSection("reviews");
+    setReviewId(id);
+  });
+  useLoadApprovals();
   const projects = useProjects();
   const reviews = useReviews();
   const [creating, setCreating] = useState(false);
@@ -42,7 +48,6 @@ export function App() {
   const { dispatchToast } = useToastController(toasterId);
 
   // Selections fall back to the first item, so a closed review or removed project never leaves a blank.
-  const [reviewId, setReviewId] = useState<string>();
   const reviewList = reviews.data ?? [];
   const selectedReview = reviewList.find((review) => review.id === reviewId) ?? reviewList[0];
   const [projectId, setProjectId] = useState<string>();

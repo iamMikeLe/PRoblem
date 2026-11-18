@@ -18,3 +18,19 @@ export function describeTurnEnd(end: TurnEnd): string {
   if (end.costUsd !== null) parts.push(`$${end.costUsd.toFixed(2)}`);
   return parts.join(" · ");
 }
+
+type Approval = Extract<ConversationEntry, { kind: "approval" }>;
+
+const DECISION_LABEL: Record<Approval["decision"], string> = {
+  "allow-once": "You allowed once",
+  "allow-review": "You allowed for this review",
+  deny: "You denied",
+  // The turn was stopped, or Claude Code withdrew the request (e.g. a newer one replaced it).
+  expired: "Withdrawn before you answered",
+};
+
+/** The line an answered approval card leaves in the transcript. */
+export function describeApproval(approval: Approval): string {
+  const line = `${DECISION_LABEL[approval.decision]}: ${approval.summary}`;
+  return approval.message ? `${line} — “${approval.message}”` : line;
+}

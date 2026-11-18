@@ -12,6 +12,7 @@ import {
   type IpcResult,
   ipcContract,
   ipcSchemas,
+  type PendingApproval,
   type Project,
   type Review,
   type ReviewRoomBridge,
@@ -80,6 +81,7 @@ export function makeReview(id: string, project: Project, overrides: Partial<Revi
     status: "idle",
     sessionId: null,
     model: null,
+    fixMode: false,
     createdAt: "2026-11-17T10:00:00.000Z",
     updatedAt: "2026-11-17T10:00:00.000Z",
     ...overrides,
@@ -104,6 +106,7 @@ interface StubState {
   entries: Record<string, StoredEntry[]>;
   catalog: ClaudeCatalog;
   sendError?: StubError | undefined;
+  approvals: PendingApproval[];
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
   settings: AppSettings;
@@ -138,6 +141,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     calls: [],
     entries: {},
     findings: {},
+    approvals: [],
     settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
@@ -242,6 +246,27 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         return ok(null);
       case "claude:catalog":
         return ok(state.catalog);
+      case "reviews:setFixMode": {
+        const { id, fixMode } = ipcContract[channel].input.parse(raw);
+        const current = state.reviews.find((r) => r.id === id);
+        if (!current) return fail({ code: "review_not_found", message: "Review not found" });
+        const updated = { ...current, fixMode };
+        state.reviews = state.reviews.map((r) => (r.id === id ? updated : r));
+        return ok(updated);
+      }
+      case "approvals:list":
+        return ok(state.approvals);
+      case "approvals:decide": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        if (!state.approvals.some((a) => a.id === id)) {
+          return fail({
+            code: "approval_not_found",
+            message: "This request was already answered or has ended.",
+          });
+        }
+        state.approvals = state.approvals.filter((a) => a.id !== id);
+        return ok(null);
+      }
       case "findings:list": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.findings[id] ?? []);

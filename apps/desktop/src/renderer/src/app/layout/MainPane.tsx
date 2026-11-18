@@ -17,7 +17,7 @@ import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";
 import { useDrafts } from "../../features/conversation/drafts.ts";
 import { useConversation } from "../../features/conversation/queries.ts";
-import { useReviewStatus } from "../../features/conversation/store.ts";
+import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
@@ -95,12 +95,19 @@ function ConversationTab({
 }) {
   const status = useReviewStatus(review);
   const { entries, live, error, isLoading } = useConversation(review.id);
+  const approvals = usePendingApprovals(review.id);
   return (
     <>
       {error ? (
         <Text role="alert">Could not load the conversation: {error.message}</Text>
       ) : (
-        <Conversation entries={entries} live={live} status={status} loading={isLoading} />
+        <Conversation
+          entries={entries}
+          live={live}
+          status={status}
+          loading={isLoading}
+          approvals={approvals}
+        />
       )}
       <Composer review={review} status={status} autoFocus={autoFocus} onFocused={onFocused} />
     </>

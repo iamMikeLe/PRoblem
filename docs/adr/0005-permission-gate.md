@@ -1,6 +1,6 @@
 # 0005. App-owned PreToolUse permission gate
 
-- Status: accepted (deny-only form in Phase 3, ADR 0010; approvals in Phase 5)
+- Status: accepted (deny-only form in Phase 3, ADR 0010; approvals in Phase 5, ADR 0012)
 - Date: 2026-11-17
 
 ## Context

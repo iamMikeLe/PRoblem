@@ -17,7 +17,7 @@ it is out of date. Decisions are in ADR 0010.
 - `src/main/claude/normalize.ts`: `toSignals(message, cwd)` turns one SDK message into
   `session` / `entry` / `delta` signals. Every SDK shape used is a narrow zod schema; anything
   else is ignored. The UI depends only on `ConversationEntry` (`packages/shared/src/conversation.ts`).
-- `src/main/claude/policy.ts`: the read-only `PreToolUse` decision (`decideToolUse`).
+- `src/main/claude/policy.ts`: the gate (`decideToolUse`: allow / deny / ask); `approvals.ts`, `grants.ts`: approval cards and "Allow for this review".
 - `src/main/claude/entries.ts`: `review_entries` table (append-only, `seq` per review).
 
 ## Session model
@@ -29,8 +29,8 @@ it is out of date. Decisions are in ADR 0010.
 - The first message is `firstTurnPrompt(review)` (review prompt + head/base/merge base), sent when
   the review is created. The `session_id` of `system/init` is stored on the review; later turns
   pass `resume`, which also works after an app restart.
-- Options that keep a review read-only (do not loosen without an ADR):
-  `tools: ["Read", "Grep", "Glob", "Bash"]`, the `PreToolUse` hook, a deny-all `canUseTool`,
+- Options that keep a review safe (do not loosen without an ADR):
+  `tools: REVIEW_TOOLS`, the `PreToolUse` hook plus the approval `canUseTool`,
   `permissionMode: "default"`, `settingSources: ["user"]`, `strictMcpConfig: true`, `mcpServers: {}`,
   `settings: { disableAllHooks: false }`, `env: reviewEnv(process.env)` (no `GIT_*`, no LFS smudge).
   The Bash policy is a per-subcommand git **allowlist** (git abbreviates long options, so a
@@ -73,15 +73,22 @@ Claude reports findings by calling a tool, not by printing JSON:
 - The system prompt appendix (`REVIEW_SYSTEM_APPEND`) tells Claude when to call the tool.
 - Test the handler directly: `reportFindingsTool(report).handler(input, {})`.
 
-## Permission gate (ADR 0005)
+## Permission gate (ADR 0005, ADR 0012)
 
-- Register a `PreToolUse` hook for every tool (`matcher` omitted). It returns allow, deny, or
-  waits for the user's decision from an approval card.
-- Read-only tools and the `report_findings` tool are allowed. Bash is allowed only for commands
-  matching the read-only allowlist; everything else asks.
-- User `allow` rules must not widen this: force `permissionMode: "default"`.
-- While waiting, the review status is `needs-input`; the pending request is persisted so the
-  card survives a page reload (but not an app restart; the turn is then aborted).
+- `decideToolUse(tool, input, { workdir, fixMode, granted })` returns `allow` / `deny` / `ask`.
+  The `PreToolUse` hook passes the decision on, and `"ask"` reaches `canUseTool`. `canUseTool`
+  runs the gate again, then `askUser` shows an approval card and awaits the answer.
+- A probe confirmed that a hook's "ask" reaches `canUseTool` even when a settings allow rule
+  matches, so the user's allow rules cannot skip a card. `permissionMode: "default"` keeps their
+  `defaultMode` out.
+- **Grants** ("Allow for this review") are exact: the Bash command string, or the Read/Edit/Write
+  path (`claude/grants.ts`). WebFetch and WebSearch are never granted.
+- **Fix mode** comes from the database at every call. Edits outside the folder or in any `.git`
+  are always denied.
+- **Pending approvals** live in memory (`claude/approvals.ts`). Stop, cancel and shutdown expire
+  them, and Claude Code may withdraw one when a newer request supersedes it (its `signal` aborts).
+- Whenever a call is refused or the gate changes, update `REVIEW_TOOLS`, the gate tests in
+  `policy.test.ts`, and ADR 0012.
 
 ## Testing
 
@@ -89,7 +96,7 @@ Never call the real SDK in tests. `test/main/claude/sessions.test.ts` has `fakeC
 scripted `RunQuery` whose turns can be held open (to test busy, Stop and the queue) and that
 records the options each turn received. Test with an in-memory database (`openDatabase(":memory:")`).
 
-Covered: order and numbering of entries, session id stored and resumed, read-only options and the
+Covered: order and numbering of entries, session id stored and resumed, the gate options, approval cards (allow once, for the review, deny, expire on Stop), fix mode, and the
 gate, busy, Stop (running and queued), the concurrency limit, a missing `claude`, error results,
 recovery after a quit, the catalog. The policy has its own table-driven tests (`policy.test.ts`).
 A real turn is checked by hand in a second app instance (`REVIEWROOM_HOME` + `--user-data-dir`) driven over CDP.

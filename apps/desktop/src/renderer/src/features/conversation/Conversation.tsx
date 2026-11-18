@@ -10,9 +10,15 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { ArrowDownRegular } from "@fluentui/react-icons";
-import type { ConversationEntry, ReviewStatus, StoredEntry } from "@reviewroom/shared";
+import type {
+  ConversationEntry,
+  PendingApproval,
+  ReviewStatus,
+  StoredEntry,
+} from "@reviewroom/shared";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
-import { describeTurnEnd } from "./format.ts";
+import { ApprovalCard } from "./ApprovalCard.tsx";
+import { describeApproval, describeTurnEnd } from "./format.ts";
 import { Markdown } from "./Markdown.tsx";
 import { isBusy } from "./store.ts";
 import { ToolCallCard } from "./ToolCallCard.tsx";
@@ -64,6 +70,7 @@ const useStyles = makeStyles({
     color: tokens.colorNeutralForeground3,
   },
   empty: { color: tokens.colorNeutralForeground3, textAlign: "center" },
+  decision: { color: tokens.colorNeutralForeground3, overflowWrap: "anywhere" },
   jump: {
     position: "absolute",
     bottom: tokens.spacingVerticalM,
@@ -79,13 +86,15 @@ interface Props {
   status: ReviewStatus;
   /** The stored transcript is still loading (do not show the empty state yet). */
   loading?: boolean;
+  /** Tool calls of this review waiting for the user. */
+  approvals?: readonly PendingApproval[];
 }
 
 /**
  * The conversation of a review. Follows new output while the view is at the bottom; once the user
  * scrolls up it stays put and offers a "Jump to latest" button instead.
  */
-export function Conversation({ entries, live, status, loading = false }: Props) {
+export function Conversation({ entries, live, status, loading = false, approvals = [] }: Props) {
   const styles = useStyles();
   const scroller = useRef<HTMLDivElement>(null);
   const [following, setFollowing] = useState(true);
@@ -109,7 +118,7 @@ export function Conversation({ entries, live, status, loading = false }: Props) 
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow whenever new output arrives
   useLayoutEffect(() => {
     if (following) toBottom();
-  }, [following, entries.length, live, status]);
+  }, [following, entries.length, live, status, approvals.length]);
 
   const onScroll = () => {
     const element = scroller.current;
@@ -150,6 +159,12 @@ export function Conversation({ entries, live, status, loading = false }: Props) 
                 );
               case "tool-result":
                 return null;
+              case "approval":
+                return (
+                  <Caption1 key={seq} className={styles.decision}>
+                    {describeApproval(entry)}
+                  </Caption1>
+                );
               case "turn-end":
                 return entry.outcome === "error" ? (
                   <MessageBar key={seq} intent="error">
@@ -172,13 +187,18 @@ export function Conversation({ entries, live, status, loading = false }: Props) 
               <Markdown text={live} />
             </div>
           )}
+          {approvals.map((approval) => (
+            <ApprovalCard key={approval.id} approval={approval} />
+          ))}
           {busy && (
             <div className={styles.working} role="status">
               <Spinner size="extra-tiny" />
               <Caption1>
                 {status === "queued"
                   ? "Waiting for a free slot (other reviews are running)…"
-                  : "Claude is working…"}
+                  : status === "needs-input"
+                    ? "Waiting for your approval…"
+                    : "Claude is working…"}
               </Caption1>
             </div>
           )}

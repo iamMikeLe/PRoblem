@@ -4,6 +4,7 @@ import {
   type CloseReviewResult,
   type CreateProjectRequest,
   type CreateReviewRequest,
+  type DecideApprovalRequest,
   type Finding,
   type FindingCounts,
   type IpcChannel,
@@ -11,6 +12,7 @@ import {
   type IpcOutput,
   ipcSchemas,
   type OpenInEditorRequest,
+  type PendingApproval,
   type Project,
   type Review,
   type ReviewRoomBridge,
@@ -74,9 +76,17 @@ export const api = {
     stop: async (id: string): Promise<void> => {
       await call("reviews:stop", { id });
     },
+    setFixMode: (id: string, fixMode: boolean): Promise<Review> =>
+      call("reviews:setFixMode", { id, fixMode }),
   },
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
+  },
+  approvals: {
+    list: (): Promise<PendingApproval[]> => call("approvals:list", undefined),
+    decide: async (request: DecideApprovalRequest): Promise<void> => {
+      await call("approvals:decide", request);
+    },
   },
   findings: {
     list: (id: string): Promise<Finding[]> => call("findings:list", { id }),

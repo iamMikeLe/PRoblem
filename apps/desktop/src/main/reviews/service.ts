@@ -233,6 +233,7 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
         prompt: input.prompt,
         status: "idle",
         sessionId: null,
+        fixMode: false,
         model: null,
         createdAt: at,
         updatedAt: at,

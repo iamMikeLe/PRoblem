@@ -109,4 +109,19 @@ export const migrations: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    version: 6,
+    name: "permission_gate",
+    sql: `
+      ALTER TABLE reviews ADD COLUMN fix_mode INTEGER NOT NULL DEFAULT 0;
+      -- "Allow for this review" (ADR 0012): an exact Bash command or path per tool.
+      CREATE TABLE review_grants (
+        review_id  TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+        tool       TEXT NOT NULL,
+        scope      TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (review_id, tool, scope)
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

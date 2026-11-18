@@ -77,8 +77,10 @@ channel, validated by `AppEventSchema`.
 4. `claude/normalize.ts` turns each SDK message into a `ConversationEntry`. The entry is appended
    to `review_entries`, then broadcast as `review.entry`. Text deltas are broadcast as
    `review.delta` and never stored.
-5. Every tool call goes through the `PreToolUse` policy (`claude/policy.ts`). Until Phase 5 it
-   allows only read-only calls and denies the rest. Phase 5 adds approval cards and `needs-input`.
+5. Every tool call goes through the `PreToolUse` gate (`claude/policy.ts`): allow, deny or ask.
+   "Ask" goes on to `canUseTool`. It shows an approval card (`review.approval`), sets
+   `needs-input` and waits for `approvals:decide`. The answer is stored as an `approval` entry
+   (ADR 0012).
 6. The result message becomes a `turn-end` entry (cost, duration, error). The status becomes
    `idle`, or `failed`. Stop calls `interrupt()` and kills the turn if it does not end in 10 s.
 7. Claude calls `report_findings` (in-process MCP server, one per turn). Main checks the whole
@@ -99,7 +101,9 @@ Single user, local machine, untrusted input (PR contents):
 
 - Renderer: `contextIsolation`, `sandbox`, no Node, strict CSP, no navigation, no new windows.
 - IPC: only contract channels; inputs validated; only our own frame may call.
-- Claude is read-only by default; the gate decides every tool call (ADR 0005, ADR 0010).
+- The gate decides every tool call: reading and read-only git run, everything else shows an
+  approval card, and edits outside the review's folder or in `.git` are refused. Fix mode lets
+  edits inside the folder run (ADR 0005, ADR 0010, ADR 0012).
 - Claude sessions load only the user's settings: never a checkout's `.claude/`, `.mcp.json` or
   `CLAUDE.md` (a PR's hooks would run as shell commands).
 - What Claude reports is untrusted: finding paths must stay inside the checkout. The editor gets
@@ -124,4 +128,5 @@ Single user, local machine, untrusted input (PR contents):
 | [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |
 | [0009](adr/0009-review-checkouts.md) | Isolated worktrees by default, detached in-place opt-in, no hooks on checkout |
 | [0010](adr/0010-claude-sessions.md) | Reviews drive the user's `claude`, one query per turn, read-only until Phase 5 |
+| [0012](adr/0012-approval-cards-and-fix-mode.md) | Approval cards via hook "ask" + `canUseTool`; exact grants; fix mode per review |
 | [0011](adr/0011-open-in-editor.md) | Open `file:line` with an editor preset or template, split into words, no shell |
