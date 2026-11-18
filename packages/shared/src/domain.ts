@@ -93,11 +93,15 @@ export const FindingSchema = z.object({
   problem: z.string(),
   /** Markdown. */
   suggestion: z.string(),
+  /** Markdown steps to reproduce (in the UI, on the command line, ...); empty when not applicable. */
+  reproduction: z.string(),
   verdict: VerdictSchema,
   /** Claude changed the finding after the user gave a verdict, so it may need another look. */
   changedSinceVerdict: z.boolean(),
   /** Set when Claude withdrew the finding (for example after new commits), with its reason. */
   withdrawnReason: z.string().nullable(),
+  /** The GitHub review it was posted in (ADR 0014); `null` until posted. */
+  postedUrl: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

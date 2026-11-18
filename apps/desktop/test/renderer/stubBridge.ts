@@ -16,6 +16,9 @@ import {
   ipcContract,
   ipcSchemas,
   type PendingApproval,
+  type PostPreview,
+  type PostReviewRequest,
+  type PrConversation,
   type ProblemBridge,
   type Project,
   type Review,
@@ -59,9 +62,11 @@ export function makeFinding(
     line: 10 * number,
     problem: `Problem of finding ${number}.`,
     suggestion: `Fix finding ${number}.`,
+    reproduction: "",
     verdict: "open",
     changedSinceVerdict: false,
     withdrawnReason: null,
+    postedUrl: null,
     createdAt: "2026-11-18T10:00:00.000Z",
     updatedAt: "2026-11-18T10:00:00.000Z",
     ...overrides,
@@ -118,6 +123,12 @@ interface StubState {
   /** What "check for new commits" answers; default: up to date. */
   updateCheck?: UpdateCheck | undefined;
   refreshError?: StubError | undefined;
+  /** GitHub: the discussion and posting preview by review id; posted requests; opened links. */
+  conversations: Record<string, PrConversation>;
+  previews: Record<string, PostPreview>;
+  posts: PostReviewRequest[];
+  postError?: StubError | undefined;
+  opened: string[];
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
   settings: AppSettings;
@@ -155,6 +166,10 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     approvals: [],
     changes: {},
     diffs: {},
+    conversations: {},
+    previews: {},
+    posts: [],
+    opened: [],
     settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
@@ -298,6 +313,25 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         const { path } = ipcContract[channel].input.parse(raw);
         const diff = state.diffs[path];
         return diff ? ok(diff) : fail({ code: "file_not_in_changes", message: "Not changed" });
+      }
+      case "github:conversation": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(state.conversations[id] ?? { status: "none", reason: "No pull request." });
+      }
+      case "github:preview": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(state.previews[id] ?? { status: "none", reason: "No pull request." });
+      }
+      case "github:post": {
+        const request = ipcContract[channel].input.parse(raw);
+        if (state.postError) return fail(state.postError);
+        state.posts.push(request);
+        return ok({ url: "https://github.com/acme/payments/pull/7#pullrequestreview-1" });
+      }
+      case "github:open": {
+        const { url } = ipcContract[channel].input.parse(raw);
+        state.opened.push(url);
+        return ok(null);
       }
       case "reviews:setFixMode": {
         const { id, fixMode } = ipcContract[channel].input.parse(raw);

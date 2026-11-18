@@ -25,6 +25,7 @@ import {
   clearMovedFrom,
   getReviewRecord,
   listInterruptedReviews,
+  markCommentsTold,
   movedFrom,
   type ReviewSessionPatch,
   updateOpenReview,
@@ -59,6 +60,10 @@ export interface SessionServiceDeps {
   log: Logger;
   /** A review started waiting for the user (native notification; the app decides when to show it). */
   notify?: (approval: PendingApproval, reviewTitle: string) => void;
+  /** New PR comments Claude has not been told about, as a note for the next message (ADR 0014). */
+  commentsNote?: (reviewId: string) => { note: string; until: string } | undefined;
+  /** A turn ended (to read the PR discussion again in the background). */
+  afterTurn?: (reviewId: string) => void;
   /** Number of reviews waiting for the user changed (dock badge). */
   attention?: (waitingReviews: number) => void;
   /** Turns that may run at the same time; the rest wait as `queued`. */
@@ -69,8 +74,11 @@ export interface SessionServiceDeps {
 }
 
 export interface SessionService {
-  /** Sends the first message of a new review (its review prompt). */
-  start(review: Review): void;
+  /**
+   * Sends the first message of a new review: its review prompt, plus the digest of the pull
+   * request's existing discussion when there is one (ADR 0014).
+   */
+  start(review: Review, digest?: string): void;
   send(request: SendMessageRequest): void;
   stop(reviewId: string): Promise<void>;
   /**
@@ -182,6 +190,8 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     prompt: string;
     told: readonly VerdictChange[];
     movedFrom: string | null;
+    /** The newest PR comment the prompt tells Claude about. */
+    commentsUntil: string | null;
   }
   const queue: QueuedTurn[] = [];
   const approvals = createApprovalQueue(now);
@@ -424,7 +434,13 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     message,
   });
 
-  async function runTurn({ reviewId, prompt, told, movedFrom: moved }: QueuedTurn): Promise<void> {
+  async function runTurn({
+    reviewId,
+    prompt,
+    told,
+    movedFrom: moved,
+    commentsUntil,
+  }: QueuedTurn): Promise<void> {
     let finish!: () => void;
     const turn: Turn = {
       abort: new AbortController(),
@@ -456,6 +472,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
             // Claude has the message now; a stopped or failed start keeps the note for next time.
             if (told.length > 0 && !closing) markVerdictsTold(db, reviewId, told);
             if (moved !== null && !closing) clearMovedFrom(db, reviewId, moved);
+            if (commentsUntil !== null && !closing) markCommentsTold(db, reviewId, commentsUntil);
             if (signal.sessionId !== review.sessionId) {
               patch(reviewId, { sessionId: signal.sessionId });
               broadcast({ type: "review.session", reviewId, sessionId: signal.sessionId });
@@ -512,6 +529,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
         log.error("could not record the end of a turn", { review: reviewId, error });
       }
       finish();
+      if (!closing) deps.afterTurn?.(reviewId);
       pump();
     }
   }
@@ -547,11 +565,12 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     text: string,
     told: readonly VerdictChange[] = [],
     moved: string | null = null,
+    commentsUntil: string | null = null,
   ): void {
     assertIdle(reviewId);
     record(reviewId, { kind: "user", text });
     setStatus(reviewId, "queued");
-    queue.push({ reviewId, prompt: text, told, movedFrom: moved });
+    queue.push({ reviewId, prompt: text, told, movedFrom: moved, commentsUntil });
     pump();
   }
 
@@ -563,8 +582,9 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
   }
 
   return {
-    start(review) {
-      enqueue(review.id, firstTurnPrompt(review));
+    start(review, digest) {
+      const prompt = firstTurnPrompt(review);
+      enqueue(review.id, digest ? `${prompt}\n\n${digest}` : prompt);
     },
 
     send({ id, text, model }) {
@@ -574,12 +594,14 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       // Tell Claude which findings the user accepted or dismissed since the last message.
       // Tell Claude what changed since the last message: a Refresh, and the user's verdicts.
       const moved = movedFrom(db, id);
+      const comments = deps.commentsNote?.(id);
       const told = untoldVerdicts(db, id);
       const notes = [
         moved === null ? undefined : movedNote(moved, review.headSha),
+        comments?.note,
         verdictNote(told),
       ].filter((note) => note !== undefined);
-      enqueue(id, [...notes, text].join("\n\n"), told, moved);
+      enqueue(id, [...notes, text].join("\n\n"), told, moved, comments?.until ?? null);
     },
 
     async stop(reviewId) {

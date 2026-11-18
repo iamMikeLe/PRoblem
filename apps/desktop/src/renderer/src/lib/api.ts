@@ -15,6 +15,10 @@ import {
   ipcSchemas,
   type OpenInEditorRequest,
   type PendingApproval,
+  type PostPreview,
+  type PostReviewRequest,
+  type PostReviewResult,
+  type PrConversation,
   type ProblemBridge,
   type Project,
   type Review,
@@ -86,6 +90,14 @@ export const api = {
   },
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
+  },
+  github: {
+    conversation: (id: string): Promise<PrConversation> => call("github:conversation", { id }),
+    preview: (id: string): Promise<PostPreview> => call("github:preview", { id }),
+    post: (request: PostReviewRequest): Promise<PostReviewResult> => call("github:post", request),
+    open: async (url: string): Promise<void> => {
+      await call("github:open", { url });
+    },
   },
   changes: {
     files: (id: string): Promise<ChangeSet> => call("changes:files", { id }),

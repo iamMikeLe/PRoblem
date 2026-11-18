@@ -34,6 +34,10 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "reviews:refresh": () => {
       throw new Error("not used");
     },
+    "github:conversation": () => ({ status: "none", reason: "x" }),
+    "github:preview": () => ({ status: "none", reason: "x" }),
+    "github:post": () => ({ url: "https://github.com/a/b/pull/1" }),
+    "github:open": () => null,
     "changes:files": () => ({ fromSha: "a", toSha: "b", files: [] }),
     "changes:file": () => ({ path: "a", binary: false, tooLarge: false, hunks: [] }),
     "reviews:setFixMode": () => {

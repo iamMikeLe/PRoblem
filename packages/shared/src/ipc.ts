@@ -20,6 +20,12 @@ import {
   VerdictSchema,
 } from "./domain.ts";
 import type { AppEvent } from "./events.ts";
+import {
+  PostPreviewSchema,
+  PostReviewRequestSchema,
+  PostReviewResultSchema,
+  PrConversationSchema,
+} from "./github.ts";
 import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
 /**
@@ -64,6 +70,11 @@ export const AppErrorCodeSchema = z.enum([
   "editor_failed",
   "approval_not_found",
   "file_not_in_changes",
+  "pr_moved",
+  "already_posted",
+  "post_uncertain",
+  "no_pull_request",
+  "invalid_url",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -229,6 +240,17 @@ export const ipcContract = {
     input: z.strictObject({ id: ReviewIdSchema, path: z.string().min(1).max(PROJECT_PATH_MAX) }),
     output: FileDiffSchema,
   },
+  /** The pull request's existing discussion (fetched from GitHub with `gh`). */
+  "github:conversation": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: PrConversationSchema,
+  },
+  /** What posting would send: each finding's exact text and whether it goes on a line. */
+  "github:preview": { input: z.strictObject({ id: ReviewIdSchema }), output: PostPreviewSchema },
+  /** Posts a GitHub review. Only ever called from the preview dialog's button. */
+  "github:post": { input: PostReviewRequestSchema, output: PostReviewResultSchema },
+  /** Opens a github.com link in the browser (anything else is refused). */
+  "github:open": { input: z.strictObject({ url: z.string().max(2048) }), output: z.null() },
   /** Tool calls of all reviews that wait for the user. */
   "approvals:list": { input: z.undefined(), output: z.array(PendingApprovalSchema) },
   /** Answers an approval card. Fails with `approval_not_found` once it was answered or expired. */

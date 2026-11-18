@@ -2,7 +2,9 @@ import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
 import type { ChangesService } from "../changes/service.ts";
 import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
+import { AppFailure } from "../errors.ts";
 import type { FindingsService } from "../findings/service.ts";
+import type { GitHubService } from "../github/service.ts";
 import type { ProjectService } from "../projects/service.ts";
 import type { ReviewService } from "../reviews/service.ts";
 import type { IpcHandlers } from "./dispatcher.ts";
@@ -13,10 +15,28 @@ export interface HandlerDeps {
   sessions: SessionService;
   findings: FindingsService;
   changes: ChangesService;
+  github: GitHubService;
+  /** Opens a URL in the user's browser (already checked to be a github.com link). */
+  openExternal: (url: string) => Promise<void>;
   settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
   editor: EditorOpener;
   /** Shows the native folder picker; resolves with the chosen folder or `null`. */
   pickFolder: () => Promise<string | null>;
+}
+
+/** An https link to github.com itself (not a subdomain, no credentials in the URL). */
+export function isGitHubUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      url.hostname === "github.com" &&
+      url.username === "" &&
+      url.password === ""
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Binds every IPC channel to the use case that implements it. */
@@ -26,6 +46,8 @@ export function createHandlers({
   sessions,
   findings,
   changes,
+  github,
+  openExternal,
   settings,
   editor,
   pickFolder,
@@ -42,8 +64,8 @@ export function createHandlers({
     "reviews:list": () => reviews.list(),
     "reviews:create": async (input) => {
       const review = await reviews.create(input);
-      // Claude starts reviewing right away; the returned review shows it as queued or running.
-      sessions.start(review);
+      // Claude starts reviewing right away, knowing what reviewers already said on the PR.
+      sessions.start(review, await github.firstDigest(review));
       return reviews.get(review.id);
     },
     "reviews:close": async ({ id }) => {
@@ -63,6 +85,15 @@ export function createHandlers({
     // The folder must not move under Claude's feet: no turn runs or starts during a refresh.
     "reviews:refresh": ({ id }) => sessions.withoutTurns(id, () => reviews.refresh(id)),
     "changes:files": ({ id }) => changes.files(id),
+    "github:conversation": ({ id }) => github.conversation(id),
+    "github:preview": ({ id }) => github.preview(id),
+    "github:post": (input) => github.post(input),
+    "github:open": async ({ url }) => {
+      if (!isGitHubUrl(url))
+        throw new AppFailure("invalid_url", "Only github.com links can be opened");
+      await openExternal(url);
+      return null;
+    },
     "changes:file": ({ id, path }) => changes.file(id, path),
     "reviews:setFixMode": ({ id, fixMode }) => sessions.setFixMode(id, fixMode),
     "approvals:list": () => sessions.approvals(),

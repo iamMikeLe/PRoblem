@@ -62,6 +62,13 @@ describe("review service", () => {
         headRefOid: fx.featureSha,
         baseRefName: "main",
       })),
+      pullRequestsForBranch: vi.fn(async () => []),
+      graphql: vi.fn(async () => {
+        throw new Error("not used");
+      }),
+      postReview: vi.fn(async () => {
+        throw new Error("not used");
+      }),
     };
     reviews = createReviewService({
       db,

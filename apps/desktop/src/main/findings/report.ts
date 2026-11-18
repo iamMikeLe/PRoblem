@@ -44,12 +44,20 @@ const fields = {
   line: z.number().int().positive().describe("Line in the head version of the file."),
   problem: z.string().trim().min(1).max(10_000).describe("What is wrong and why (markdown)."),
   suggestion: z.string().trim().max(10_000).describe("The concrete change you suggest (markdown)."),
+  reproduction: z
+    .string()
+    .trim()
+    .max(10_000)
+    .describe(
+      "Numbered steps to reproduce the problem (in the UI, on the command line, with a request or a test), with the expected and the actual result (markdown). Omit when the problem cannot be shown by running something.",
+    ),
 };
 
 const NewFindingSchema = z.object({
   ...fields,
   file: fields.file.optional(),
   line: fields.line.optional(),
+  reproduction: fields.reproduction.optional(),
 });
 
 export const ReportShape = {
@@ -68,6 +76,7 @@ export const ReportShape = {
         line: fields.line.nullable().optional(),
         problem: fields.problem.optional(),
         suggestion: fields.suggestion.optional(),
+        reproduction: fields.reproduction.optional(),
       }),
     )
     .max(50)
@@ -166,7 +175,7 @@ export function applyReport(
   const additions: FindingContent[] = [];
   for (const [index, item] of (report.add ?? []).entries()) {
     const where = location(item.file, item.line, `add[${index}]`);
-    if (where) additions.push({ ...item, ...where });
+    if (where) additions.push({ ...item, reproduction: item.reproduction ?? "", ...where });
   }
 
   const updates: { number: number; content: FindingContent }[] = [];
@@ -193,6 +202,7 @@ export function applyReport(
         title: item.title ?? current.title,
         problem: item.problem ?? current.problem,
         suggestion: item.suggestion ?? current.suggestion,
+        reproduction: item.reproduction ?? current.reproduction,
         ...where,
       },
     });

@@ -23,15 +23,17 @@ const RowSchema = z.object({
   line: z.number().nullable(),
   problem: z.string(),
   suggestion: z.string(),
+  reproduction: z.string(),
   verdict: z.string(),
   changed_since_verdict: z.number(),
   withdrawn_reason: z.string().nullable(),
+  posted_url: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
 
-const COLUMNS = `review_id, number, severity, title, file, line, problem, suggestion, verdict,
-  changed_since_verdict, withdrawn_reason, created_at, updated_at`;
+const COLUMNS = `review_id, number, severity, title, file, line, problem, suggestion, reproduction,
+  verdict, changed_since_verdict, withdrawn_reason, posted_url, created_at, updated_at`;
 
 function toFinding(raw: unknown): Finding {
   const row = RowSchema.parse(raw);
@@ -44,9 +46,11 @@ function toFinding(raw: unknown): Finding {
     line: row.line,
     problem: row.problem,
     suggestion: row.suggestion,
+    reproduction: row.reproduction,
     verdict: row.verdict,
     changedSinceVerdict: row.changed_since_verdict === 1,
     withdrawnReason: row.withdrawn_reason,
+    postedUrl: row.posted_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -59,6 +63,7 @@ export interface FindingContent {
   line: number | null;
   problem: string;
   suggestion: string;
+  reproduction: string;
 }
 
 export function countAllFindings(db: DatabaseSync, reviewId: string): number {
@@ -96,8 +101,8 @@ export function insertFinding(
   const row = db
     .prepare(
       `INSERT INTO findings (review_id, number, severity, title, file, line, problem, suggestion,
-         created_at, updated_at)
-       SELECT ?, COALESCE(MAX(number), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ? FROM findings WHERE review_id = ?
+         reproduction, created_at, updated_at)
+       SELECT ?, COALESCE(MAX(number), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM findings WHERE review_id = ?
        RETURNING number`,
     )
     .get(
@@ -108,6 +113,7 @@ export function insertFinding(
       content.line,
       content.problem,
       content.suggestion,
+      content.reproduction,
       at,
       at,
       reviewId,
@@ -128,7 +134,7 @@ export function updateFindingContent(
 ): void {
   db.prepare(
     `UPDATE findings SET severity = ?, title = ?, file = ?, line = ?, problem = ?, suggestion = ?,
-       changed_since_verdict = CASE WHEN verdict = 'open' THEN 0 ELSE 1 END, updated_at = ?
+       reproduction = ?, changed_since_verdict = CASE WHEN verdict = 'open' THEN 0 ELSE 1 END, updated_at = ?
      WHERE review_id = ? AND number = ?`,
   ).run(
     content.severity,
@@ -137,6 +143,7 @@ export function updateFindingContent(
     content.line,
     content.problem,
     content.suggestion,
+    content.reproduction,
     now.toISOString(),
     reviewId,
     number,
@@ -219,4 +226,17 @@ export function markVerdictsTold(
     "UPDATE findings SET verdict_told = ? WHERE review_id = ? AND number = ? AND verdict = ?",
   );
   for (const change of changes) mark.run(change.verdict, reviewId, change.number, change.verdict);
+}
+
+/** Findings that were posted to GitHub, with the review they went into. */
+export function markPosted(
+  db: DatabaseSync,
+  reviewId: string,
+  numbers: readonly number[],
+  url: string,
+): void {
+  const update = db.prepare(
+    "UPDATE findings SET posted_url = ? WHERE review_id = ? AND number = ?",
+  );
+  for (const number of numbers) update.run(url, reviewId, number);
 }

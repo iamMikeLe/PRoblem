@@ -586,6 +586,7 @@ describe("session service", () => {
       line: null,
       problem: "p",
       suggestion: "s",
+      reproduction: "",
     } as const;
     insertFinding(db, review.id, { ...content, title: "Retries never stop" }, at);
     insertFinding(db, review.id, { ...content, title: "Missing test" }, at);
@@ -620,7 +621,15 @@ describe("session service", () => {
     insertFinding(
       db,
       review.id,
-      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      {
+        severity: "nit",
+        title: "Typo",
+        file: null,
+        line: null,
+        problem: "p",
+        suggestion: "s",
+        reproduction: "",
+      },
       at,
     );
     setVerdict(db, review.id, 1, "dismissed", at);
@@ -675,6 +684,40 @@ describe("session service", () => {
     expect(claude.turns).toHaveLength(2);
   });
 
+  it("starts with the PR discussion and tells Claude about new comments once", async () => {
+    const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()] }));
+    let note: { note: string; until: string } | undefined;
+    const afterTurn = vi.fn();
+    const sessions = createSessionService({
+      db,
+      runQuery: claude.runQuery,
+      broadcast: (event) => events.push(event),
+      findings: createFindingsService({ db, broadcast: () => {} }),
+      claudePath: () => "/usr/local/bin/claude",
+      log: silentLogger,
+      commentsNote: () => note,
+      afterTurn,
+    });
+    sessions.start(review, "[PRoblem] Existing discussion on pull request #7 (...)");
+    await settle();
+    expect(
+      claude.turns[0]?.prompt.endsWith("[PRoblem] Existing discussion on pull request #7 (...)"),
+    ).toBe(true);
+    expect(afterTurn).toHaveBeenCalledWith(review.id);
+
+    note = {
+      note: "[PRoblem] New comments on pull request #7 (...)",
+      until: "2026-11-18T11:00:00Z",
+    };
+    sessions.send({ id: review.id, text: "Go on", model: null });
+    await settle();
+    expect(claude.turns[1]?.prompt).toBe(
+      "[PRoblem] New comments on pull request #7 (...)\n\nGo on",
+    );
+    const row = db.prepare("SELECT comments_told_at FROM reviews WHERE id = ?").get(review.id);
+    expect(row).toEqual(expect.objectContaining({ comments_told_at: "2026-11-18T11:00:00Z" }));
+  });
+
   it("keeps an untold verdict when the message is refused as busy", async () => {
     const claude = fakeClaude((turn) => ({
       messages: [sdk.init(), sdk.success()],
@@ -687,7 +730,15 @@ describe("session service", () => {
     insertFinding(
       db,
       review.id,
-      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      {
+        severity: "nit",
+        title: "Typo",
+        file: null,
+        line: null,
+        problem: "p",
+        suggestion: "s",
+        reproduction: "",
+      },
       at,
     );
     setVerdict(db, review.id, 1, "dismissed", at);
@@ -713,7 +764,15 @@ describe("session service", () => {
     insertFinding(
       db,
       review.id,
-      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      {
+        severity: "nit",
+        title: "Typo",
+        file: null,
+        line: null,
+        problem: "p",
+        suggestion: "s",
+        reproduction: "",
+      },
       at,
     );
     setVerdict(db, review.id, 1, "dismissed", at);

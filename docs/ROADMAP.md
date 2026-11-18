@@ -42,7 +42,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] New review dialog (source with branch autocomplete, base, isolated switch remembered per project, prompt)
 - [x] Close a review: confirm, remove its worktree or restore the project branch, archive the record
 - [x] Login-shell PATH for the packaged app, so `gh`/`git` from Homebrew are found
-- [ ] Link a branch review to its open PR automatically (moved to Phase 7)
+- [x] Link a branch review to its open PR automatically (done in Phase 7)
 
 ## Phase 3: Claude sessions
 
@@ -82,10 +82,11 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 7: Git host integration
 
-- [ ] Read PR comments and review threads (GitHub via `gh`); show them in the PR comments tab
-- [ ] Give Claude a digest of existing comments so it does not repeat them
-- [ ] Post findings as a GitHub review after a preview dialog (inline or summary)
-- [ ] Approve / request changes / comment
+- [x] Read PR comments and review threads (GitHub via `gh`); show them in the PR comments tab
+- [x] Give Claude a digest of existing comments so it does not repeat them
+- [x] Post findings as a GitHub review after a preview dialog (inline or summary)
+- [x] Approve / request changes / comment
+- [x] Branch reviews find their open PR (`gh pr list --head`) (ADR 0014)
 - [ ] Stretch: Bitbucket Cloud
 
 ## Phase 8: Polish

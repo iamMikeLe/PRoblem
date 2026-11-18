@@ -2,6 +2,9 @@ import {
   Badge,
   Button,
   Caption1,
+  MessageBar,
+  MessageBarActions,
+  MessageBarBody,
   makeStyles,
   Subtitle1,
   Tab,
@@ -21,6 +24,9 @@ import { useConversation } from "../../features/conversation/queries.ts";
 import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
+import { CommentsTab } from "../../features/github/CommentsTab.tsx";
+import { PostReviewDialog } from "../../features/github/PostReviewDialog.tsx";
+import { useOpenGitHub } from "../../features/github/queries.ts";
 import { useProjects } from "../../features/projects/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
@@ -69,6 +75,7 @@ const useStyles = makeStyles({
     borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
   mono: { fontFamily: tokens.fontFamilyMonospace },
+  posted: { flexBasis: "100%" },
   count: { marginInlineStart: tokens.spacingHorizontalXS },
   path: {
     fontFamily: tokens.fontFamilyMonospace,
@@ -130,6 +137,10 @@ export function MainPane({ review, onClosed }: Props) {
   // The finding to select when the Findings tab opens from the Changes tab.
   const [shownFinding, setShownFinding] = useState<number>();
   const projects = useProjects();
+  // The "post to GitHub" preview, and the link of the review just posted.
+  const [posting, setPosting] = useState(false);
+  const [posted, setPosted] = useState<{ reviewId: string; url: string }>();
+  const openGitHub = useOpenGitHub();
   const setDraft = useDrafts((state) => state.setDraft);
   const counts = useFindingCounts();
 
@@ -204,6 +215,25 @@ export function MainPane({ review, onClosed }: Props) {
         <Tooltip content={review.workdir} relationship="description">
           <Caption1 className={styles.path}>{review.workdir}</Caption1>
         </Tooltip>
+        {posted?.reviewId === review.id && (
+          <MessageBar intent="success" className={styles.posted}>
+            <MessageBarBody>Posted to GitHub.</MessageBarBody>
+            <MessageBarActions
+              containerAction={
+                <Button
+                  aria-label="Dismiss"
+                  appearance="transparent"
+                  icon={<DismissRegular />}
+                  onClick={() => setPosted(undefined)}
+                />
+              }
+            >
+              <Button size="small" onClick={() => openGitHub.mutate(posted.url)}>
+                Open on GitHub
+              </Button>
+            </MessageBarActions>
+          </MessageBar>
+        )}
       </div>
       {tab === "conversation" ? (
         <ConversationTab
@@ -219,6 +249,7 @@ export function MainPane({ review, onClosed }: Props) {
             reviewId={review.id}
             onAsk={ask}
             initialSelected={shownFinding}
+            onPost={() => setPosting(true)}
           />
           {/* The last grid row holds the composer on the Conversation tab. */}
           <div />
@@ -238,11 +269,17 @@ export function MainPane({ review, onClosed }: Props) {
         </>
       ) : (
         <>
-          <div className={styles.body}>
-            <Text>This view arrives in a later phase — see docs/ROADMAP.md.</Text>
-          </div>
+          <CommentsTab key={review.id} reviewId={review.id} onPost={() => setPosting(true)} />
           <div />
         </>
+      )}
+      {posting && (
+        <PostReviewDialog
+          reviewId={review.id}
+          open
+          onOpenChange={setPosting}
+          onPosted={(url) => setPosted({ reviewId: review.id, url })}
+        />
       )}
       <CloseReviewDialog
         review={review}

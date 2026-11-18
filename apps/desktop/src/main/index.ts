@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@problem/shared";
-import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
 import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
 import { createSessionService } from "./claude/sessions.ts";
@@ -14,6 +14,7 @@ import type { Logger } from "./errors.ts";
 import { createFindingsService } from "./findings/service.ts";
 import { createGhClient } from "./git/gh.ts";
 import { repairWorktree } from "./git/worktree.ts";
+import { createGitHubService } from "./github/service.ts";
 import { createDispatcher } from "./ipc/dispatcher.ts";
 import { createHandlers } from "./ipc/handlers.ts";
 import { broadcast, registerIpc } from "./ipc/register.ts";
@@ -87,14 +88,16 @@ async function start(): Promise<void> {
   };
 
   const projects = createProjectService({ db, home, log });
+  const gh = createGhClient();
   const reviews = createReviewService({
     db,
     worktreesDir: join(dir, "worktrees"),
-    gh: createGhClient(),
+    gh,
     log,
   });
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
+  const github = createGitHubService({ db, gh, review: (id) => reviews.get(id), changes, log });
   const settings = {
     get: () => getSettings(db),
     update: (request: Parameters<typeof updateSettings>[1]) => updateSettings(db, request),
@@ -130,6 +133,8 @@ async function start(): Promise<void> {
       notification.show();
     },
     attention: (waiting) => app.setBadgeCount(waiting),
+    commentsNote: (id) => github.commentsNote(id),
+    afterTurn: (id) => github.refreshInBackground(id),
   });
   sessions.recover();
   registerIpc(
@@ -141,6 +146,8 @@ async function start(): Promise<void> {
         sessions,
         findings,
         changes,
+        github,
+        openExternal: (url) => shell.openExternal(url),
         settings,
         editor,
         pickFolder,

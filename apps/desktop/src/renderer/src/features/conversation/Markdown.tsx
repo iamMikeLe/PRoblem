@@ -20,6 +20,12 @@ const useStyles = makeStyles({
       paddingInline: tokens.spacingHorizontalXXS,
       borderRadius: tokens.borderRadiusSmall,
     },
+    // `---` separates findings in a posted review's summary.
+    "& hr": {
+      border: "none",
+      borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
+      marginBlock: tokens.spacingVerticalL,
+    },
     "& table": { borderCollapse: "collapse" },
     "& th, & td": {
       border: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,

@@ -3,6 +3,7 @@ export * from "./channels.ts";
 export * from "./conversation.ts";
 export * from "./domain.ts";
 export * from "./events.ts";
+export * from "./github.ts";
 export * from "./ipc.ts";
 export * from "./prompts.ts";
 export * from "./settings.ts";

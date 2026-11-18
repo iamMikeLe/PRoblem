@@ -238,3 +238,14 @@ export function clearMovedFrom(db: DatabaseSync, id: string, sha: string): void 
     sha,
   );
 }
+
+/**
+ * Claude was told about the PR comments up to `until` (ADR 0014); never moves back in time.
+ * (The `comments_note` columns of migration 8 are unused: the note is built at send time.)
+ */
+export function markCommentsTold(db: DatabaseSync, id: string, until: string): void {
+  db.prepare(
+    `UPDATE reviews SET comments_told_at = ?
+     WHERE id = ? AND (comments_told_at IS NULL OR comments_told_at < ?)`,
+  ).run(until, id, until);
+}

@@ -134,4 +134,27 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE reviews ADD COLUMN moved_from_sha TEXT;
     `,
   },
+  {
+    version: 8,
+    name: "github",
+    sql: `
+      -- The GitHub review a finding was posted in (ADR 0014).
+      ALTER TABLE findings ADD COLUMN posted_url TEXT;
+      -- The open pull request of a branch review, found by its head branch (JSON PullRequestLink).
+      ALTER TABLE reviews ADD COLUMN linked_pr TEXT;
+      -- PR comments: the newest one Claude has been told about, and a note of newer ones that
+      -- starts the next message (with the newest comment it covers).
+      ALTER TABLE reviews ADD COLUMN comments_told_at TEXT;
+      ALTER TABLE reviews ADD COLUMN comments_note TEXT;
+      ALTER TABLE reviews ADD COLUMN comments_note_until TEXT;
+    `,
+  },
+  {
+    version: 9,
+    name: "finding_reproduction",
+    sql: `
+      -- Steps to reproduce a finding (markdown); empty when it cannot be reproduced by running something.
+      ALTER TABLE findings ADD COLUMN reproduction TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

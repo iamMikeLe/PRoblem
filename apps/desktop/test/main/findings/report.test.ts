@@ -107,6 +107,22 @@ describe("findings", () => {
     expect(findings.list("r1")[0]?.changedSinceVerdict).toBe(false);
   });
 
+  it("stores steps to reproduce when given, keeps them on updates, and can replace them", () => {
+    report({ add: [finding("A", { reproduction: "1. Run `pnpm test`." }), finding("B")] });
+    expect(findings.list("r1").map((f) => f.reproduction)).toEqual(["1. Run `pnpm test`.", ""]);
+
+    report({
+      update: [
+        { number: 1, title: "A2" },
+        { number: 2, reproduction: "1. Open Settings." },
+      ],
+    });
+    expect(findings.list("r1").map((f) => f.reproduction)).toEqual([
+      "1. Run `pnpm test`.",
+      "1. Open Settings.",
+    ]);
+  });
+
   it("clears the line when the file changes without one, and can clear the file", () => {
     report({ add: [finding("A", { file: "a.ts", line: 4 })] });
     report({ update: [{ number: 1, file: "b.ts" }] });
@@ -248,7 +264,7 @@ describe("findings", () => {
     expect(tool.name).toBe("report_findings");
     const ok = await tool.handler(
       {
-        add: [{ severity: "major", title: "A", problem: "p", suggestion: "s" }],
+        add: [{ severity: "major", title: "A", problem: "p", suggestion: "s", reproduction: "" }],
         update: undefined,
         withdraw: undefined,
       },

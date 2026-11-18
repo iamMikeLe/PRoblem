@@ -26,6 +26,7 @@ import {
   ChatRegular,
   CheckmarkRegular,
   DismissCircleRegular,
+  SendRegular,
 } from "@fluentui/react-icons";
 import type { Finding, Severity, Verdict } from "@problem/shared";
 import { useState } from "react";
@@ -74,6 +75,7 @@ const useStyles = makeStyles({
     gridTemplateColumns: "minmax(0, 1fr)",
     minHeight: 0,
   },
+  post: { marginInlineStart: "auto" },
   toolbar: {
     display: "flex",
     alignItems: "center",
@@ -143,10 +145,12 @@ interface Props {
   onAsk: (finding: Finding) => void;
   /** Open with this finding selected (from the Changes tab). */
   initialSelected?: number | undefined;
+  /** Opens the "post to GitHub" preview. */
+  onPost: () => void;
 }
 
 /** Findings Claude reported for a review, with the user's verdicts. */
-export function FindingsTab({ reviewId, onAsk, initialSelected }: Props) {
+export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props) {
   const styles = useStyles();
   const findings = useFindings(reviewId);
   const setVerdict = useSetVerdict();
@@ -220,6 +224,7 @@ export function FindingsTab({ reviewId, onAsk, initialSelected }: Props) {
         <Caption1>
           {verdictText(finding)}
           {finding.changedSinceVerdict && " · changed"}
+          {finding.postedUrl && " · posted"}
         </Caption1>
       ),
     }),
@@ -247,6 +252,9 @@ export function FindingsTab({ reviewId, onAsk, initialSelected }: Props) {
             </Tab>
           ))}
         </TabList>
+        <Button className={styles.post} size="small" icon={<SendRegular />} onClick={onPost}>
+          Post to GitHub…
+        </Button>
       </div>
 
       <div className={styles.list}>
@@ -329,6 +337,12 @@ export function FindingsTab({ reviewId, onAsk, initialSelected }: Props) {
             </MessageBar>
           )}
           <Markdown text={current.problem} />
+          {current.reproduction.trim() !== "" && (
+            <>
+              <Text weight="semibold">How to reproduce</Text>
+              <Markdown text={current.reproduction} />
+            </>
+          )}
           {current.suggestion.trim() !== "" && (
             <>
               <Text weight="semibold">Suggestion</Text>
