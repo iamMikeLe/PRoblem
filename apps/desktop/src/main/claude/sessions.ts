@@ -123,6 +123,18 @@ export function reviewEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   return { ...clean, GIT_LFS_SKIP_SMUDGE: "1", GIT_TERMINAL_PROMPT: "0" };
 }
 
+/** The sandbox every Bash command of a review runs in. */
+export const REVIEW_SANDBOX = {
+  enabled: true,
+  // Refuse to run rather than silently run commands unsandboxed.
+  failIfUnavailable: true,
+  // Sandboxed or not, a command still needs the gate's approval.
+  autoAllowBashIfSandboxed: false,
+  // Claude cannot ask for a command to run outside the sandbox.
+  allowUnsandboxedCommands: false,
+  network: { allowedDomains: [], strictAllowlist: true },
+} as const satisfies NonNullable<Options["sandbox"]>;
+
 /** The longest text an approval card shows; longer requests are refused, never shortened. */
 const APPROVAL_TEXT_MAX = 4000;
 /** Cards one review may have waiting at once; more are refused (no flooding the user). */
@@ -375,6 +387,9 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       canUseTool,
       // Our gate must run even if the user's settings disable hooks.
       settings: { disableAllHooks: false },
+      // Approved commands run in Claude Code's OS sandbox (ADR 0012): writes only inside the
+      // review's folder, no network, and no way for Claude to opt a command out of it.
+      sandbox: REVIEW_SANDBOX,
       env: reviewEnv(process.env),
       includePartialMessages: true,
       systemPrompt: {

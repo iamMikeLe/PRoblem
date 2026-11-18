@@ -74,11 +74,29 @@ The audit found the following, and each has a regression test:
 - **Low: card flooding.** Fix: at most 5 waiting cards per review, and one notification per
   review.
 
+## Sandbox (follow-up, 2026-11-18)
+An approved command used to run with the user's full rights. Every Bash command of a review now
+runs in Claude Code's OS sandbox (`REVIEW_SANDBOX` in `claude/sessions.ts`; seatbelt on macOS).
+This was the user's choice: sandbox, no network.
+- **What the sandbox allows:** writes only inside the review's folder, and no network
+  (`allowedDomains: []`, `strictAllowlist`).
+- **No escape:** `allowUnsandboxedCommands: false`, so Claude cannot opt a command out, and
+  `failIfUnavailable: true`, so a missing sandbox stops the turn rather than running commands
+  unsandboxed.
+- **Still asks:** `autoAllowBashIfSandboxed: false`, so sandboxed commands still need the gate's approval.
+- **Verified in a real run:**
+  - A write inside the folder worked.
+  - A write to the home folder failed with `EPERM`.
+  - `curl` was blocked (`deny network-outbound`).
+- The system prompt asks Claude to request approval-needing calls one at a time. Claude Code
+  withdraws an older permission request when a newer one arrives, so parallel requests would
+  lose all but the last.
+
 ## Consequences
 - A card blocks only its own review. The other reviews keep running.
 - When Claude makes several calls at once, Claude Code may withdraw an older request ("a newer
   request superseded it"). The transcript then shows "Withdrawn before you answered".
-- An approved command runs with the user's rights. That is the point of asking; the card shows
-  the exact command and the full request.
+- An approved command runs in the sandbox. It can read the user's files but write only inside the
+  review's folder and reach no network, so installs and downloads fail inside reviews.
 - Fix-mode edits are blocked inside `.git`. An approved Bash command can still write anywhere,
   so the app's own git calls keep hooks disabled (ADR 0009).

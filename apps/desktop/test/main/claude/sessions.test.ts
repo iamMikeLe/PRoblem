@@ -294,6 +294,13 @@ describe("session service", () => {
       settingSources: ["user"],
       strictMcpConfig: true,
       settings: { disableAllHooks: false },
+      sandbox: {
+        enabled: true,
+        failIfUnavailable: true,
+        autoAllowBashIfSandboxed: false,
+        allowUnsandboxedCommands: false,
+        network: { allowedDomains: [], strictAllowlist: true },
+      },
     });
     expect(Object.keys(options?.mcpServers ?? {})).toEqual(["reviewroom"]);
     expect(options?.mcpServers?.reviewroom).toMatchObject({ type: "sdk", name: "reviewroom" });

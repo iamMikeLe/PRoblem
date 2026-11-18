@@ -16,8 +16,8 @@ not silently widen what runs during a review.
 
 ## Decision
 A `PreToolUse` hook decides every call: allow (read-only tools, allowlisted read-only commands,
-`report_findings`), deny, or ask the user through an approval card. Sandboxing Bash on top is
-a candidate hardening step.
+`report_findings`), deny, or ask the user through an approval card. Bash also runs in Claude Code's
+OS sandbox (ADR 0012).
 
 ## Consequences
 - The allowlist parser is security-critical: unit-tested heavily, and audited by `security-auditor`.
