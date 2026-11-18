@@ -26,6 +26,7 @@ import {
   PostReviewResultSchema,
   PrConversationSchema,
 } from "./github.ts";
+import { SearchRequestSchema, SearchResultsSchema } from "./search.ts";
 import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
 /**
@@ -263,6 +264,8 @@ export const ipcContract = {
     output: z.array(FindingSchema),
   },
   /** Open findings and blockers of every open review, by review id (for the list pane). */
+  /** Reviews, findings and changed files of open reviews that contain every word. */
+  "search:query": { input: SearchRequestSchema, output: SearchResultsSchema },
   "findings:counts": {
     input: z.undefined(),
     output: z.record(z.string(), FindingCountsSchema),

@@ -119,7 +119,7 @@ const useStyles = makeStyles({
   muted: { color: tokens.colorNeutralForeground3 },
 });
 
-function SeverityBadge({ severity }: { severity: Severity }) {
+export function SeverityBadge({ severity }: { severity: Severity }) {
   const { label, color } = SEVERITY[severity];
   return (
     <Badge appearance="tint" color={color} shape="rounded">

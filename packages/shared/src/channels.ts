@@ -29,6 +29,7 @@ export const IPC_CHANNELS = [
   "claude:catalog",
   "findings:list",
   "findings:counts",
+  "search:query",
   "findings:setVerdict",
   "settings:get",
   "settings:update",

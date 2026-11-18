@@ -38,6 +38,7 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "github:preview": () => ({ status: "none", reason: "x" }),
     "github:post": () => ({ url: "https://github.com/a/b/pull/1" }),
     "github:open": () => null,
+    "search:query": () => ({ reviews: [], findings: [], files: [] }),
     "changes:files": () => ({ fromSha: "a", toSha: "b", files: [] }),
     "changes:file": () => ({ path: "a", binary: false, tooLarge: false, hunks: [] }),
     "reviews:setFixMode": () => {

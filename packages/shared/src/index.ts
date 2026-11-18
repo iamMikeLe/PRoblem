@@ -6,4 +6,5 @@ export * from "./events.ts";
 export * from "./github.ts";
 export * from "./ipc.ts";
 export * from "./prompts.ts";
+export * from "./search.ts";
 export * from "./settings.ts";

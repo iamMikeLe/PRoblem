@@ -22,6 +22,7 @@ import type { RendererSource } from "./ipc/trust.ts";
 import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
 import { createReviewService } from "./reviews/service.ts";
+import { createSearchService } from "./search/service.ts";
 import { getSettings, updateSettings } from "./settings/repository.ts";
 import { createMainWindow } from "./window.ts";
 
@@ -98,6 +99,7 @@ async function start(): Promise<void> {
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
   const github = createGitHubService({ db, gh, review: (id) => reviews.get(id), changes, log });
+  const search = createSearchService({ db, changes, log });
   const settings = {
     get: () => getSettings(db),
     update: (request: Parameters<typeof updateSettings>[1]) => updateSettings(db, request),
@@ -147,6 +149,7 @@ async function start(): Promise<void> {
         findings,
         changes,
         github,
+        search,
         openExternal: (url) => shell.openExternal(url),
         settings,
         editor,

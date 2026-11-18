@@ -22,6 +22,7 @@ import {
   type ProblemBridge,
   type Project,
   type Review,
+  type SearchResults,
   type StoredEntry,
   type UpdateCheck,
 } from "@problem/shared";
@@ -103,7 +104,7 @@ interface StubError {
   message: string;
 }
 
-interface StubState {
+export interface StubState {
   projects: Project[];
   reviews: Review[];
   branches: string[];
@@ -129,6 +130,8 @@ interface StubState {
   posts: PostReviewRequest[];
   postError?: StubError | undefined;
   opened: string[];
+  /** What `search:query` returns (whatever the text). */
+  searchResults: SearchResults;
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
   settings: AppSettings;
@@ -170,6 +173,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     previews: {},
     posts: [],
     opened: [],
+    searchResults: { reviews: [], findings: [], files: [] },
     settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
@@ -358,6 +362,8 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.findings[id] ?? []);
       }
+      case "search:query":
+        return ok(state.searchResults);
       case "findings:counts": {
         const counts = Object.entries(state.findings).map(([id, list]) => {
           const open = list.filter((f) => f.verdict === "open" && f.withdrawnReason === null);

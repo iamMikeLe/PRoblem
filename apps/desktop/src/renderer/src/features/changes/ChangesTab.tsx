@@ -171,15 +171,17 @@ const useStyles = makeStyles({
 interface Props {
   review: Review;
   project: Project | undefined;
+  /** The file to select first (from search); otherwise the first file shown. */
+  initialFile?: string | undefined;
   onShowFinding: (finding: Finding) => void;
 }
 
 /** The Changes tab: what the review changes since its merge base, with findings on their lines. */
-export function ChangesTab({ review, project, onShowFinding }: Props) {
+export function ChangesTab({ review, project, initialFile, onShowFinding }: Props) {
   const styles = useStyles();
   const changes = useChangeSet(review.id, review.headSha);
   const findings = useFindings(review.id);
-  const [selected, setSelected] = useState<string>();
+  const [selected, setSelected] = useState<string | undefined>(initialFile);
   const [mode, setMode] = useState<DiffMode>(loadDiffMode);
   const panel = usePanel("changes.files", FILE_LIST_LIMITS);
   const filters = project?.changeFilters ?? DEFAULT_CHANGE_FILTERS;

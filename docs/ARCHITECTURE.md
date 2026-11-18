@@ -43,6 +43,7 @@ flowchart LR
 | `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy, `report_findings` MCP server | no |
 | `src/main/findings/` | Findings repository, report validation, verdicts and the note to Claude (ADR 0004) | no |
 | `src/main/changes/`, `git/diff.ts` | Changed files and per-file diffs between merge base and head (ADR 0013) | no |
+| `src/main/search/` | Title-bar search over open reviews, their findings and changed files (plain word matching, no index) | no |
 | `src/main/github/` | PR discussion (GraphQL via `gh`), digest for Claude, preview and posting of GitHub reviews (ADR 0014) | no |
 | `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |

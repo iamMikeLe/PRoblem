@@ -16,6 +16,7 @@ import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
 import { useProjects } from "../features/projects/queries.ts";
 import { NewReviewDialog } from "../features/reviews/NewReviewDialog.tsx";
 import { useReviews } from "../features/reviews/queries.ts";
+import type { SearchTarget } from "../features/search/GlobalSearch.tsx";
 import { SettingsPage } from "../features/settings/SettingsPage.tsx";
 import { usePanel } from "../lib/panel.ts";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
@@ -49,6 +50,8 @@ export function App() {
   const projects = useProjects();
   const reviews = useReviews();
   const [creating, setCreating] = useState(false);
+  // The search result to show; a new object each time, so the same result can be opened twice.
+  const [focus, setFocus] = useState<SearchTarget>();
   const toasterId = useId("toaster");
   const { dispatchToast } = useToastController(toasterId);
 
@@ -81,7 +84,13 @@ export function App() {
         section === "reviews" && reviewsList.collapsed && styles.listCollapsed,
       )}
     >
-      <TitleBar />
+      <TitleBar
+        onOpen={(target) => {
+          setSection("reviews");
+          setReviewId(target.reviewId);
+          setFocus({ ...target });
+        }}
+      />
       <AppRail selected={section} onSelect={setSection} />
       {section === "projects" ? (
         <>
@@ -103,7 +112,7 @@ export function App() {
             collapsed={reviewsList.collapsed}
             onCollapsedChange={reviewsList.setCollapsed}
           />
-          <MainPane review={selectedReview} onClosed={reviewClosed} />
+          <MainPane review={selectedReview} focus={focus} onClosed={reviewClosed} />
         </>
       )}
       {creating && projects.data && (

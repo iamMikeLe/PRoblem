@@ -7,6 +7,7 @@ import type { FindingsService } from "../findings/service.ts";
 import type { GitHubService } from "../github/service.ts";
 import type { ProjectService } from "../projects/service.ts";
 import type { ReviewService } from "../reviews/service.ts";
+import type { SearchService } from "../search/service.ts";
 import type { IpcHandlers } from "./dispatcher.ts";
 
 export interface HandlerDeps {
@@ -16,6 +17,7 @@ export interface HandlerDeps {
   findings: FindingsService;
   changes: ChangesService;
   github: GitHubService;
+  search: SearchService;
   /** Opens a URL in the user's browser (already checked to be a github.com link). */
   openExternal: (url: string) => Promise<void>;
   settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
@@ -47,6 +49,7 @@ export function createHandlers({
   findings,
   changes,
   github,
+  search,
   openExternal,
   settings,
   editor,
@@ -85,6 +88,7 @@ export function createHandlers({
     // The folder must not move under Claude's feet: no turn runs or starts during a refresh.
     "reviews:refresh": ({ id }) => sessions.withoutTurns(id, () => reviews.refresh(id)),
     "changes:files": ({ id }) => changes.files(id),
+    "search:query": ({ text }) => search.query(text),
     "github:conversation": ({ id }) => github.conversation(id),
     "github:preview": ({ id }) => github.preview(id),
     "github:post": (input) => github.post(input),

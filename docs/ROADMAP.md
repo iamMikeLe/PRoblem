@@ -92,7 +92,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 ## Phase 8: Polish
 
 - [ ] Theme switch: Teams dark, light, high contrast (persisted)
-- [ ] Search in the title bar across reviews and findings
+- [x] Search in the title bar across reviews, findings and changed files (⌘K / Ctrl+K)
 - [ ] Keyboard shortcuts (next review, next finding, focus composer)
 - [ ] Toasts, error boundary, empty states, loading skeletons
 - [ ] Renderer bundle: minify and split routes

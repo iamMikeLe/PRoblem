@@ -22,6 +22,7 @@ import {
   type ProblemBridge,
   type Project,
   type Review,
+  type SearchResults,
   type SendMessageRequest,
   type SetVerdictRequest,
   type StoredEntry,
@@ -102,6 +103,9 @@ export const api = {
   changes: {
     files: (id: string): Promise<ChangeSet> => call("changes:files", { id }),
     file: (id: string, path: string): Promise<FileDiff> => call("changes:file", { id, path }),
+  },
+  search: {
+    query: (text: string): Promise<SearchResults> => call("search:query", { text }),
   },
   approvals: {
     list: (): Promise<PendingApproval[]> => call("approvals:list", undefined),

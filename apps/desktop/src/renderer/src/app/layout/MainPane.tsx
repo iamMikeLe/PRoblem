@@ -31,6 +31,7 @@ import { useProjects } from "../../features/projects/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
+import type { SearchTarget } from "../../features/search/GlobalSearch.tsx";
 
 type ReviewTab = "conversation" | "findings" | "changes" | "comments";
 const TABS: readonly ReviewTab[] = ["conversation", "findings", "changes", "comments"];
@@ -125,10 +126,12 @@ function ConversationTab({
 
 interface Props {
   review: Review | undefined;
+  /** A search result to show in this review (a new object each time one is chosen). */
+  focus?: SearchTarget | undefined;
   onClosed: (note: string | null) => void;
 }
 
-export function MainPane({ review, onClosed }: Props) {
+export function MainPane({ review, focus, onClosed }: Props) {
   const styles = useStyles();
   const [tab, setTab] = useState<ReviewTab>("conversation");
   const [closing, setClosing] = useState(false);
@@ -136,6 +139,19 @@ export function MainPane({ review, onClosed }: Props) {
   const [asking, setAsking] = useState<string>();
   // The finding to select when the Findings tab opens from the Changes tab.
   const [shownFinding, setShownFinding] = useState<number>();
+  // The file to select when the Changes tab opens from search.
+  const [shownFile, setShownFile] = useState<string>();
+  // A new search result: switch tabs while rendering (no effect, so no flash of the old tab).
+  const [shownFocus, setShownFocus] = useState<SearchTarget>();
+  if (focus !== shownFocus && focus?.reviewId === review?.id) {
+    setShownFocus(focus);
+    setAsking(undefined);
+    setShownFinding(focus?.kind === "finding" ? focus.number : undefined);
+    setShownFile(focus?.kind === "file" ? focus.path : undefined);
+    setTab(
+      focus?.kind === "finding" ? "findings" : focus?.kind === "file" ? "changes" : "conversation",
+    );
+  }
   const projects = useProjects();
   // The "post to GitHub" preview, and the link of the review just posted.
   const [posting, setPosting] = useState(false);
@@ -181,6 +197,7 @@ export function MainPane({ review, onClosed }: Props) {
             if (isReviewTab(data.value)) {
               setAsking(undefined);
               setShownFinding(undefined);
+              setShownFile(undefined);
               setTab(data.value);
             }
           }}
@@ -257,8 +274,9 @@ export function MainPane({ review, onClosed }: Props) {
       ) : tab === "changes" ? (
         <>
           <ChangesTab
-            key={review.id}
+            key={`${review.id}:${shownFile ?? ""}`}
             review={review}
+            initialFile={shownFile}
             project={project}
             onShowFinding={(finding) => {
               setShownFinding(finding.number);

@@ -1,11 +1,5 @@
-import {
-  Avatar,
-  makeStyles,
-  mergeClasses,
-  SearchBox,
-  Text,
-  tokens,
-} from "@fluentui/react-components";
+import { Avatar, makeStyles, mergeClasses, Text, tokens } from "@fluentui/react-components";
+import { GlobalSearch, type SearchTarget } from "../../features/search/GlobalSearch.tsx";
 
 const useStyles = makeStyles({
   root: {
@@ -26,7 +20,7 @@ const useStyles = makeStyles({
   overlay: { paddingRight: "152px" },
   brand: { fontWeight: tokens.fontWeightSemibold },
   interactive: { WebkitAppRegion: "no-drag" },
-  search: { width: "100%" },
+  search: { width: "100%", minWidth: 0 },
   end: {
     display: "flex",
     justifyContent: "flex-end",
@@ -35,7 +29,7 @@ const useStyles = makeStyles({
   },
 });
 
-export function TitleBar() {
+export function TitleBar({ onOpen }: { onOpen: (target: SearchTarget) => void }) {
   const styles = useStyles();
   const platform = window.problem?.platform;
 
@@ -48,11 +42,9 @@ export function TitleBar() {
       )}
     >
       <Text className={styles.brand}>PRoblem</Text>
-      <SearchBox
-        className={mergeClasses(styles.search, styles.interactive)}
-        placeholder="Search reviews, findings, files"
-        size="small"
-      />
+      <div className={mergeClasses(styles.search, styles.interactive)}>
+        <GlobalSearch onOpen={onOpen} />
+      </div>
       <div className={styles.end}>
         <Avatar className={styles.interactive} name="Reviewer" size={28} />
       </div>
