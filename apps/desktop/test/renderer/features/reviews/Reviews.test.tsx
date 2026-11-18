@@ -140,4 +140,21 @@ describe("Reviews", () => {
     expect(await screen.findByText("No open reviews.")).toBeTruthy();
     expect(api.calls).toContainEqual({ channel: "reviews:close", input: { id: "r1" } });
   });
+
+  it("collapses the reviews list to its buttons and remembers it", async () => {
+    const project = makeProject("p1", "payments-api");
+    stubBridge([project], [makeReview("r1", project)]);
+    renderApp();
+    const list = await screen.findByRole("complementary", { name: "Reviews" });
+    await within(list).findByText("feature/r1");
+    fireEvent.click(within(list).getByRole("button", { name: "Hide reviews" }));
+
+    const rail = screen.getByRole("complementary", { name: "Reviews" });
+    expect(within(rail).queryByRole("heading", { name: "Reviews" })).toBeNull();
+    expect(within(rail).getByRole("button", { name: "New review" })).toBeTruthy();
+    expect(window.localStorage.getItem("problem.panel.reviews.list")).toContain('"collapsed":true');
+
+    fireEvent.click(within(rail).getByRole("button", { name: "Show reviews" }));
+    expect(await screen.findByRole("heading", { name: "Reviews" })).toBeTruthy();
+  });
 });

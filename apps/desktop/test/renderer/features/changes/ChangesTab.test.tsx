@@ -67,6 +67,7 @@ describe("Changes tab", () => {
     cleanup();
     removeBridge();
     useConversationStore.setState({ entries: {}, live: {}, statuses: {}, approvals: {} });
+    window.localStorage.clear();
   });
 
   it("lists changed files with counts, and still names the files the filters hide", async () => {
@@ -189,5 +190,40 @@ describe("Changes tab", () => {
     expect(
       screen.getByRole("button", { name: "Refresh to dddddddd" }).hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("resizes the file list from the keyboard, within limits, and remembers the width", async () => {
+    setup();
+    await openChanges();
+    const handle = screen.getByRole("separator", { name: "Resize the file list" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("300");
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("332");
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("800");
+    fireEvent.keyDown(handle, { key: "Home" });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("180");
+
+    cleanup();
+    removeBridge();
+    setup();
+    await openChanges();
+    expect(
+      screen.getByRole("separator", { name: "Resize the file list" }).getAttribute("aria-valuenow"),
+    ).toBe("180");
+  });
+
+  it("collapses the file list to a button and shows it again, keeping the diff", async () => {
+    setup();
+    await openChanges();
+    fireEvent.click(screen.getByRole("button", { name: "Hide the file list" }));
+    expect(screen.queryByRole("tree", { name: "Changed files" })).toBeNull();
+    expect(screen.queryByRole("separator")).toBeNull();
+    expect(screen.getByRole("region", { name: "Diff" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show the file list" }));
+    expect(await screen.findByRole("tree", { name: "Changed files" })).toBeTruthy();
   });
 });

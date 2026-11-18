@@ -11,7 +11,12 @@ import {
   tokens,
   useArrowNavigationGroup,
 } from "@fluentui/react-components";
-import { ComposeRegular, FolderAddRegular } from "@fluentui/react-icons";
+import {
+  ComposeRegular,
+  FolderAddRegular,
+  PanelLeftContractRegular,
+  PanelLeftExpandRegular,
+} from "@fluentui/react-icons";
 import type { FindingCounts, Project, Review } from "@problem/shared";
 import { useFindingCounts } from "../../features/findings/queries.ts";
 import { describeReview, formatAge } from "../../features/reviews/describe.ts";
@@ -30,8 +35,21 @@ const useStyles = makeStyles({
   header: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    gap: tokens.spacingHorizontalXS,
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalS} ${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+  },
+  heading: { flexGrow: 1 },
+  // The collapsed list: buttons to show it again and to start a review.
+  rail: {
+    gridArea: "list",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: tokens.spacingVerticalXS,
+    paddingBlock: tokens.spacingVerticalM,
+    paddingInline: tokens.spacingHorizontalXS,
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
   list: { overflowY: "auto", paddingInline: tokens.spacingHorizontalS },
   group: {
@@ -68,6 +86,8 @@ interface Props {
   onSelect: (id: string) => void;
   onAddProject: () => void;
   onNewReview: () => void;
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
 }
 
 /** Reviews grouped by project, in the order the projects API returns them. */
@@ -79,23 +99,54 @@ export function ListPane({
   onSelect,
   onAddProject,
   onNewReview,
+  collapsed,
+  onCollapsedChange,
 }: Props) {
   const styles = useStyles();
   const item = useListItemStyles();
   const arrowNavigation = useArrowNavigationGroup({ axis: "vertical", memorizeCurrent: true });
   const byProject = Map.groupBy(reviews, (review) => review.projectId);
   const counts = useFindingCounts();
+  const newReview = (
+    <Tooltip content="New review" relationship="label">
+      <Button
+        appearance="subtle"
+        icon={<ComposeRegular />}
+        disabledFocusable={!projects?.length}
+        onClick={onNewReview}
+      />
+    </Tooltip>
+  );
+
+  if (collapsed) {
+    return (
+      <aside className={styles.rail} aria-label="Reviews">
+        <Tooltip content="Show reviews" relationship="label">
+          <Button
+            appearance="subtle"
+            icon={<PanelLeftExpandRegular />}
+            aria-expanded={false}
+            onClick={() => onCollapsedChange(false)}
+          />
+        </Tooltip>
+        {newReview}
+      </aside>
+    );
+  }
 
   return (
     <aside className={styles.root} aria-label="Reviews">
       <div className={styles.header}>
-        <Subtitle2 as="h2">Reviews</Subtitle2>
-        <Tooltip content="New review" relationship="label">
+        <Subtitle2 as="h2" className={styles.heading}>
+          Reviews
+        </Subtitle2>
+        {newReview}
+        <Tooltip content="Hide reviews" relationship="label">
           <Button
             appearance="subtle"
-            icon={<ComposeRegular />}
-            disabledFocusable={!projects?.length}
-            onClick={onNewReview}
+            icon={<PanelLeftContractRegular />}
+            aria-expanded
+            onClick={() => onCollapsedChange(true)}
           />
         </Tooltip>
       </div>

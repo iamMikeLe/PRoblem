@@ -1,5 +1,6 @@
 import {
   makeStyles,
+  mergeClasses,
   Toast,
   ToastBody,
   Toaster,
@@ -16,6 +17,7 @@ import { useProjects } from "../features/projects/queries.ts";
 import { NewReviewDialog } from "../features/reviews/NewReviewDialog.tsx";
 import { useReviews } from "../features/reviews/queries.ts";
 import { SettingsPage } from "../features/settings/SettingsPage.tsx";
+import { usePanel } from "../lib/panel.ts";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
@@ -29,11 +31,14 @@ const useStyles = makeStyles({
     gridTemplateRows: "48px minmax(0, 1fr)",
     gridTemplateAreas: `"title title title" "rail list main"`,
   },
+  // The reviews list collapsed to a strip of buttons.
+  listCollapsed: { gridTemplateColumns: "68px auto minmax(0, 1fr)" },
 });
 
 /** Teams-style shell: title bar, app rail, list pane, main pane. */
 export function App() {
   const styles = useStyles();
+  const reviewsList = usePanel("reviews.list", { initial: 320, min: 320, max: 320 });
   const [section, setSection] = useState<RailSection>("reviews");
   const [reviewId, setReviewId] = useState<string>();
   useAppEvents((id) => {
@@ -70,7 +75,12 @@ export function App() {
     );
 
   return (
-    <div className={styles.shell}>
+    <div
+      className={mergeClasses(
+        styles.shell,
+        section === "reviews" && reviewsList.collapsed && styles.listCollapsed,
+      )}
+    >
       <TitleBar />
       <AppRail selected={section} onSelect={setSection} />
       {section === "projects" ? (
@@ -90,6 +100,8 @@ export function App() {
             onSelect={setReviewId}
             onAddProject={() => setSection("projects")}
             onNewReview={() => setCreating(true)}
+            collapsed={reviewsList.collapsed}
+            onCollapsedChange={reviewsList.setCollapsed}
           />
           <MainPane review={selectedReview} onClosed={reviewClosed} />
         </>

@@ -14,12 +14,19 @@ import {
   Tab,
   TabList,
   Text,
+  Tooltip,
   Tree,
   TreeItem,
   TreeItemLayout,
   tokens,
 } from "@fluentui/react-components";
-import { ArrowSyncRegular, DocumentRegular, FolderRegular } from "@fluentui/react-icons";
+import {
+  ArrowSyncRegular,
+  DocumentRegular,
+  FolderRegular,
+  PanelLeftContractRegular,
+  PanelLeftExpandRegular,
+} from "@fluentui/react-icons";
 import {
   type ChangedFile,
   type ChangeFilters,
@@ -30,6 +37,8 @@ import {
   type Review,
 } from "@problem/shared";
 import { useMemo, useState } from "react";
+import { type PanelLimits, usePanel } from "../../lib/panel.ts";
+import { ResizeHandle } from "../../lib/ResizeHandle.tsx";
 import { useIsBusy } from "../conversation/store.ts";
 import { useFindings, useOpenInEditor } from "../findings/queries.ts";
 import { useUpdateProject } from "../projects/queries.ts";
@@ -47,6 +56,9 @@ const STATUS_LETTER: Record<ChangedFile["status"], string> = {
   "type-changed": "T",
 };
 
+/** The file list's width: wide enough for a file name, never wider than most of the window. */
+export const FILE_LIST_LIMITS: PanelLimits = { initial: 300, min: 180, max: 800 };
+
 const useStyles = makeStyles({
   root: {
     display: "grid",
@@ -61,17 +73,33 @@ const useStyles = makeStyles({
     gap: tokens.spacingHorizontalS,
     color: tokens.colorNeutralForeground3,
   },
+  // Columns are set inline: the file list's width, the resize handle, the diff.
   body: {
     display: "grid",
-    gridTemplateColumns: "300px minmax(0, 1fr)",
     minHeight: 0,
     marginTop: tokens.spacingVerticalS,
     borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
   side: {
     display: "grid",
-    gridTemplateRows: "auto minmax(0, 1fr)",
+    gridTemplateRows: "auto auto minmax(0, 1fr)",
     minHeight: 0,
+    minWidth: 0,
+    borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+  },
+  sideHeader: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: tokens.spacingHorizontalS,
+    padding: `${tokens.spacingVerticalXXS} ${tokens.spacingHorizontalXS} ${tokens.spacingVerticalXXS} ${tokens.spacingHorizontalM}`,
+    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+  },
+  // The collapsed file list: only the button that shows it again.
+  rail: {
+    display: "flex",
+    justifyContent: "center",
+    paddingTop: tokens.spacingVerticalXXS,
     borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
   filters: {
@@ -81,7 +109,8 @@ const useStyles = makeStyles({
     padding: tokens.spacingHorizontalM,
     borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
-  tree: { overflowY: "auto", minHeight: 0, paddingBlock: tokens.spacingVerticalXS },
+  // Deep folders scroll sideways; the panel can also be widened.
+  tree: { overflow: "auto", minHeight: 0, paddingBlock: tokens.spacingVerticalXS },
   hidden: {
     padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
     color: tokens.colorNeutralForeground3,
@@ -152,6 +181,7 @@ export function ChangesTab({ review, project, onShowFinding }: Props) {
   const findings = useFindings(review.id);
   const [selected, setSelected] = useState<string>();
   const [mode, setMode] = useState<DiffMode>(loadDiffMode);
+  const panel = usePanel("changes.files", FILE_LIST_LIMITS);
   const filters = project?.changeFilters ?? DEFAULT_CHANGE_FILTERS;
 
   const { visible, hidden } = useMemo(() => {
@@ -171,42 +201,84 @@ export function ChangesTab({ review, project, onShowFinding }: Props) {
       <div className={styles.banner}>
         <UpdateBanner review={review} />
       </div>
-      <div className={styles.body}>
-        <aside className={styles.side} aria-label="Changed files">
-          {project && (
-            <FilterControls
-              key={`${project.id}:${filters.exclude.join(",")}`}
-              project={project}
-              filters={filters}
-            />
-          )}
-          <div className={styles.tree}>
-            {changes.isLoading && <Spinner size="small" label="Loading changes" />}
-            {changes.error && (
-              <MessageBar intent="error">
-                <MessageBarBody>{changes.error.message}</MessageBarBody>
-              </MessageBar>
-            )}
-            {changes.data && visible.length === 0 && (
-              <Text className={styles.center}>
-                {files.length === 0
-                  ? "No changes against the merge base."
-                  : "All changed files are hidden by the filters."}
-              </Text>
-            )}
-            {visible.length > 0 && (
-              <FileTree
-                files={visible}
-                selected={current?.path}
-                findings={openFindings}
-                onSelect={setSelected}
+      <div
+        className={styles.body}
+        style={{
+          gridTemplateColumns: panel.collapsed
+            ? "auto minmax(0, 1fr)"
+            : `${panel.width}px auto minmax(0, 1fr)`,
+        }}
+      >
+        {panel.collapsed ? (
+          <div className={styles.rail}>
+            <Tooltip content="Show the file list" relationship="label">
+              <Button
+                appearance="subtle"
+                icon={<PanelLeftExpandRegular />}
+                aria-expanded={false}
+                onClick={() => panel.setCollapsed(false)}
+              />
+            </Tooltip>
+          </div>
+        ) : (
+          <aside className={styles.side} aria-label="Changed files">
+            <div className={styles.sideHeader}>
+              <Caption1>
+                {visible.length} {visible.length === 1 ? "file" : "files"} changed
+              </Caption1>
+              <Tooltip content="Hide the file list" relationship="label">
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={<PanelLeftContractRegular />}
+                  aria-expanded
+                  onClick={() => panel.setCollapsed(true)}
+                />
+              </Tooltip>
+            </div>
+            {project && (
+              <FilterControls
+                key={`${project.id}:${filters.exclude.join(",")}`}
+                project={project}
+                filters={filters}
               />
             )}
-            {hidden.length > 0 && (
-              <HiddenFiles files={hidden} selected={current?.path} onSelect={setSelected} />
-            )}
-          </div>
-        </aside>
+            <div className={styles.tree}>
+              {changes.isLoading && <Spinner size="small" label="Loading changes" />}
+              {changes.error && (
+                <MessageBar intent="error">
+                  <MessageBarBody>{changes.error.message}</MessageBarBody>
+                </MessageBar>
+              )}
+              {changes.data && visible.length === 0 && (
+                <Text className={styles.center}>
+                  {files.length === 0
+                    ? "No changes against the merge base."
+                    : "All changed files are hidden by the filters."}
+                </Text>
+              )}
+              {visible.length > 0 && (
+                <FileTree
+                  files={visible}
+                  selected={current?.path}
+                  findings={openFindings}
+                  onSelect={setSelected}
+                />
+              )}
+              {hidden.length > 0 && (
+                <HiddenFiles files={hidden} selected={current?.path} onSelect={setSelected} />
+              )}
+            </div>
+          </aside>
+        )}
+        {!panel.collapsed && (
+          <ResizeHandle
+            label="Resize the file list"
+            width={panel.width}
+            limits={FILE_LIST_LIMITS}
+            onWidth={panel.setWidth}
+          />
+        )}
         <section className={styles.main} aria-label="Diff">
           {current ? (
             <FilePanel
