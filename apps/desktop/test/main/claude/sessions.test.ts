@@ -20,7 +20,11 @@ import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import { insertFinding, setVerdict } from "../../../src/main/findings/repository.ts";
 import { createFindingsService } from "../../../src/main/findings/service.ts";
 import { insertProject } from "../../../src/main/projects/repository.ts";
-import { getReviewRecord, insertReview } from "../../../src/main/reviews/repository.ts";
+import {
+  getReviewRecord,
+  insertReview,
+  updateReviewHead,
+} from "../../../src/main/reviews/repository.ts";
 
 const SHA = (c: string) => c.repeat(40);
 
@@ -598,6 +602,77 @@ describe("session service", () => {
       '[PRoblem] Since my last message I have:\n- dismissed #1 "Retries never stop"\n- accepted #2 "Missing test"\n\nAnything else?',
     );
     expect(claude.turns[2]?.prompt).toBe("Thanks");
+  });
+
+  it("tells Claude once that a refresh moved the head, before the verdicts", async () => {
+    const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()] }));
+    const sessions = service(claude.runQuery);
+    sessions.start(review);
+    await settle();
+    expect(sessions.isBusy(review.id)).toBe(false);
+    const at = new Date("2026-11-18T10:00:00.000Z");
+    updateReviewHead(
+      db,
+      review.id,
+      { title: "t", headSha: SHA("d"), baseSha: SHA("b"), mergeBaseSha: SHA("c") },
+      at,
+    );
+    insertFinding(
+      db,
+      review.id,
+      { severity: "nit", title: "Typo", file: null, line: null, problem: "p", suggestion: "s" },
+      at,
+    );
+    setVerdict(db, review.id, 1, "dismissed", at);
+
+    sessions.send({ id: review.id, text: "Look again", model: null });
+    expect(sessions.isBusy(review.id)).toBe(true);
+    await settle();
+    sessions.send({ id: review.id, text: "Thanks", model: null });
+    await settle();
+
+    const prompt = claude.turns[1]?.prompt ?? "";
+    expect(prompt).toMatch(
+      new RegExp(
+        `^\\[PRoblem\\] The review was refreshed: the head moved from ${SHA("a")} to ${SHA("d")}\\.`,
+      ),
+    );
+    expect(prompt).toContain(`git log --oneline ${SHA("a")}..${SHA("d")}`);
+    expect(prompt.indexOf("refreshed")).toBeLessThan(prompt.indexOf('dismissed #1 "Typo"'));
+    expect(prompt.endsWith("Look again")).toBe(true);
+    expect(claude.turns[2]?.prompt).toBe("Thanks");
+  });
+
+  it("refuses messages while a refresh moves the folder, and refreshes only when idle", async () => {
+    const claude = fakeClaude((turn) => ({
+      messages: [sdk.init(), sdk.success()],
+      hold: turn === 0,
+    }));
+    const sessions = service(claude.runQuery);
+    sessions.start(review);
+    await vi.waitFor(() => expect(claude.turns).toHaveLength(1));
+    await expect(sessions.withoutTurns(review.id, async () => "moved")).rejects.toMatchObject({
+      code: "review_busy",
+    });
+    claude.turns[0]?.release();
+    await settle();
+
+    let finish!: () => void;
+    const refreshing = sessions.withoutTurns(
+      review.id,
+      () =>
+        new Promise<string>((resolve) => {
+          finish = () => resolve("moved");
+        }),
+    );
+    expect(() => sessions.send({ id: review.id, text: "Hi", model: null })).toThrow(
+      expect.objectContaining({ code: "review_busy" }),
+    );
+    finish();
+    expect(await refreshing).toBe("moved");
+    sessions.send({ id: review.id, text: "Hi", model: null });
+    await settle();
+    expect(claude.turns).toHaveLength(2);
   });
 
   it("keeps an untold verdict when the message is refused as busy", async () => {

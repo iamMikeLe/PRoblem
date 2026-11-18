@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { Project } from "@problem/shared";
+import {
+  type ChangeFilters,
+  ChangeFiltersSchema,
+  DEFAULT_CHANGE_FILTERS,
+  type Project,
+} from "@problem/shared";
 import { z } from "zod";
 
 /** A `projects` row as SQLite returns it, validated instead of cast. */
@@ -9,6 +14,7 @@ const ProjectRowSchema = z.object({
   name: z.string(),
   path: z.string(),
   review_prompt: z.string(),
+  change_filters: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -20,12 +26,24 @@ function toProject(row: unknown): Project {
     name: parsed.name,
     path: parsed.path,
     reviewPrompt: parsed.review_prompt,
+    changeFilters: parseFilters(parsed.change_filters),
     createdAt: parsed.created_at,
     updatedAt: parsed.updated_at,
   };
 }
 
-const COLUMNS = "id, name, path, review_prompt, created_at, updated_at";
+/** Stored filters, or the defaults when there are none or they no longer parse. */
+function parseFilters(json: string | null): ChangeFilters {
+  if (json === null) return DEFAULT_CHANGE_FILTERS;
+  try {
+    const parsed = ChangeFiltersSchema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : DEFAULT_CHANGE_FILTERS;
+  } catch {
+    return DEFAULT_CHANGE_FILTERS;
+  }
+}
+
+const COLUMNS = "id, name, path, review_prompt, change_filters, created_at, updated_at";
 
 export function listProjects(db: DatabaseSync): Project[] {
   return db
@@ -55,6 +73,7 @@ export function insertProject(db: DatabaseSync, input: NewProject, now = new Dat
   const project: Project = {
     id: randomUUID(),
     ...input,
+    changeFilters: DEFAULT_CHANGE_FILTERS,
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
   };
@@ -74,6 +93,7 @@ export function insertProject(db: DatabaseSync, input: NewProject, now = new Dat
 export interface ProjectPatch {
   name?: string | undefined;
   reviewPrompt?: string | undefined;
+  changeFilters?: ChangeFilters | undefined;
 }
 
 /** Applies a partial update; returns the updated project, or `undefined` if the id is unknown. */
@@ -89,14 +109,12 @@ export function updateProject(
     ...current,
     name: patch.name ?? current.name,
     reviewPrompt: patch.reviewPrompt ?? current.reviewPrompt,
+    changeFilters: patch.changeFilters ?? current.changeFilters,
     updatedAt: now.toISOString(),
   };
-  db.prepare("UPDATE projects SET name = ?, review_prompt = ?, updated_at = ? WHERE id = ?").run(
-    next.name,
-    next.reviewPrompt,
-    next.updatedAt,
-    id,
-  );
+  db.prepare(
+    "UPDATE projects SET name = ?, review_prompt = ?, change_filters = ?, updated_at = ? WHERE id = ?",
+  ).run(next.name, next.reviewPrompt, JSON.stringify(next.changeFilters), next.updatedAt, id);
   return next;
 }
 

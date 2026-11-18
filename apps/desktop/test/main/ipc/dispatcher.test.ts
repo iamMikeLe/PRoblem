@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type Project } from "@problem/shared";
+import { DEFAULT_CHANGE_FILTERS, DEFAULT_SETTINGS, type Project } from "@problem/shared";
 import { describe, expect, it, vi } from "vitest";
 import { AppFailure, type Logger, silentLogger } from "../../../src/main/errors.ts";
 import { createDispatcher, type IpcHandlers } from "../../../src/main/ipc/dispatcher.ts";
@@ -8,6 +8,7 @@ const project: Project = {
   name: "payments-api",
   path: "/repos/payments-api",
   reviewPrompt: "Review it.",
+  changeFilters: DEFAULT_CHANGE_FILTERS,
   createdAt: "2026-11-17T10:00:00.000Z",
   updatedAt: "2026-11-17T10:00:00.000Z",
 };
@@ -27,6 +28,14 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "reviews:events": () => [],
     "reviews:send": () => null,
     "reviews:stop": () => null,
+    "reviews:checkUpdate": () => {
+      throw new Error("not used");
+    },
+    "reviews:refresh": () => {
+      throw new Error("not used");
+    },
+    "changes:files": () => ({ fromSha: "a", toSha: "b", files: [] }),
+    "changes:file": () => ({ path: "a", binary: false, tooLarge: false, hunks: [] }),
     "reviews:setFixMode": () => {
       throw new Error("not used");
     },

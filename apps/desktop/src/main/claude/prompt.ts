@@ -22,6 +22,19 @@ export function firstTurnPrompt(review: Review): string {
 }
 
 /**
+ * Starts the user's next message after a Refresh (ADR 0013), so Claude re-checks its findings
+ * against the new commits instead of reviewing a head that no longer exists.
+ */
+export function movedNote(fromSha: string, toSha: string): string {
+  return [
+    `[PRoblem] The review was refreshed: the head moved from ${fromSha} to ${toSha}.`,
+    `See the new commits with: git log --oneline ${fromSha}..${toSha}`,
+    `and their changes with: git diff ${fromSha} ${toSha}`,
+    "Re-check your findings: update or withdraw those the new commits affect, and add new ones.",
+  ].join("\n");
+}
+
+/**
  * Appended to Claude Code's system prompt for every review turn. Fix mode is read when the turn
  * starts; the gate itself always uses the current setting.
  */

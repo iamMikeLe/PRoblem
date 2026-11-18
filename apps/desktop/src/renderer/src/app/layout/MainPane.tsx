@@ -13,6 +13,7 @@ import {
 import { DismissRegular } from "@fluentui/react-icons";
 import type { Finding, Review } from "@problem/shared";
 import { useState } from "react";
+import { ChangesTab } from "../../features/changes/ChangesTab.tsx";
 import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";
 import { useDrafts } from "../../features/conversation/drafts.ts";
@@ -20,6 +21,7 @@ import { useConversation } from "../../features/conversation/queries.ts";
 import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
+import { useProjects } from "../../features/projects/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
@@ -125,6 +127,9 @@ export function MainPane({ review, onClosed }: Props) {
   const [closing, setClosing] = useState(false);
   // The review of an "Ask about #N": its composer takes focus once, then this is cleared.
   const [asking, setAsking] = useState<string>();
+  // The finding to select when the Findings tab opens from the Changes tab.
+  const [shownFinding, setShownFinding] = useState<number>();
+  const projects = useProjects();
   const setDraft = useDrafts((state) => state.setDraft);
   const counts = useFindingCounts();
 
@@ -141,6 +146,7 @@ export function MainPane({ review, onClosed }: Props) {
   }
 
   const openCount = counts.data?.[review.id]?.open ?? 0;
+  const project = projects.data?.find((p) => p.id === review.projectId);
   const ask = (finding: Finding) => {
     const prefix = `About #${finding.number} (${finding.title}): `;
     setDraft(review.id, (current) =>
@@ -163,6 +169,7 @@ export function MainPane({ review, onClosed }: Props) {
           onTabSelect={(_, data) => {
             if (isReviewTab(data.value)) {
               setAsking(undefined);
+              setShownFinding(undefined);
               setTab(data.value);
             }
           }}
@@ -207,8 +214,26 @@ export function MainPane({ review, onClosed }: Props) {
         />
       ) : tab === "findings" ? (
         <>
-          <FindingsTab key={review.id} reviewId={review.id} onAsk={ask} />
+          <FindingsTab
+            key={`${review.id}:${shownFinding ?? ""}`}
+            reviewId={review.id}
+            onAsk={ask}
+            initialSelected={shownFinding}
+          />
           {/* The last grid row holds the composer on the Conversation tab. */}
+          <div />
+        </>
+      ) : tab === "changes" ? (
+        <>
+          <ChangesTab
+            key={review.id}
+            review={review}
+            project={project}
+            onShowFinding={(finding) => {
+              setShownFinding(finding.number);
+              setTab("findings");
+            }}
+          />
           <div />
         </>
       ) : (

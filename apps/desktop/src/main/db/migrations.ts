@@ -124,4 +124,14 @@ export const migrations: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    version: 7,
+    name: "changes_view",
+    sql: `
+      -- JSON ChangeFilters; NULL = the defaults.
+      ALTER TABLE projects ADD COLUMN change_filters TEXT;
+      -- The head a review had before its last Refresh, until Claude has been told (ADR 0013).
+      ALTER TABLE reviews ADD COLUMN moved_from_sha TEXT;
+    `,
+  },
 ];

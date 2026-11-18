@@ -8,6 +8,7 @@ const project = {
   name: "a",
   path: "/a",
   reviewPrompt: "x",
+  changeFilters: { hideTests: false, hideGenerated: true, exclude: [] },
   createdAt: "2026-11-17T10:00:00.000Z",
   updatedAt: "2026-11-17T10:00:00.000Z",
 };

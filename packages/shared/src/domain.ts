@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ChangeFiltersSchema } from "./changes.ts";
 
 /**
  * Domain model shared by server and web. Zod schemas are the single source of truth:
@@ -11,6 +12,8 @@ export const ProjectSchema = z.object({
   /** Absolute path to a git repository on this machine. */
   path: z.string().min(1),
   reviewPrompt: z.string(),
+  /** What the Changes view hides for this project's reviews. */
+  changeFilters: ChangeFiltersSchema,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

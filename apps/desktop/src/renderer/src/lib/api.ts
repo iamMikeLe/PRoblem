@@ -1,10 +1,12 @@
 import {
   type AppSettings,
+  type ChangeSet,
   type ClaudeCatalog,
   type CloseReviewResult,
   type CreateProjectRequest,
   type CreateReviewRequest,
   type DecideApprovalRequest,
+  type FileDiff,
   type Finding,
   type FindingCounts,
   type IpcChannel,
@@ -19,6 +21,7 @@ import {
   type SendMessageRequest,
   type SetVerdictRequest,
   type StoredEntry,
+  type UpdateCheck,
   type UpdateProjectRequest,
   type UpdateSettingsRequest,
 } from "@problem/shared";
@@ -76,11 +79,17 @@ export const api = {
     stop: async (id: string): Promise<void> => {
       await call("reviews:stop", { id });
     },
+    checkUpdate: (id: string): Promise<UpdateCheck> => call("reviews:checkUpdate", { id }),
+    refresh: (id: string): Promise<Review> => call("reviews:refresh", { id }),
     setFixMode: (id: string, fixMode: boolean): Promise<Review> =>
       call("reviews:setFixMode", { id, fixMode }),
   },
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
+  },
+  changes: {
+    files: (id: string): Promise<ChangeSet> => call("changes:files", { id }),
+    file: (id: string, path: string): Promise<FileDiff> => call("changes:file", { id, path }),
   },
   approvals: {
     list: (): Promise<PendingApproval[]> => call("approvals:list", undefined),

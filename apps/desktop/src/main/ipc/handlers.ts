@@ -1,4 +1,5 @@
 import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
+import type { ChangesService } from "../changes/service.ts";
 import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
 import type { FindingsService } from "../findings/service.ts";
@@ -11,6 +12,7 @@ export interface HandlerDeps {
   reviews: ReviewService;
   sessions: SessionService;
   findings: FindingsService;
+  changes: ChangesService;
   settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
   editor: EditorOpener;
   /** Shows the native folder picker; resolves with the chosen folder or `null`. */
@@ -23,6 +25,7 @@ export function createHandlers({
   reviews,
   sessions,
   findings,
+  changes,
   settings,
   editor,
   pickFolder,
@@ -56,6 +59,11 @@ export function createHandlers({
       sessions.send(input);
       return null;
     },
+    "reviews:checkUpdate": ({ id }) => reviews.checkUpdate(id),
+    // The folder must not move under Claude's feet: no turn runs or starts during a refresh.
+    "reviews:refresh": ({ id }) => sessions.withoutTurns(id, () => reviews.refresh(id)),
+    "changes:files": ({ id }) => changes.files(id),
+    "changes:file": ({ id, path }) => changes.file(id, path),
     "reviews:setFixMode": ({ id, fixMode }) => sessions.setFixMode(id, fixMode),
     "approvals:list": () => sessions.approvals(),
     "approvals:decide": (input) => {

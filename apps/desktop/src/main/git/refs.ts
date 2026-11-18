@@ -196,3 +196,41 @@ export async function listBranches(root: string): Promise<string[]> {
   }
   return [...names].sort((a, b) => a.localeCompare(b));
 }
+
+/** Whether `ancestor` is part of the history of `commit`. */
+export async function isAncestor(root: string, ancestor: string, commit: string): Promise<boolean> {
+  try {
+    await runGit(root, ["merge-base", "--is-ancestor", "--end-of-options", ancestor, commit]);
+    return true;
+  } catch (error) {
+    if (error instanceof GitCommandError) return false;
+    throw error;
+  }
+}
+
+/** Commits in `to` that `from` lacks: their number, and the newest `limit` of them. */
+export async function commitsBetween(
+  root: string,
+  from: string,
+  to: string,
+  limit: number,
+): Promise<{ count: number; commits: { sha: string; subject: string }[] }> {
+  const range = `${from}..${to}`;
+  const count = Number(await runGit(root, ["rev-list", "--count", "--end-of-options", range]));
+  const log = await runGit(root, [
+    "log",
+    "--no-decorate",
+    `--max-count=${limit}`,
+    "--format=%H%x1f%s",
+    "--end-of-options",
+    range,
+  ]);
+  const commits = log
+    .split("\n")
+    .filter((line) => line !== "")
+    .map((line) => {
+      const [sha = "", subject = ""] = line.split("\x1f");
+      return { sha, subject };
+    });
+  return { count, commits };
+}

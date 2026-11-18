@@ -42,6 +42,7 @@ flowchart LR
 | `src/main/projects/`, `reviews/` | Services (use cases) and their repositories | no |
 | `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy, `report_findings` MCP server | no |
 | `src/main/findings/` | Findings repository, report validation, verdicts and the note to Claude (ADR 0004) | no |
+| `src/main/changes/`, `git/diff.ts` | Changed files and per-file diffs between merge base and head (ADR 0013) | no |
 | `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
@@ -137,5 +138,6 @@ Single user, local machine, untrusted input (PR contents):
 | [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |
 | [0009](adr/0009-review-checkouts.md) | Isolated worktrees by default, detached in-place opt-in, no hooks on checkout |
 | [0010](adr/0010-claude-sessions.md) | Reviews drive the user's `claude`, one query per turn, read-only until Phase 5 |
+| [0013](adr/0013-changes-view-and-refresh.md) | Own diff parser and view; check on open; Refresh moves the folder and tells Claude on the next message |
 | [0012](adr/0012-approval-cards-and-fix-mode.md) | Approval cards via hook "ask" + `canUseTool`; exact grants; fix mode per review |
 | [0011](adr/0011-open-in-editor.md) | Open `file:line` with an editor preset or template, split into words, no shell |

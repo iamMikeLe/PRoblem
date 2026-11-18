@@ -186,3 +186,55 @@ export function listInterruptedReviews(db: DatabaseSync): Review[] {
     .all()
     .map((row) => toRecord(row).review);
 }
+
+export interface ReviewHead {
+  title: string;
+  headSha: string;
+  baseSha: string;
+  mergeBaseSha: string | null;
+}
+
+/**
+ * Moves an open review to a new head (Refresh). The head it had before is kept in
+ * `moved_from_sha` until Claude has been told (the oldest untold head wins; moving back to it
+ * clears it).
+ */
+export function updateReviewHead(
+  db: DatabaseSync,
+  id: string,
+  head: ReviewHead,
+  now = new Date(),
+): void {
+  db.prepare(
+    `UPDATE reviews SET
+       moved_from_sha = CASE WHEN COALESCE(moved_from_sha, head_sha) = ? THEN NULL
+                             ELSE COALESCE(moved_from_sha, head_sha) END,
+       title = ?, head_sha = ?, base_sha = ?, merge_base_sha = ?, updated_at = ?
+     WHERE id = ? AND closed_at IS NULL`,
+  ).run(
+    head.headSha,
+    head.title,
+    head.headSha,
+    head.baseSha,
+    head.mergeBaseSha,
+    now.toISOString(),
+    id,
+  );
+}
+
+/** The head before the last Refresh(es) that Claude has not been told about yet. */
+export function movedFrom(db: DatabaseSync, id: string): string | null {
+  const row = z
+    .object({ moved_from_sha: z.string().nullable() })
+    .optional()
+    .parse(db.prepare("SELECT moved_from_sha FROM reviews WHERE id = ?").get(id));
+  return row?.moved_from_sha ?? null;
+}
+
+/** Claude was told about the move from `sha` (no-op if the review moved again meanwhile). */
+export function clearMovedFrom(db: DatabaseSync, id: string, sha: string): void {
+  db.prepare("UPDATE reviews SET moved_from_sha = NULL WHERE id = ? AND moved_from_sha = ?").run(
+    id,
+    sha,
+  );
+}

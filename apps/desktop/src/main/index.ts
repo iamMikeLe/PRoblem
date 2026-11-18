@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@problem/shared";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
+import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
 import { createSessionService } from "./claude/sessions.ts";
 import { DATABASE_NAME, dataDir } from "./config.ts";
@@ -93,6 +94,7 @@ async function start(): Promise<void> {
     log,
   });
   const findings = createFindingsService({ db, broadcast });
+  const changes = createChangesService({ review: (id) => reviews.get(id) });
   const settings = {
     get: () => getSettings(db),
     update: (request: Parameters<typeof updateSettings>[1]) => updateSettings(db, request),
@@ -138,6 +140,7 @@ async function start(): Promise<void> {
         reviews,
         sessions,
         findings,
+        changes,
         settings,
         editor,
         pickFolder,

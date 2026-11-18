@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CreateProjectRequestSchema,
+  DEFAULT_CHANGE_FILTERS,
   DEFAULT_REVIEW_PROMPT,
   ipcContract,
   ReviewPromptSchema,
@@ -12,6 +13,7 @@ const project = {
   name: "payments-api",
   path: "/repos/payments-api",
   reviewPrompt: DEFAULT_REVIEW_PROMPT,
+  changeFilters: DEFAULT_CHANGE_FILTERS,
   createdAt: "2026-11-17T10:00:00.000Z",
   updatedAt: "2026-11-17T10:00:00.000Z",
 };

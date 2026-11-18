@@ -2,9 +2,12 @@ import {
   type AppErrorCode,
   type AppEvent,
   type AppSettings,
+  type ChangeSet,
   type ClaudeCatalog,
+  DEFAULT_CHANGE_FILTERS,
   DEFAULT_REVIEW_PROMPT,
   DEFAULT_SETTINGS,
+  type FileDiff,
   type Finding,
   type IpcChannel,
   type IpcInput,
@@ -17,6 +20,7 @@ import {
   type Project,
   type Review,
   type StoredEntry,
+  type UpdateCheck,
 } from "@problem/shared";
 
 export interface StubCall {
@@ -31,6 +35,7 @@ export function makeProject(id: string, name: string, overrides: Partial<Project
     name,
     path: `/repos/${name}`,
     reviewPrompt: DEFAULT_REVIEW_PROMPT,
+    changeFilters: DEFAULT_CHANGE_FILTERS,
     createdAt: "2026-11-17T10:00:00.000Z",
     updatedAt: "2026-11-17T10:00:00.000Z",
     ...overrides,
@@ -107,6 +112,12 @@ interface StubState {
   catalog: ClaudeCatalog;
   sendError?: StubError | undefined;
   approvals: PendingApproval[];
+  /** Changed files by review id, and diffs by path. */
+  changes: Record<string, ChangeSet>;
+  diffs: Record<string, FileDiff>;
+  /** What "check for new commits" answers; default: up to date. */
+  updateCheck?: UpdateCheck | undefined;
+  refreshError?: StubError | undefined;
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
   settings: AppSettings;
@@ -142,6 +153,8 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     entries: {},
     findings: {},
     approvals: [],
+    changes: {},
+    diffs: {},
     settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
@@ -180,6 +193,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
       }
       case "projects:update": {
         const { id, patch } = ipcContract[channel].input.parse(raw);
+        const filtersOnly = patch.changeFilters;
         const index = projects.findIndex((p) => p.id === id);
         const current = projects[index];
         if (!current) return fail({ code: "project_not_found", message: "Project not found" });
@@ -188,6 +202,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
           ...current,
           name: patch.name ?? current.name,
           reviewPrompt: patch.reviewPrompt ?? current.reviewPrompt,
+          changeFilters: filtersOnly ?? current.changeFilters,
         };
         projects[index] = updated;
         return ok(updated);
@@ -246,6 +261,44 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         return ok(null);
       case "claude:catalog":
         return ok(state.catalog);
+      case "reviews:checkUpdate": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        const review = state.reviews.find((r) => r.id === id);
+        if (!review) return fail({ code: "review_not_found", message: "Review not found" });
+        return ok(
+          state.updateCheck ?? {
+            headSha: review.headSha,
+            latestSha: review.headSha,
+            newCommits: 0,
+            commits: [],
+            rewritten: false,
+          },
+        );
+      }
+      case "reviews:refresh": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        if (state.refreshError) return fail(state.refreshError);
+        const latest = state.updateCheck?.latestSha;
+        state.reviews = state.reviews.map((r) =>
+          r.id === id && latest ? { ...r, headSha: latest } : r,
+        );
+        state.updateCheck = undefined;
+        const review = state.reviews.find((r) => r.id === id);
+        return review
+          ? ok(review)
+          : fail({ code: "review_not_found", message: "Review not found" });
+      }
+      case "changes:files": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(
+          state.changes[id] ?? { fromSha: "c".repeat(40), toSha: "a".repeat(40), files: [] },
+        );
+      }
+      case "changes:file": {
+        const { path } = ipcContract[channel].input.parse(raw);
+        const diff = state.diffs[path];
+        return diff ? ok(diff) : fail({ code: "file_not_in_changes", message: "Not changed" });
+      }
       case "reviews:setFixMode": {
         const { id, fixMode } = ipcContract[channel].input.parse(raw);
         const current = state.reviews.find((r) => r.id === id);

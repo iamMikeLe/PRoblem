@@ -22,8 +22,10 @@ import { verdictNote } from "../findings/report.ts";
 import { markVerdictsTold, untoldVerdicts, type VerdictChange } from "../findings/repository.ts";
 import type { FindingsService } from "../findings/service.ts";
 import {
+  clearMovedFrom,
   getReviewRecord,
   listInterruptedReviews,
+  movedFrom,
   type ReviewSessionPatch,
   updateOpenReview,
 } from "../reviews/repository.ts";
@@ -34,7 +36,7 @@ import { addGrant, hasGrant, removeGrants } from "./grants.ts";
 import { FINDINGS_SERVER } from "./names.ts";
 import { toSignals } from "./normalize.ts";
 import { decideToolUse, type GateDecision, REVIEW_TOOLS } from "./policy.ts";
-import { firstTurnPrompt, reviewSystemAppend } from "./prompt.ts";
+import { firstTurnPrompt, movedNote, reviewSystemAppend } from "./prompt.ts";
 
 /** The part of the SDK's `Query` the app uses; tests provide a fake. */
 export interface ClaudeQuery extends AsyncIterable<unknown> {
@@ -80,6 +82,13 @@ export interface SessionService {
   /** Tool calls of all reviews that wait for the user. */
   approvals(): PendingApproval[];
   decide(request: DecideApprovalRequest): void;
+  /** Whether a turn of the review runs or waits in the queue. */
+  isBusy(reviewId: string): boolean;
+  /**
+   * Runs `task` (a Refresh) while no turn of the review may start; fails with `review_busy` when
+   * one runs or waits.
+   */
+  withoutTurns<T>(reviewId: string, task: () => Promise<T>): Promise<T>;
   /** Turns fix mode on or off (read by the gate at every tool call). */
   setFixMode(reviewId: string, fixMode: boolean): Review;
   catalog(): ClaudeCatalog;
@@ -164,11 +173,15 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
   const stopTimeoutMs = deps.stopTimeoutMs ?? 10_000;
 
   const running = new Map<string, Turn>();
-  /** `told`: verdicts the prompt tells Claude about, marked as told once the turn has started. */
+  /**
+   * `told`: verdicts the prompt tells Claude about; `movedFrom`: the head before a Refresh it tells
+   * Claude about. Both are marked as told once the turn has started.
+   */
   interface QueuedTurn {
     reviewId: string;
     prompt: string;
     told: readonly VerdictChange[];
+    movedFrom: string | null;
   }
   const queue: QueuedTurn[] = [];
   const approvals = createApprovalQueue(now);
@@ -411,7 +424,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     message,
   });
 
-  async function runTurn({ reviewId, prompt, told }: QueuedTurn): Promise<void> {
+  async function runTurn({ reviewId, prompt, told, movedFrom: moved }: QueuedTurn): Promise<void> {
     let finish!: () => void;
     const turn: Turn = {
       abort: new AbortController(),
@@ -442,6 +455,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
           if (signal.type === "session") {
             // Claude has the message now; a stopped or failed start keeps the note for next time.
             if (told.length > 0 && !closing) markVerdictsTold(db, reviewId, told);
+            if (moved !== null && !closing) clearMovedFrom(db, reviewId, moved);
             if (signal.sessionId !== review.sessionId) {
               patch(reviewId, { sessionId: signal.sessionId });
               broadcast({ type: "review.session", reviewId, sessionId: signal.sessionId });
@@ -510,7 +524,16 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     }
   }
 
+  /** Reviews whose folder is being moved by a Refresh: no turn may start meanwhile. */
+  const exclusive = new Set<string>();
+
   function assertIdle(reviewId: string): void {
+    if (exclusive.has(reviewId)) {
+      throw new AppFailure(
+        "review_busy",
+        "The review is being refreshed. Send your message when it is done.",
+      );
+    }
     if (running.has(reviewId) || queue.some((item) => item.reviewId === reviewId)) {
       throw new AppFailure(
         "review_busy",
@@ -519,11 +542,16 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     }
   }
 
-  function enqueue(reviewId: string, text: string, told: readonly VerdictChange[] = []): void {
+  function enqueue(
+    reviewId: string,
+    text: string,
+    told: readonly VerdictChange[] = [],
+    moved: string | null = null,
+  ): void {
     assertIdle(reviewId);
     record(reviewId, { kind: "user", text });
     setStatus(reviewId, "queued");
-    queue.push({ reviewId, prompt: text, told });
+    queue.push({ reviewId, prompt: text, told, movedFrom: moved });
     pump();
   }
 
@@ -544,9 +572,14 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       assertIdle(id);
       if (model !== review.model) patch(id, { model });
       // Tell Claude which findings the user accepted or dismissed since the last message.
+      // Tell Claude what changed since the last message: a Refresh, and the user's verdicts.
+      const moved = movedFrom(db, id);
       const told = untoldVerdicts(db, id);
-      const note = verdictNote(told);
-      enqueue(id, note ? `${note}\n\n${text}` : text, told);
+      const notes = [
+        moved === null ? undefined : movedNote(moved, review.headSha),
+        verdictNote(told),
+      ].filter((note) => note !== undefined);
+      enqueue(id, [...notes, text].join("\n\n"), told, moved);
     },
 
     async stop(reviewId) {
@@ -592,6 +625,18 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     },
 
     entries: (reviewId) => listEntries(db, reviewId),
+
+    isBusy: (reviewId) => running.has(reviewId) || queue.some((item) => item.reviewId === reviewId),
+
+    async withoutTurns(reviewId, task) {
+      assertIdle(reviewId);
+      exclusive.add(reviewId);
+      try {
+        return await task();
+      } finally {
+        exclusive.delete(reviewId);
+      }
+    },
 
     approvals: () => approvals.list(),
 

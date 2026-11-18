@@ -2,14 +2,22 @@ import { randomUUID } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import type { CloseReviewResult, CreateReviewRequest, Review, ReviewSource } from "@problem/shared";
+import type {
+  CloseReviewResult,
+  CreateReviewRequest,
+  Review,
+  ReviewSource,
+  UpdateCheck,
+} from "@problem/shared";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { GhClient } from "../git/gh.ts";
 import { githubRepoOf, parsePullRequestUrl } from "../git/github.ts";
 import {
   assertBranchName,
+  commitsBetween,
   defaultBaseBranch,
   fetchRefspec,
+  isAncestor,
   listBranches,
   listRemotes,
   mergeBase,
@@ -33,6 +41,7 @@ import {
   insertReview,
   listOpenReviews,
   markReviewClosed,
+  updateReviewHead,
 } from "./repository.ts";
 
 export interface ReviewServiceDeps {
@@ -51,6 +60,10 @@ export interface ReviewService {
   create(input: CreateReviewRequest): Promise<Review>;
   close(id: string): Promise<CloseReviewResult>;
   branches(projectId: string): Promise<string[]>;
+  /** Fetches the review's branch or pull request and compares its head (ADR 0013). */
+  checkUpdate(id: string): Promise<UpdateCheck>;
+  /** Moves the review's folder to the latest head; the caller makes sure Claude is not working. */
+  refresh(id: string): Promise<Review>;
 }
 
 /** What to check out, resolved from the user's input. */
@@ -317,7 +330,89 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     });
   }
 
+  function openRecord(id: string) {
+    const record = getReviewRecord(db, id);
+    if (!record || record.closedAt !== null)
+      throw new AppFailure("review_not_found", "Review not found");
+    return record;
+  }
+
+  /** The review's branch or pull request as it is now on the remote. */
+  function resolveLatest(review: Review, root: string): Promise<ResolvedHead> {
+    return review.source.kind === "pull-request"
+      ? resolvePullRequest(root, review.source.url)
+      : resolveBranch(root, review.source.branch);
+  }
+
+  async function checkUpdate(id: string): Promise<UpdateCheck> {
+    const { review } = openRecord(id);
+    const root = projectOrFail(review.projectId).path;
+    const latest = await resolveLatest(review, root);
+    if (latest.headSha === review.headSha) {
+      return {
+        headSha: review.headSha,
+        latestSha: latest.headSha,
+        newCommits: 0,
+        commits: [],
+        rewritten: false,
+      };
+    }
+    const rewritten = !(await isAncestor(root, review.headSha, latest.headSha));
+    const { count, commits } = await commitsBetween(root, review.headSha, latest.headSha, 20);
+    return {
+      headSha: review.headSha,
+      latestSha: latest.headSha,
+      newCommits: count,
+      commits,
+      rewritten,
+    };
+  }
+
+  async function refresh(id: string): Promise<Review> {
+    const first = openRecord(id).review;
+    return serialized(first.projectId, async () => {
+      const { review } = openRecord(id);
+      const root = projectOrFail(review.projectId).path;
+      const latest = await resolveLatest(review, root);
+      if (latest.headSha === review.headSha) return review;
+      // Uncommitted edits (fix mode, or the user's own in an in-place review) would be lost or
+      // block the checkout: the user decides what to do with them first.
+      if (await hasLocalChanges(review.workdir)) {
+        throw new AppFailure(
+          "local_changes",
+          "The review's folder has uncommitted changes. Commit, stash or discard them, then refresh.",
+        );
+      }
+      if (!review.isolated) {
+        const atRisk = await ignoredFilesOverwrittenBy(root, latest.headSha);
+        if (atRisk.length > 0) {
+          throw new AppFailure(
+            "ignored_files_at_risk",
+            `Moving the project folder would overwrite ignored files (${atRisk.slice(0, 3).join(", ")}).`,
+          );
+        }
+      }
+      const baseSha = await resolveBaseCommit(root, latest.remote, review.baseBranch);
+      const mergeBaseSha = (await mergeBase(root, latest.headSha, baseSha)) ?? null;
+      await checkout(review.workdir, { sha: latest.headSha });
+      updateReviewHead(
+        db,
+        id,
+        { title: latest.title, headSha: latest.headSha, baseSha, mergeBaseSha },
+        now(),
+      );
+      log.info("review refreshed", {
+        id,
+        from: shortSha(review.headSha),
+        to: shortSha(latest.headSha),
+      });
+      return openRecord(id).review;
+    });
+  }
+
   return {
+    checkUpdate,
+    refresh,
     list: () => listOpenReviews(db),
     get(id) {
       const record = getReviewRecord(db, id);

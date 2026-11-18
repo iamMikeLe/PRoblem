@@ -75,10 +75,10 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 6: Changes view
 
-- [ ] Diff against the merge base, file tree with +/- counts
-- [ ] Filters: tests / generated / glob patterns, remembered per project
-- [ ] Findings shown on their lines; line numbers open the editor
-- [ ] Detect new commits on the PR; Refresh moves the review and tells Claude what changed
+- [x] Diff against the merge base, file tree with +/- counts
+- [x] Filters: tests / generated / glob patterns, remembered per project
+- [x] Findings shown on their lines; line numbers open the editor
+- [x] Detect new commits (when the tab opens or on "Check now"); Refresh moves the review and tells Claude on the next message (ADR 0013)
 
 ## Phase 7: Git host integration
 

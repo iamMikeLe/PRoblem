@@ -31,13 +31,16 @@ export class GitCommandError extends Error {
   readonly stderr: string;
   readonly spawnFailed: boolean;
   readonly timedOut: boolean;
+  /** The output was larger than `maxBuffer`. */
+  readonly tooMuchOutput: boolean;
 
   constructor(error: ExecFileException, stderr: string) {
     super(error.message, { cause: error });
     this.name = "GitCommandError";
     this.stderr = stderr.trim();
     this.spawnFailed = error.code === "ENOENT";
-    this.timedOut = error.killed === true;
+    this.tooMuchOutput = error.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+    this.timedOut = error.killed === true && !this.tooMuchOutput;
   }
 }
 
@@ -60,13 +63,22 @@ export interface RunGitOptions {
    * recursion and Git LFS downloads (ADR 0009).
    */
   noHooks?: boolean;
+  /** Largest output accepted, in bytes (default 1 MB); more fails with `tooMuchOutput`. */
+  maxBuffer?: number;
 }
 
 /**
  * Settings for commands that touch code under review: no hooks (`core.hooksPath` pointing
- * nowhere) and no recursion into submodules the PR may declare.
+ * nowhere), no recursion into submodules the PR may declare, and no file system monitor program.
  */
-const NO_HOOKS = ["-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=false"] as const;
+const NO_HOOKS = [
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "submodule.recurse=false",
+  "-c",
+  "core.fsmonitor=false",
+] as const;
 
 /**
  * Runs git with an argument array (never a shell) and resolves with its stdout minus the final
@@ -75,7 +87,7 @@ const NO_HOOKS = ["-c", "core.hooksPath=/dev/null", "-c", "submodule.recurse=fal
 export function runGit(
   cwd: string,
   args: readonly string[],
-  { timeoutMs = GIT_TIMEOUT_MS, noHooks = false }: RunGitOptions = {},
+  { timeoutMs = GIT_TIMEOUT_MS, noHooks = false, maxBuffer = 1024 * 1024 }: RunGitOptions = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -86,6 +98,7 @@ export function runGit(
         // Git LFS would download objects from a URL the PR can set in `.lfsconfig`; keep pointers.
         env: noHooks ? { ...gitEnv(), GIT_LFS_SKIP_SMUDGE: "1" } : gitEnv(),
         timeout: timeoutMs,
+        maxBuffer,
         killSignal: "SIGKILL",
         encoding: "utf8",
       },

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  ChangeFiltersSchema,
+  ChangeSetSchema,
+  FileDiffSchema,
+  UpdateCheckSchema,
+} from "./changes.ts";
 import type { IpcChannel } from "./channels.ts";
 import {
   ApprovalDecisionSchema,
@@ -57,6 +63,7 @@ export const AppErrorCodeSchema = z.enum([
   "editor_not_found",
   "editor_failed",
   "approval_not_found",
+  "file_not_in_changes",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -91,10 +98,15 @@ export const UpdateProjectRequestSchema = z
   .strictObject({
     name: ProjectNameSchema.optional(),
     reviewPrompt: ReviewPromptSchema.optional(),
+    changeFilters: ChangeFiltersSchema.optional(),
   })
-  .refine((value) => value.name !== undefined || value.reviewPrompt !== undefined, {
-    message: "Nothing to update",
-  });
+  .refine(
+    (value) =>
+      value.name !== undefined ||
+      value.reviewPrompt !== undefined ||
+      value.changeFilters !== undefined,
+    { message: "Nothing to update" },
+  );
 export type UpdateProjectRequest = z.infer<typeof UpdateProjectRequestSchema>;
 
 const ProjectIdSchema = z.string().min(1);
@@ -198,6 +210,24 @@ export const ipcContract = {
   "reviews:setFixMode": {
     input: z.strictObject({ id: ReviewIdSchema, fixMode: z.boolean() }),
     output: ReviewSchema,
+  },
+  /** Fetches the review's branch or pull request and compares its head with the review's. */
+  "reviews:checkUpdate": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: UpdateCheckSchema,
+  },
+  /**
+   * Moves the review to the latest head (fails with `review_busy` while Claude works, and with
+   * `local_changes` when the review's folder has uncommitted edits). Claude is told on the next
+   * message.
+   */
+  "reviews:refresh": { input: z.strictObject({ id: ReviewIdSchema }), output: ReviewSchema },
+  /** Files the review changes, compared with its merge base. */
+  "changes:files": { input: z.strictObject({ id: ReviewIdSchema }), output: ChangeSetSchema },
+  /** The diff of one changed file (`path` must be one of `changes:files`). */
+  "changes:file": {
+    input: z.strictObject({ id: ReviewIdSchema, path: z.string().min(1).max(PROJECT_PATH_MAX) }),
+    output: FileDiffSchema,
   },
   /** Tool calls of all reviews that wait for the user. */
   "approvals:list": { input: z.undefined(), output: z.array(PendingApprovalSchema) },

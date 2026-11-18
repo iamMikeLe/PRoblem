@@ -5,7 +5,10 @@ const CHECKOUT_TIMEOUT_MS = 120_000;
 
 /** True when tracked files have uncommitted changes (untracked files do not block a checkout). */
 export async function hasLocalChanges(root: string): Promise<boolean> {
-  const out = await runGit(root, ["status", "--porcelain", "--untracked-files=no"]);
+  // Runs in code under review (a worktree, or the project folder): no hooks, no fsmonitor.
+  const out = await runGit(root, ["status", "--porcelain", "--untracked-files=no"], {
+    noHooks: true,
+  });
   return out.trim() !== "";
 }
 

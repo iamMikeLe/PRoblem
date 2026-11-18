@@ -117,3 +117,8 @@ const NO_APPROVALS: PendingApproval[] = [];
 export function usePendingApprovals(reviewId: string): PendingApproval[] {
   return useConversationStore((state) => state.approvals[reviewId] ?? NO_APPROVALS);
 }
+
+/** Whether Claude is working on (or waiting to work on) the review, from the live status. */
+export function useIsBusy(review: { id: string; status: ReviewStatus }): boolean {
+  return isBusy(useReviewStatus(review));
+}

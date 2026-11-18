@@ -141,16 +141,21 @@ interface Props {
   reviewId: string;
   /** "Ask about #N": prefill the composer and switch to the conversation. */
   onAsk: (finding: Finding) => void;
+  /** Open with this finding selected (from the Changes tab). */
+  initialSelected?: number | undefined;
 }
 
 /** Findings Claude reported for a review, with the user's verdicts. */
-export function FindingsTab({ reviewId, onAsk }: Props) {
+export function FindingsTab({ reviewId, onAsk, initialSelected }: Props) {
   const styles = useStyles();
   const findings = useFindings(reviewId);
   const setVerdict = useSetVerdict();
   const openEditor = useOpenInEditor();
-  const [filter, setFilter] = useState<FindingFilter>("open");
-  const [selected, setSelected] = useState<number>();
+  // A finding chosen elsewhere may be accepted or dismissed: show all findings then.
+  const [filter, setFilter] = useState<FindingFilter>(
+    initialSelected === undefined ? "open" : "all",
+  );
+  const [selected, setSelected] = useState<number | undefined>(initialSelected);
 
   const all = findings.data ?? [];
   const shown = all
