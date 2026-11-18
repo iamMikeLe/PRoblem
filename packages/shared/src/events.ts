@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { StoredEntrySchema } from "./conversation.ts";
 import { FindingSchema, ReviewStatusSchema } from "./domain.ts";
 
 /**
@@ -11,6 +12,15 @@ export const AppEventSchema = z.discriminatedUnion("type", [
     reviewId: z.string(),
     status: ReviewStatusSchema,
   }),
+  /** A conversation entry was stored. */
+  z.object({ type: z.literal("review.entry"), entry: StoredEntrySchema }),
+  /**
+   * Text Claude is writing right now, for display only (never stored). Each delta extends the live
+   * text of the review; the next `assistant` entry or the end of the turn replaces it.
+   */
+  z.object({ type: z.literal("review.delta"), reviewId: z.string(), text: z.string() }),
+  /** Claude Code started a session for the review (first turn). */
+  z.object({ type: z.literal("review.session"), reviewId: z.string(), sessionId: z.string() }),
   z.object({
     type: z.literal("review.findings"),
     reviewId: z.string(),

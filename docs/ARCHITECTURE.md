@@ -40,6 +40,7 @@ flowchart LR
 | `src/main/ipc/handlers.ts` | Channel → use case | no |
 | `src/main/ipc/trust.ts` | Is this URL our own UI? | no |
 | `src/main/projects/`, `reviews/` | Services (use cases) and their repositories | no |
+| `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
 | `src/preload/index.ts` | `window.reviewroom` bridge | yes |
@@ -60,24 +61,31 @@ zod input and output schema.
    anything else is logged and reported as `internal`.
 5. The renderer parses `data` with the output schema before React sees it.
 
-Events (review status, findings, stream output from Phase 3) go the other way on one channel,
-validated by `AppEventSchema`.
+Events (review status, conversation entries, live text, findings) go the other way on one
+channel, validated by `AppEventSchema`.
 
-## Data flow of a review turn (from Phase 3)
+## Data flow of a review turn (ADR 0010)
 
-1. The user sends a message → `invoke("reviews:send", { reviewId, text })`.
-2. The session service starts `query()` in the review's workdir (`resume` after the first turn).
-3. Each SDK message becomes a normalized review event, is appended to SQLite, then broadcast.
-4. Tool calls go through the permission gate; when it needs the user, the review turns
-   `needs-input` and an approval card appears.
-5. Claude calls `report_findings`; main assigns stable numbers, stores and broadcasts them.
-6. The turn ends, the status becomes `idle`.
+1. Creating a review sends its filled-in prompt as the first message. Later messages come from the
+   composer: `invoke("reviews:send", { id, text, model })`.
+2. `claude/sessions.ts` stores the user entry and marks the review `queued`. At most 3 turns
+   run at once.
+3. A turn starts `query()` with the user's `claude`, in the review's workdir, with `resume` after
+   the first turn. The session id from `system/init` is stored on the review.
+4. `claude/normalize.ts` turns each SDK message into a `ConversationEntry`. The entry is appended
+   to `review_entries`, then broadcast as `review.entry`. Text deltas are broadcast as
+   `review.delta` and never stored.
+5. Every tool call goes through the `PreToolUse` policy (`claude/policy.ts`). Until Phase 5 it
+   allows only read-only calls and denies the rest. Phase 5 adds approval cards and `needs-input`.
+6. The result message becomes a `turn-end` entry (cost, duration, error). The status becomes
+   `idle`, or `failed`. Stop calls `interrupt()` and kills the turn if it does not end in 10 s.
+7. Phase 4: Claude calls `report_findings`; main assigns stable numbers, stores and broadcasts them.
 
 ## Storage
 
 `~/.reviewroom/` (override with `REVIEWROOM_HOME`):
 
-- `reviewroom.db`: projects, reviews, events, findings, approvals (WAL mode)
+- `reviewroom.db`: projects, reviews, conversation entries (later findings, approvals); WAL mode
 - `worktrees/<project>/<review-id>/`: isolated checkouts
 
 ## Security model
@@ -86,8 +94,9 @@ Single user, local machine, untrusted input (PR contents):
 
 - Renderer: `contextIsolation`, `sandbox`, no Node, strict CSP, no navigation, no new windows.
 - IPC: only contract channels; inputs validated; only our own frame may call.
-- Claude is read-only by default; the gate decides every tool call (ADR 0005).
-- PR checkouts never load their own Claude settings or MCP config.
+- Claude is read-only by default; the gate decides every tool call (ADR 0005, ADR 0010).
+- Claude sessions load only the user's settings: never a checkout's `.claude/`, `.mcp.json` or
+  `CLAUDE.md` (a PR's hooks would run as shell commands).
 - No shell strings: every `git`/`gh` call is an argument array; user input never reaches git as
   an option (ADR 0009).
 - Checkouts of review code run with all git hooks disabled (ADR 0009).
@@ -106,3 +115,4 @@ Single user, local machine, untrusted input (PR contents):
 | [0007](adr/0007-project-identity-and-review-prompt.md) | A project is its repository root; its review prompt is stored as text |
 | [0008](adr/0008-electron-with-typed-ipc.md) | Electron desktop app with a typed IPC contract |
 | [0009](adr/0009-review-checkouts.md) | Isolated worktrees by default, detached in-place opt-in, no hooks on checkout |
+| [0010](adr/0010-claude-sessions.md) | Reviews drive the user's `claude`, one query per turn, read-only until Phase 5 |

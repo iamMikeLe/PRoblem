@@ -7,13 +7,16 @@ import {
   Tab,
   TabList,
   Text,
-  Textarea,
   Tooltip,
   tokens,
 } from "@fluentui/react-components";
-import { DismissRegular, SendRegular } from "@fluentui/react-icons";
+import { DismissRegular } from "@fluentui/react-icons";
 import type { Review } from "@reviewroom/shared";
 import { useState } from "react";
+import { Composer } from "../../features/conversation/Composer.tsx";
+import { Conversation } from "../../features/conversation/Conversation.tsx";
+import { useConversation } from "../../features/conversation/queries.ts";
+import { useReviewStatus } from "../../features/conversation/store.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
@@ -28,6 +31,8 @@ const useStyles = makeStyles({
     gridArea: "main",
     display: "grid",
     gridTemplateRows: "auto auto 1fr auto",
+    // One column that never grows with its content (long paths, long commands).
+    gridTemplateColumns: "minmax(0, 1fr)",
     minHeight: 0,
     minWidth: 0,
     backgroundColor: tokens.colorNeutralBackground1,
@@ -72,14 +77,23 @@ const useStyles = makeStyles({
     overflowY: "auto",
     color: tokens.colorNeutralForeground3,
   },
-  composer: {
-    display: "flex",
-    gap: tokens.spacingHorizontalS,
-    alignItems: "flex-end",
-    padding: tokens.spacingHorizontalL,
-  },
-  input: { flexGrow: 1 },
 });
+
+/** The Conversation tab: transcript plus composer. Keyed by review, so drafts and scroll reset. */
+function ConversationTab({ review }: { review: Review }) {
+  const status = useReviewStatus(review);
+  const { entries, live, error, isLoading } = useConversation(review.id);
+  return (
+    <>
+      {error ? (
+        <Text role="alert">Could not load the conversation: {error.message}</Text>
+      ) : (
+        <Conversation entries={entries} live={live} status={status} loading={isLoading} />
+      )}
+      <Composer review={review} status={status} />
+    </>
+  );
+}
 
 interface Props {
   review: Review | undefined;
@@ -106,7 +120,7 @@ export function MainPane({ review, onClosed }: Props) {
   return (
     <main className={styles.root}>
       <div className={styles.header}>
-        <StatusDot status={review.status} />
+        <StatusDot review={review} />
         <Subtitle1 as="h2" className={styles.title} title={review.title}>
           {review.title}
         </Subtitle1>
@@ -141,22 +155,16 @@ export function MainPane({ review, onClosed }: Props) {
           <Caption1 className={styles.path}>{review.workdir}</Caption1>
         </Tooltip>
       </div>
-      <div className={styles.body}>
-        <Text>
-          {tab === "conversation"
-            ? "Claude joins the review in Phase 3."
-            : "This view arrives in a later phase — see docs/ROADMAP.md."}
-        </Text>
-      </div>
-      <div className={styles.composer}>
-        <Textarea
-          className={styles.input}
-          resize="vertical"
-          disabled
-          placeholder="Ask Claude about this review (available from Phase 3)"
-        />
-        <Button appearance="primary" icon={<SendRegular />} aria-label="Send" disabled />
-      </div>
+      {tab === "conversation" ? (
+        <ConversationTab key={review.id} review={review} />
+      ) : (
+        <>
+          <div className={styles.body}>
+            <Text>This view arrives in a later phase — see docs/ROADMAP.md.</Text>
+          </div>
+          <div />
+        </>
+      )}
       <CloseReviewDialog
         review={review}
         open={closing}

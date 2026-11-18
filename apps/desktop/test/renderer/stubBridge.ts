@@ -1,6 +1,7 @@
 import {
   type AppErrorCode,
   type AppEvent,
+  type ClaudeCatalog,
   DEFAULT_REVIEW_PROMPT,
   type IpcChannel,
   type IpcInput,
@@ -11,6 +12,7 @@ import {
   type Project,
   type Review,
   type ReviewRoomBridge,
+  type StoredEntry,
 } from "@reviewroom/shared";
 
 export interface StubCall {
@@ -49,6 +51,8 @@ export function makeReview(id: string, project: Project, overrides: Partial<Revi
     isolated: true,
     prompt: project.reviewPrompt,
     status: "idle",
+    sessionId: null,
+    model: null,
     createdAt: "2026-11-17T10:00:00.000Z",
     updatedAt: "2026-11-17T10:00:00.000Z",
     ...overrides,
@@ -69,6 +73,10 @@ interface StubState {
   createReviewError?: StubError | undefined;
   closeReviewError?: StubError | undefined;
   calls: StubCall[];
+  /** Stored conversations by review id. */
+  entries: Record<string, StoredEntry[]>;
+  catalog: ClaudeCatalog;
+  sendError?: StubError | undefined;
   /** What the native folder picker "chooses"; `null` = the user cancels. */
   pickedFolder: string | null;
   /** When set, the matching call fails with this error. */
@@ -97,6 +105,21 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     branches: ["feature/login", "main", "release/1.0"],
     closeNote: null,
     calls: [],
+    entries: {},
+    catalog: {
+      models: [
+        { value: "opus", displayName: "Opus", description: "Most capable" },
+        { value: "haiku", displayName: "Haiku", description: "Fastest" },
+      ],
+      commands: [
+        {
+          name: "security-review",
+          description: "Security review of the changes",
+          argumentHint: "",
+        },
+        { name: "simplify", description: "Simplify the code", argumentHint: "" },
+      ],
+    },
     pickedFolder: null,
     emit: (event) => {
       for (const listener of listeners) listener(event);
@@ -171,6 +194,21 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         state.reviews.splice(index, 1);
         return ok({ note: state.closeNote });
       }
+      case "reviews:events": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(state.entries[id] ?? []);
+      }
+      case "reviews:send": {
+        const { id, model } = ipcContract[channel].input.parse(raw);
+        if (state.sendError) return fail(state.sendError);
+        state.reviews = state.reviews.map((r) => (r.id === id ? { ...r, model } : r));
+        return ok(null);
+      }
+      case "reviews:stop":
+        ipcContract[channel].input.parse(raw);
+        return ok(null);
+      case "claude:catalog":
+        return ok(state.catalog);
     }
   }
 

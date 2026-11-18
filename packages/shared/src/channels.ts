@@ -12,6 +12,10 @@ export const IPC_CHANNELS = [
   "reviews:list",
   "reviews:create",
   "reviews:close",
+  "reviews:events",
+  "reviews:send",
+  "reviews:stop",
+  "claude:catalog",
   "dialog:pickFolder",
 ] as const;
 

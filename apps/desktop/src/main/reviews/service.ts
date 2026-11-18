@@ -51,6 +51,8 @@ export interface ReviewServiceDeps {
 
 export interface ReviewService {
   list(): Review[];
+  /** An open review, or `review_not_found`. */
+  get(id: string): Review;
   create(input: CreateReviewRequest): Promise<Review>;
   close(id: string): Promise<CloseReviewResult>;
   branches(projectId: string): Promise<string[]>;
@@ -230,6 +232,8 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
         isolated: input.isolated,
         prompt: input.prompt,
         status: "idle",
+        sessionId: null,
+        model: null,
         createdAt: at,
         updatedAt: at,
       };
@@ -319,6 +323,12 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
 
   return {
     list: () => listOpenReviews(db),
+    get(id) {
+      const record = getReviewRecord(db, id);
+      if (!record || record.closedAt !== null)
+        throw new AppFailure("review_not_found", "Review not found");
+      return record.review;
+    },
     create,
     close,
     branches: async (projectId) => listBranches(projectOrFail(projectId).path),

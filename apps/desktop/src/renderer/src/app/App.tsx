@@ -8,6 +8,7 @@ import {
   useToastController,
 } from "@fluentui/react-components";
 import { useState } from "react";
+import { useAppEvents } from "../features/conversation/useAppEvents.ts";
 import { ProjectDetail } from "../features/projects/ProjectDetail.tsx";
 import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
 import { useProjects } from "../features/projects/queries.ts";
@@ -32,6 +33,7 @@ const useStyles = makeStyles({
 export function App() {
   const styles = useStyles();
   const [section, setSection] = useState<RailSection>("reviews");
+  useAppEvents();
   const projects = useProjects();
   const reviews = useReviews();
   const [creating, setCreating] = useState(false);

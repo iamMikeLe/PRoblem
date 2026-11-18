@@ -1,5 +1,6 @@
 import { Badge, type BadgeProps } from "@fluentui/react-components";
-import type { ReviewStatus } from "@reviewroom/shared";
+import type { Review, ReviewStatus } from "@reviewroom/shared";
+import { useReviewStatus } from "../conversation/store.ts";
 
 const statusAppearance: Record<
   ReviewStatus,
@@ -12,7 +13,9 @@ const statusAppearance: Record<
   failed: { color: "danger", label: "Failed" },
 };
 
-export function StatusDot({ status }: { status: ReviewStatus }) {
+/** The review's live status (from events), shown as a colored dot. */
+export function StatusDot({ review }: { review: Pick<Review, "id" | "status"> }) {
+  const status = useReviewStatus(review);
   const { color, label } = statusAppearance[status];
   return (
     <Badge size="extra-small" shape="circular" color={color} aria-label={label} title={label} />

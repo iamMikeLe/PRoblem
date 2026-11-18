@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { type Review, ReviewSchema } from "@reviewroom/shared";
+import { type Review, ReviewSchema, type ReviewStatus } from "@reviewroom/shared";
 import { z } from "zod";
 
 /** A review as stored, with the fields only the main process needs. */
@@ -27,6 +27,8 @@ const RowSchema = z.object({
   isolated: z.number(),
   prompt: z.string(),
   status: z.string(),
+  session_id: z.string().nullable(),
+  model: z.string().nullable(),
   restore_branch: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
@@ -52,6 +54,8 @@ function toRecord(raw: unknown): ReviewRecord {
     isolated: row.isolated === 1,
     prompt: row.prompt,
     status: row.status,
+    sessionId: row.session_id,
+    model: row.model,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   });
@@ -60,7 +64,7 @@ function toRecord(raw: unknown): ReviewRecord {
 
 const COLUMNS = `id, project_id, title, source_kind, pr_url, pr_number, pr_repo, head_branch,
   head_sha, base_branch, base_sha, merge_base_sha, workdir, isolated, prompt, status,
-  restore_branch, created_at, updated_at, closed_at`;
+  session_id, model, restore_branch, created_at, updated_at, closed_at`;
 
 /** Open reviews of all projects, newest first. */
 export function listOpenReviews(db: DatabaseSync): Review[] {
@@ -95,7 +99,7 @@ export function countOpenReviews(db: DatabaseSync, projectId: string): number {
 export function insertReview(db: DatabaseSync, review: Review, restoreBranch: string | null): void {
   const pr = review.source.kind === "pull-request" ? review.source : undefined;
   db.prepare(
-    `INSERT INTO reviews (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    `INSERT INTO reviews (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
   ).run(
     review.id,
     review.projectId,
@@ -113,6 +117,8 @@ export function insertReview(db: DatabaseSync, review: Review, restoreBranch: st
     review.isolated ? 1 : 0,
     review.prompt,
     review.status,
+    review.sessionId,
+    review.model,
     restoreBranch,
     review.createdAt,
     review.updatedAt,
@@ -126,4 +132,49 @@ export function markReviewClosed(db: DatabaseSync, id: string, now = new Date())
     .prepare("UPDATE reviews SET closed_at = ?, updated_at = ? WHERE id = ? AND closed_at IS NULL")
     .run(at, at, id);
   return Number(result.changes) > 0;
+}
+
+/** Fields of an open review that the session service changes. */
+export type ReviewSessionPatch = Partial<{
+  status: ReviewStatus;
+  sessionId: string;
+  model: string | null;
+}>;
+
+/** Updates an open review; returns the updated review, or `undefined` if it is closed or gone. */
+export function updateOpenReview(
+  db: DatabaseSync,
+  id: string,
+  patch: ReviewSessionPatch,
+  now = new Date(),
+): Review | undefined {
+  const sets: string[] = ["updated_at = ?"];
+  const values: (string | null)[] = [now.toISOString()];
+  if (patch.status !== undefined) {
+    sets.push("status = ?");
+    values.push(patch.status);
+  }
+  if (patch.sessionId !== undefined) {
+    sets.push("session_id = ?");
+    values.push(patch.sessionId);
+  }
+  if (patch.model !== undefined) {
+    sets.push("model = ?");
+    values.push(patch.model);
+  }
+  const result = db
+    .prepare(`UPDATE reviews SET ${sets.join(", ")} WHERE id = ? AND closed_at IS NULL`)
+    .run(...values, id);
+  return Number(result.changes) > 0 ? getReviewRecord(db, id)?.review : undefined;
+}
+
+/** Open reviews whose turn was cut off because the app quit (status still queued or running). */
+export function listInterruptedReviews(db: DatabaseSync): Review[] {
+  return db
+    .prepare(
+      `SELECT ${COLUMNS} FROM reviews
+       WHERE closed_at IS NULL AND status IN ('queued', 'running', 'needs-input')`,
+    )
+    .all()
+    .map((row) => toRecord(row).review);
 }

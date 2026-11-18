@@ -5,32 +5,52 @@ description: How ReviewRoom drives Claude through the Claude Agent SDK - one que
 
 # Claude Agent SDK integration
 
-Package: `@anthropic-ai/claude-agent-sdk` (added in Phase 3). The SDK API moves quickly:
-**before writing code, read the installed typings** (`node_modules/@anthropic-ai/claude-agent-sdk/*.d.ts`)
-and correct this skill if it is out of date.
+Package: `@anthropic-ai/claude-agent-sdk`, pinned to the version matching the user's Claude Code.
+The SDK API moves quickly: **before writing code, read the installed typings**
+(`apps/desktop/node_modules/@anthropic-ai/claude-agent-sdk/sdk.d.ts`) and correct this skill if
+it is out of date. Decisions are in ADR 0010.
+
+## Where the code lives
+
+- `src/main/claude/sessions.ts`: queue, turns, Stop, recovery, catalog. Electron-free; `runQuery`,
+  `broadcast` and `claudePath` are injected.
+- `src/main/claude/normalize.ts`: `toSignals(message, cwd)` turns one SDK message into
+  `session` / `entry` / `delta` signals. Every SDK shape used is a narrow zod schema; anything
+  else is ignored. The UI depends only on `ConversationEntry` (`packages/shared/src/conversation.ts`).
+- `src/main/claude/policy.ts`: the read-only `PreToolUse` decision (`decideToolUse`).
+- `src/main/claude/entries.ts`: `review_entries` table (append-only, `seq` per review).
 
 ## Session model
 
-- A review has at most one running turn. Each user message starts one `query()` call with
-  `cwd` set to the review's workdir.
-- The first turn's prompt is the project's review prompt filled with base, head, PR info.
-- Store the `session_id` from the first `system`/`init` message on the review; later turns pass
-  `resume: sessionId`, which also works after the app restarts.
-- Load `settingSources: ["user", "project"]` only for trusted checkouts. For an isolated worktree
-  of someone's PR, load project settings from the main checkout, never from the PR (see the
-  security-auditor invariants).
+- A review has at most one running or queued turn (`review_busy` otherwise); at most 3 turns run
+  app-wide, the rest are `queued`.
+- Each message starts one `query({ prompt, options })` with `cwd` = the review's workdir and
+  `pathToClaudeCodeExecutable` = the user's `claude` from PATH (the bundled binary is not used).
+- The first message is `firstTurnPrompt(review)` (review prompt + head/base/merge base), sent when
+  the review is created. The `session_id` of `system/init` is stored on the review; later turns
+  pass `resume`, which also works after an app restart.
+- Options that keep a review read-only (do not loosen without an ADR):
+  `tools: ["Read", "Grep", "Glob", "Bash"]`, the `PreToolUse` hook, a deny-all `canUseTool`,
+  `permissionMode: "default"`, `settingSources: ["user"]`, `strictMcpConfig: true`, `mcpServers: {}`,
+  `settings: { disableAllHooks: false }`, `env: reviewEnv(process.env)` (no `GIT_*`, no LFS smudge).
+  The Bash policy is a per-subcommand git **allowlist** (git abbreviates long options, so a
+  denylist was bypassed: see ADR 0010); add an option only with a test that it cannot execute,
+  write, or read outside the checkout.
+  Never add `"project"`: a pull request's `.claude/settings.json` hooks would run as shell commands
+  (verified with a control run, ADR 0010).
 
 ## Streaming
 
-- Iterate the async generator and, for every SDK message:
-  1. append a normalized event to the review's event log (SQLite), then
-  2. `broadcast()` it (`ipc/register.ts`) to the renderer, tagged with the review id.
-- The Agent SDK runs in the Electron main process (Node 24). Keep the session service
-  Electron-free; inject `query` and `broadcast` so it is testable.
-- Normalize in one module (`toReviewEvents(message)`), so the UI depends on our event schema,
-  not the SDK's message shapes.
-- Stop = call `interrupt()` on the running query (keep a `Map<reviewId, Query>`); the review stays
-  usable and its status returns to `idle`.
+- For every SDK message: entries are appended to SQLite, then broadcast as `review.entry`; text
+  deltas (`includePartialMessages: true`) are broadcast as `review.delta` only, never stored.
+- The `result` message becomes a `turn-end` entry (outcome, cost, duration, error). Every turn
+  ends with exactly one `turn-end`, even when the SDK throws or the turn is stopped.
+- Status: `queued` → `running` → `idle` (or `failed` after an error), as `review.status` events.
+- Stop: a queued turn is dropped; a running one gets `interrupt()`, then `AbortController.abort()`
+  after 10 s. Closing a review aborts at once. At startup, reviews left `queued`/`running` get an
+  "interrupted" entry and become `idle` (`recover()`).
+- Models and slash commands come from `supportedModels()` / `supportedCommands()` of the first
+  turn of the app run (`claude:catalog`).
 
 ## Findings via an MCP tool (ADR 0004)
 
@@ -68,11 +88,11 @@ const findingsServer = createSdkMcpServer({
 
 ## Testing
 
-Never call the real SDK in tests. Inject the `query` function and fake it:
+Never call the real SDK in tests. `test/main/claude/sessions.test.ts` has `fakeClaude(script)`, a
+scripted `RunQuery` whose turns can be held open (to test busy, Stop and the queue) and that
+records the options each turn received. Test with an in-memory database (`openDatabase(":memory:")`).
 
-```ts
-const fakeQuery = (messages: SDKMessage[]) => async function* () { yield* messages; };
-```
-
-Test: session id is stored and resumed, events are persisted and broadcast in order, interrupt
-stops the turn, `report_findings` keeps numbers stable, and the gate denies a write by default.
+Covered: order and numbering of entries, session id stored and resumed, read-only options and the
+gate, busy, Stop (running and queued), the concurrency limit, a missing `claude`, error results,
+recovery after a quit, the catalog. The policy has its own table-driven tests (`policy.test.ts`).
+A real turn is checked by hand in a second app instance (`REVIEWROOM_HOME` + `--user-data-dir`) driven over CDP.

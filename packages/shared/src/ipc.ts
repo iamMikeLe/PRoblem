@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { IpcChannel } from "./channels.ts";
+import { ClaudeCatalogSchema, StoredEntrySchema } from "./conversation.ts";
 import { ProjectSchema, ReviewSchema } from "./domain.ts";
 import type { AppEvent } from "./events.ts";
 
@@ -37,6 +38,8 @@ export const AppErrorCodeSchema = z.enum([
   "review_not_found",
   "project_has_reviews",
   "ignored_files_at_risk",
+  "review_busy",
+  "claude_unavailable",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -104,6 +107,20 @@ export const CloseReviewResultSchema = z.object({
 });
 export type CloseReviewResult = z.infer<typeof CloseReviewResultSchema>;
 
+export const MESSAGE_MAX = 20_000;
+
+export const SendMessageRequestSchema = z.strictObject({
+  id: ReviewIdSchema,
+  text: z
+    .string()
+    .trim()
+    .min(1, "Write a message first.")
+    .max(MESSAGE_MAX, `A message is limited to ${MESSAGE_MAX} characters.`),
+  /** Model for this and later turns; `null` = Claude Code's default. */
+  model: z.string().trim().min(1).max(200).nullable(),
+});
+export type SendMessageRequest = z.infer<typeof SendMessageRequestSchema>;
+
 export const ipcContract = {
   "projects:list": { input: z.undefined(), output: z.array(ProjectSchema) },
   "projects:create": { input: CreateProjectRequestSchema, output: ProjectSchema },
@@ -124,6 +141,17 @@ export const ipcContract = {
     input: z.strictObject({ id: ReviewIdSchema }),
     output: CloseReviewResultSchema,
   },
+  /** The stored conversation of a review, oldest first. */
+  "reviews:events": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: z.array(StoredEntrySchema),
+  },
+  /** Queues a turn; progress arrives as events. Fails with `review_busy` while a turn runs. */
+  "reviews:send": { input: SendMessageRequestSchema, output: z.null() },
+  /** Stops the running or queued turn of a review (no-op when idle). */
+  "reviews:stop": { input: z.strictObject({ id: ReviewIdSchema }), output: z.null() },
+  /** Models and slash commands for the composer (known after the first turn of any review). */
+  "claude:catalog": { input: z.undefined(), output: ClaudeCatalogSchema },
   /** Opens the native folder picker; `null` when the user cancels. */
   "dialog:pickFolder": { input: z.undefined(), output: z.string().nullable() },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;

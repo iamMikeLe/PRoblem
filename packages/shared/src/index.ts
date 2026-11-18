@@ -1,4 +1,5 @@
 export * from "./channels.ts";
+export * from "./conversation.ts";
 export * from "./domain.ts";
 export * from "./events.ts";
 export * from "./ipc.ts";

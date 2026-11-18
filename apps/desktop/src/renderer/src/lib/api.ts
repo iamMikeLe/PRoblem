@@ -1,4 +1,5 @@
 import {
+  type ClaudeCatalog,
   type CloseReviewResult,
   type CreateProjectRequest,
   type CreateReviewRequest,
@@ -9,6 +10,8 @@ import {
   type Project,
   type Review,
   type ReviewRoomBridge,
+  type SendMessageRequest,
+  type StoredEntry,
   type UpdateProjectRequest,
 } from "@reviewroom/shared";
 
@@ -58,6 +61,16 @@ export const api = {
     list: (): Promise<Review[]> => call("reviews:list", undefined),
     create: (body: CreateReviewRequest): Promise<Review> => call("reviews:create", body),
     close: (id: string): Promise<CloseReviewResult> => call("reviews:close", { id }),
+    events: (id: string): Promise<StoredEntry[]> => call("reviews:events", { id }),
+    send: async (request: SendMessageRequest): Promise<void> => {
+      await call("reviews:send", request);
+    },
+    stop: async (id: string): Promise<void> => {
+      await call("reviews:stop", { id });
+    },
+  },
+  claude: {
+    catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
   },
   dialog: {
     pickFolder: (): Promise<string | null> => call("dialog:pickFolder", undefined),

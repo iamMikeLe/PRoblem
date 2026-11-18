@@ -24,6 +24,10 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
       throw new Error("not used");
     },
     "reviews:close": () => ({ note: null }),
+    "reviews:events": () => [],
+    "reviews:send": () => null,
+    "reviews:stop": () => null,
+    "claude:catalog": () => ({ models: [], commands: [] }),
     "dialog:pickFolder": async () => null,
     ...overrides,
   };

@@ -63,4 +63,21 @@ export const migrations: readonly Migration[] = [
         WHERE isolated = 0 AND closed_at IS NULL;
     `,
   },
+  {
+    version: 4,
+    name: "claude_sessions",
+    sql: `
+      ALTER TABLE reviews ADD COLUMN session_id TEXT;
+      ALTER TABLE reviews ADD COLUMN model TEXT;
+      -- The conversation of a review, append-only. \`payload\` is a JSON ConversationEntry.
+      CREATE TABLE review_entries (
+        review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+        seq       INTEGER NOT NULL CHECK (seq > 0),
+        at        TEXT NOT NULL,
+        kind      TEXT NOT NULL,
+        payload   TEXT NOT NULL,
+        PRIMARY KEY (review_id, seq)
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

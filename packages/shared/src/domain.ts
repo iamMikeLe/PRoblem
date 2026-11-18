@@ -55,6 +55,10 @@ export const ReviewSchema = z.object({
   /** The review prompt for this review, copied from the project and possibly edited. */
   prompt: z.string(),
   status: ReviewStatusSchema,
+  /** Claude Code session of this review; `null` until the first turn has started. */
+  sessionId: z.string().nullable(),
+  /** Model chosen for this review; `null` = Claude Code's default. */
+  model: z.string().nullable(),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });

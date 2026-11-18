@@ -30,7 +30,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] Native folder picker in Add project
 - [x] Remove Fastify, WebSocket, origin guard; port all tests
 - [ ] Packaged `.dmg` with electron-builder (`pnpm package`), checked on a clean machine
-- [ ] Main → renderer event wiring used by the UI (lands with Phase 3 streaming)
+- [x] Main → renderer event wiring used by the UI (landed with Phase 3 streaming)
 
 ## Phase 2: Review lifecycle (no Claude yet)
 
@@ -46,12 +46,14 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 3: Claude sessions
 
-- [ ] Add the Agent SDK; session service with one `query()` per turn and `resume`
-- [ ] Normalize SDK messages into review events; persist and broadcast to the renderer
-- [ ] Zustand store fed by `onEvent` for all reviews; status dots update live
-- [ ] Conversation tab: markdown messages, collapsible tool-call cards, auto-scroll that respects the user
-- [ ] Composer: send, `/skill` completion, Stop (interrupt), model picker
-- [ ] Survives restart: transcript reloads, next message resumes the same session
+- [x] Add the Agent SDK; session service with one `query()` per turn and `resume` (ADR 0010)
+- [x] Normalize SDK messages into review events; persist and broadcast to the renderer
+- [x] Zustand store fed by `onEvent` for all reviews; status dots update live
+- [x] Conversation tab: markdown messages, collapsible tool-call cards, auto-scroll that respects the user
+- [x] Composer: send, `/skill` completion, Stop (interrupt), model picker
+- [x] Survives restart: transcript reloads, next message resumes the same session
+- [x] First turn starts when the review is created; at most 3 turns at once, the rest queued
+- [x] Read-only until Phase 5: own tool list, `PreToolUse` policy, no settings or MCP from the checkout
 
 ## Phase 4: Findings
 

@@ -6,5 +6,10 @@ class ResizeObserverStub {
 }
 
 if (!("ResizeObserver" in globalThis)) {
-  Object.defineProperty(globalThis, "ResizeObserver", { value: ResizeObserverStub });
+  // Writable: Fluent's positioning code assigns its own fallback when it opens a popup.
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: ResizeObserverStub,
+    writable: true,
+    configurable: true,
+  });
 }

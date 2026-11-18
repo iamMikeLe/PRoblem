@@ -1,6 +1,9 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
+import { findExecutable } from "./claude/executable.ts";
+import { createSessionService } from "./claude/sessions.ts";
 import { dataDir } from "./config.ts";
 import { openDatabase } from "./db/database.ts";
 import { absolutePathOnly, loginShellPath } from "./env.ts";
@@ -8,7 +11,7 @@ import type { Logger } from "./errors.ts";
 import { createGhClient } from "./git/gh.ts";
 import { createDispatcher } from "./ipc/dispatcher.ts";
 import { createHandlers } from "./ipc/handlers.ts";
-import { registerIpc } from "./ipc/register.ts";
+import { broadcast, registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
 import { createProjectService } from "./projects/service.ts";
 import { createReviewService } from "./reviews/service.ts";
@@ -69,9 +72,17 @@ async function start(): Promise<void> {
     gh: createGhClient(),
     log,
   });
+  const sessions = createSessionService({
+    db,
+    runQuery: (prompt, options) => query({ prompt, options }),
+    broadcast,
+    claudePath: () => findExecutable("claude", process.env.PATH),
+    log,
+  });
+  sessions.recover();
   registerIpc(
     ipcMain,
-    createDispatcher(createHandlers({ projects, reviews, pickFolder }), log),
+    createDispatcher(createHandlers({ projects, reviews, sessions, pickFolder }), log),
     source,
   );
 
@@ -87,5 +98,8 @@ async function start(): Promise<void> {
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
   });
-  app.on("will-quit", () => db.close());
+  app.on("will-quit", () => {
+    sessions.shutdown();
+    db.close();
+  });
 }

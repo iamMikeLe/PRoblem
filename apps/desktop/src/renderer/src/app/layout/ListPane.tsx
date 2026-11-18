@@ -140,7 +140,7 @@ export function ListPane({
                   )}
                   onClick={() => onSelect(review.id)}
                 >
-                  <StatusDot status={review.status} />
+                  <StatusDot review={review} />
                   <span className={styles.text}>
                     <Text weight="semibold" className={item.ellipsis}>
                       {review.title}
