@@ -12,7 +12,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { FolderOpenRegular } from "@fluentui/react-icons";
-import { PROJECT_NAME_MAX, PROJECT_PATH_MAX, type Project } from "@reviewroom/shared";
+import { PROJECT_NAME_MAX, PROJECT_PATH_MAX, type Project } from "@problem/shared";
 import { type FormEvent, useState } from "react";
 import { api } from "../../lib/api.ts";
 import { useCreateProject } from "./queries.ts";

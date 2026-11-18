@@ -84,6 +84,11 @@ export async function removeWorktree(root: string, dir: string): Promise<void> {
   }
 }
 
+/** Re-links a worktree whose folder was moved (both git's record and the folder's `.git` file). */
+export async function repairWorktree(root: string, dir: string): Promise<void> {
+  await runGit(root, ["worktree", "repair", "--end-of-options", dir]);
+}
+
 /** Checks out `target` (a SHA to detach at, or a branch to return to) in the project checkout. */
 export async function checkout(
   root: string,

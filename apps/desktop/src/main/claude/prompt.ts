@@ -1,4 +1,4 @@
-import type { Review } from "@reviewroom/shared";
+import type { Review } from "@problem/shared";
 
 /** The first message of a review: the review prompt plus where the changes are. */
 export function firstTurnPrompt(review: Review): string {
@@ -29,7 +29,7 @@ export function reviewSystemAppend(fixMode: boolean): string {
   return `${PERMISSIONS}\n\n${fixMode ? FIX_MODE_ON : FIX_MODE_OFF}\n\n${FINDINGS}`;
 }
 
-const PERMISSIONS = `You are running inside ReviewRoom, a desktop app for code reviews.
+const PERMISSIONS = `You are running inside PRoblem, a desktop app for code reviews.
 Reading files in the current folder, Grep, Glob and plain read-only git commands run directly.
 Anything else (other commands, reading outside the folder, web access, edits without fix mode)
 shows the user an approval card and waits. Request such calls one at a time, not in parallel.
@@ -52,6 +52,6 @@ const FINDINGS = `Findings: record every problem you find with the report_findin
   ones by their number, withdraw ones that no longer apply. Do not add a finding twice.
 - The app numbers findings (#1, #2, ...). Use those numbers when you refer to a finding.
 - Give file paths relative to the repository root and the line in the head version.
-- Messages that start with "[ReviewRoom]" tell you which findings the user accepted or dismissed.
+- Messages that start with "[PRoblem]" tell you which findings the user accepted or dismissed.
   Do not argue for a dismissed finding again unless you have new evidence.
 - In your answer, summarize briefly and refer to the numbers instead of repeating every detail.`;

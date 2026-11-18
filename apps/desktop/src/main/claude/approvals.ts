@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { ApprovalDecision, PendingApproval } from "@reviewroom/shared";
+import type { ApprovalDecision, PendingApproval } from "@problem/shared";
 import { AppFailure } from "../errors.ts";
 
 /**

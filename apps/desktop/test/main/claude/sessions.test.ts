@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
-import type { AppEvent, ConversationEntry, Review } from "@reviewroom/shared";
+import type { AppEvent, ConversationEntry, Review } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { listEntries } from "../../../src/main/claude/entries.ts";
@@ -211,7 +211,7 @@ describe("session service", () => {
   const settle = () => vi.waitFor(() => expect(status()).not.toMatch(/queued|running/));
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "reviewroom-sessions-"));
+    dir = mkdtempSync(join(tmpdir(), "problem-sessions-"));
     db = openDatabase(":memory:");
     events = [];
     review = addReview("r1");
@@ -302,8 +302,8 @@ describe("session service", () => {
         network: { allowedDomains: [], strictAllowlist: true },
       },
     });
-    expect(Object.keys(options?.mcpServers ?? {})).toEqual(["reviewroom"]);
-    expect(options?.mcpServers?.reviewroom).toMatchObject({ type: "sdk", name: "reviewroom" });
+    expect(Object.keys(options?.mcpServers ?? {})).toEqual(["problem"]);
+    expect(options?.mcpServers?.problem).toMatchObject({ type: "sdk", name: "problem" });
     expect(options?.env?.GIT_LFS_SKIP_SMUDGE).toBe("1");
 
     const gate: HookCallback | undefined = options?.hooks?.PreToolUse?.[0]?.hooks[0];
@@ -331,7 +331,7 @@ describe("session service", () => {
     expect(await ask("Bash", { command: "rm -rf ." })).toMatchObject({
       hookSpecificOutput: { permissionDecision: "ask" },
     });
-    expect(await ask("mcp__reviewroom__report_findings", { add: [] })).toMatchObject({
+    expect(await ask("mcp__problem__report_findings", { add: [] })).toMatchObject({
       hookSpecificOutput: { permissionDecision: "allow" },
     });
     expect(await ask("mcp__other__report_findings", {})).toMatchObject({
@@ -595,7 +595,7 @@ describe("session service", () => {
     await settle();
 
     expect(claude.turns[1]?.prompt).toBe(
-      '[ReviewRoom] Since my last message I have:\n- dismissed #1 "Retries never stop"\n- accepted #2 "Missing test"\n\nAnything else?',
+      '[PRoblem] Since my last message I have:\n- dismissed #1 "Retries never stop"\n- accepted #2 "Missing test"\n\nAnything else?',
     );
     expect(claude.turns[2]?.prompt).toBe("Thanks");
   });
@@ -677,7 +677,7 @@ describe("session service", () => {
     expect(entries(sessions, other.id).at(-1)).toMatchObject({
       kind: "turn-end",
       outcome: "error",
-      message: expect.stringContaining("without ReviewRoom's permission check"),
+      message: expect.stringContaining("without PRoblem's permission check"),
     });
   });
 

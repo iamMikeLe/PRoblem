@@ -12,7 +12,7 @@ import {
   Text,
   tokens,
 } from "@fluentui/react-components";
-import type { Review } from "@reviewroom/shared";
+import type { Review } from "@problem/shared";
 import { useCloseReview } from "./queries.ts";
 
 const useStyles = makeStyles({

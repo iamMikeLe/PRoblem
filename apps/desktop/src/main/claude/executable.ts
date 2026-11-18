@@ -2,7 +2,7 @@ import { accessSync, constants, statSync } from "node:fs";
 import { delimiter, isAbsolute, join } from "node:path";
 
 /**
- * Finds the user's `claude` executable on PATH (absolute entries only). ReviewRoom drives the
+ * Finds the user's `claude` executable on PATH (absolute entries only). PRoblem drives the
  * Claude Code the user has installed and logged in to, instead of shipping its own copy.
  */
 export function findExecutable(name: string, path: string | undefined): string | undefined {

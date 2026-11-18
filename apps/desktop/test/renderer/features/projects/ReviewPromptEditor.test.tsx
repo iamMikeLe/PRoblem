@@ -1,4 +1,4 @@
-import { DEFAULT_REVIEW_PROMPT } from "@reviewroom/shared";
+import { DEFAULT_REVIEW_PROMPT } from "@problem/shared";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderApp } from "../../renderApp.tsx";

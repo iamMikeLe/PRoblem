@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { Review } from "@reviewroom/shared";
+import type { Review } from "@problem/shared";
 import { insertProject } from "../../../src/main/projects/repository.ts";
 import { insertReview } from "../../../src/main/reviews/repository.ts";
 

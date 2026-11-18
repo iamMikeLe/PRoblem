@@ -161,7 +161,7 @@ describe("SDK message normalization", () => {
       "https://example.com/?q=1",
     );
     expect(summarizeToolCall("WebSearch", { query: "retry backoff" }, CWD)).toBe("retry backoff");
-    const report = "mcp__reviewroom__report_findings";
+    const report = "mcp__problem__report_findings";
     expect(summarizeToolCall(report, { add: [{}, {}], withdraw: [{}] }, CWD)).toBe(
       "Findings: 2 new, 1 withdrawn",
     );

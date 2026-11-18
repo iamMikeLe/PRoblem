@@ -16,7 +16,7 @@ import {
   type ReviewStatus,
   type SendMessageRequest,
   TOOL_TEXT_MAX,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { AppFailure, type Logger } from "../errors.ts";
 import { verdictNote } from "../findings/report.ts";
 import { markVerdictsTold, untoldVerdicts, type VerdictChange } from "../findings/repository.ts";
@@ -155,7 +155,7 @@ export function approvalText(toolName: string, input: Record<string, unknown>): 
 }
 
 const NOT_INSTALLED =
-  "Claude Code was not found on your PATH. Install it (https://code.claude.com), run `claude` once to log in, then restart ReviewRoom.";
+  "Claude Code was not found on your PATH. Install it (https://code.claude.com), run `claude` once to log in, then restart PRoblem.";
 
 export function createSessionService(deps: SessionServiceDeps): SessionService {
   const { db, broadcast, log } = deps;
@@ -464,7 +464,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
               log.error("a tool ran without the permission gate", { review: reviewId });
               record(reviewId, signal.entry);
               throw new Error(
-                "A tool ran without ReviewRoom's permission check, so the turn was stopped. Check your Claude Code hook settings.",
+                "A tool ran without PRoblem's permission check, so the turn was stopped. Check your Claude Code hook settings.",
               );
             }
             record(reviewId, signal.entry);
@@ -618,7 +618,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
           outcome: "interrupted",
           costUsd: null,
           durationMs: null,
-          message: "ReviewRoom closed while Claude was working. Send a message to continue.",
+          message: "PRoblem closed while Claude was working. Send a message to continue.",
         });
         setStatus(review.id, "idle");
       }

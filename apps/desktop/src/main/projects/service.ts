@@ -6,7 +6,7 @@ import {
   DEFAULT_REVIEW_PROMPT,
   type Project,
   type UpdateProjectRequest,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { AppFailure, type Logger } from "../errors.ts";
 import { GitUnavailableError, NotAGitRepoError, resolveRepoRoot } from "../git/repo.ts";
 import { countOpenReviews } from "../reviews/repository.ts";

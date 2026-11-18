@@ -21,7 +21,7 @@ import {
   type EditorPreset,
   EditorPresetSchema,
   UpdateSettingsRequestSchema,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { useState } from "react";
 import { useSettings, useUpdateSettings } from "./queries.ts";
 
@@ -84,7 +84,7 @@ function EditorSettings({ saved }: { saved: AppSettings }) {
         Editor
       </Subtitle2>
       <Text className={styles.muted}>
-        Where file:line links in findings open. ReviewRoom runs the editor's command-line launcher,
+        Where file:line links in findings open. PRoblem runs the editor's command-line launcher,
         which must be on your PATH.
       </Text>
       <RadioGroup

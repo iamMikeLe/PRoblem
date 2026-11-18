@@ -1,4 +1,4 @@
-# ReviewRoom
+# PRoblem
 
 Electron desktop app for running many Claude Code reviews of branches and pull requests at once,
 across several repositories. Teams-style dark UI. Single user, local machine.
@@ -12,7 +12,7 @@ pnpm install          # once (downloads the Electron binary)
 pnpm dev              # Electron window with hot reload (electron-vite)
 pnpm verify           # lint + typecheck + test + build (run before saying "done")
 pnpm test             # all Vitest suites (main: node, renderer: jsdom)
-pnpm --filter @reviewroom/desktop exec vitest run test/main/ipc/dispatcher.test.ts   # one file
+pnpm --filter @problem/desktop exec vitest run test/main/ipc/dispatcher.test.ts   # one file
 pnpm package          # build a distributable with electron-builder (apps/desktop/dist)
 pnpm format           # Biome format + safe fixes
 ```
@@ -24,7 +24,7 @@ pnpm format           # Biome format + safe fixes
 - `apps/desktop/src/main`: Electron main process. `ipc/` (dispatcher, handlers, sender trust,
   registration), `projects/` (`service.ts` + `repository.ts`), `db/` (`node:sqlite` + migrations),
   `git/`. Only `index.ts`, `window.ts` and `ipc/register.ts` may import `electron`.
-- `apps/desktop/src/preload`: the `window.reviewroom` bridge (`invoke`, `onEvent`). Keep it tiny.
+- `apps/desktop/src/preload`: the `window.problem` bridge (`invoke`, `onEvent`). Keep it tiny.
 - `apps/desktop/src/renderer/src`: React 19 + Fluent UI v9 (`teamsDarkTheme`). `app/` = shell,
   `features/<feature>/` = UI, queries and store, `lib/api.ts` = typed IPC client.
 - Tests: `apps/desktop/test/main` mirrors `src/main`, `apps/desktop/test/renderer` mirrors the UI.

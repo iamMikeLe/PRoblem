@@ -12,7 +12,7 @@ import {
   useArrowNavigationGroup,
 } from "@fluentui/react-components";
 import { AddRegular } from "@fluentui/react-icons";
-import type { Project } from "@reviewroom/shared";
+import type { Project } from "@problem/shared";
 import { useState } from "react";
 import { useListItemStyles } from "../../app/layout/listItemStyles.ts";
 import { AddProjectDialog } from "./AddProjectDialog.tsx";

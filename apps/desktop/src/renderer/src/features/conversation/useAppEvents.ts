@@ -1,4 +1,4 @@
-import { parseAppEvent } from "@reviewroom/shared";
+import { parseAppEvent } from "@problem/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { findingCountsKey, findingsKey } from "../findings/queries.ts";
@@ -17,7 +17,7 @@ export function useAppEvents(onShowReview: (reviewId: string) => void): void {
   const showReview = useRef(onShowReview);
   showReview.current = onShowReview;
   useEffect(() => {
-    const bridge = window.reviewroom;
+    const bridge = window.problem;
     if (!bridge) return;
     return bridge.onEvent((raw) => {
       // The preload already checks events; parse again so the store only sees valid ones.

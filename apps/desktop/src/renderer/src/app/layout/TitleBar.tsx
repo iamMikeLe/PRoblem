@@ -37,7 +37,7 @@ const useStyles = makeStyles({
 
 export function TitleBar() {
   const styles = useStyles();
-  const platform = window.reviewroom?.platform;
+  const platform = window.problem?.platform;
 
   return (
     <header
@@ -47,7 +47,7 @@ export function TitleBar() {
         platform !== undefined && platform !== "darwin" && styles.overlay,
       )}
     >
-      <Text className={styles.brand}>ReviewRoom</Text>
+      <Text className={styles.brand}>PRoblem</Text>
       <SearchBox
         className={mergeClasses(styles.search, styles.interactive)}
         placeholder="Search reviews, findings, files"

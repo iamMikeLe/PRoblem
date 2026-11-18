@@ -1,4 +1,4 @@
-import type { PendingApproval } from "@reviewroom/shared";
+import type { PendingApproval } from "@problem/shared";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { visibleParts } from "../../../../src/renderer/src/features/conversation/ApprovalCard.tsx";

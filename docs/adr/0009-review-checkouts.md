@@ -38,13 +38,13 @@ Supporting rules:
   still archived and the note says what was left behind.
 - **A failed fetch is an error**, except "the remote has no such branch" (then a local branch is
   used): reviewing a stale local copy silently would be worse.
-- **Pull requests are fetched into our own namespace** (`refs/reviewroom/pull/<n>`), not
+- **Pull requests are fetched into our own namespace** (`refs/problem/pull/<n>`), not
   `FETCH_HEAD`, so parallel starts do not race.
 - **Inputs never reach git as options**: branch names pass `git check-ref-format` and may not
   start with `-`; positional arguments follow `--end-of-options`; PR links must be
   `https://github.com/<owner>/<repo>/pull/<n>` for a repository that is one of the project's remotes.
 - **Close only deletes what we created**: a worktree is removed only if it lies inside
-  `~/.reviewroom/worktrees`.
+  `~/.problem/worktrees`.
 - The base defaults to the PR's base branch, else the remote's default branch (`origin/HEAD`).
   Unlike the reference tool, we do not guess the branch a feature split off from; the user can
   pick another base in the dialog.

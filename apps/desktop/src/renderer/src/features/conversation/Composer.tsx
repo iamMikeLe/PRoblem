@@ -13,7 +13,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { SendRegular, StopRegular } from "@fluentui/react-icons";
-import type { ClaudeCatalog, Review, ReviewStatus } from "@reviewroom/shared";
+import type { ClaudeCatalog, Review, ReviewStatus } from "@problem/shared";
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { useDraft } from "./drafts.ts";
 import { useCatalog, useSendMessage, useSetFixMode, useStopReview } from "./queries.ts";

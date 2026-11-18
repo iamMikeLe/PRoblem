@@ -1,11 +1,11 @@
 ---
 name: ship-feature
-description: The ReviewRoom delivery workflow. Takes one roadmap item or feature from plan to verified, reviewed change - architect plan, incremental implementation with tests, parallel code/security/UI review, verification, docs update. Use whenever implementing a roadmap item, a phase, or any feature that spans more than one file.
+description: The PRoblem delivery workflow. Takes one roadmap item or feature from plan to verified, reviewed change - architect plan, incremental implementation with tests, parallel code/security/UI review, verification, docs update. Use whenever implementing a roadmap item, a phase, or any feature that spans more than one file.
 ---
 
 # Ship a feature
 
-The workflow every ReviewRoom feature goes through. Each stage has an exit condition; do not move
+The workflow every PRoblem feature goes through. Each stage has an exit condition; do not move
 on until it is met.
 
 ## 1. Frame

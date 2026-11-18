@@ -6,7 +6,7 @@ import {
   type Severity,
   type Verdict,
   VerdictSchema,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { z } from "zod";
 
 /**

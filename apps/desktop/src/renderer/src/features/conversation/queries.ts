@@ -1,4 +1,4 @@
-import type { DecideApprovalRequest, SendMessageRequest } from "@reviewroom/shared";
+import type { DecideApprovalRequest, SendMessageRequest } from "@problem/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "../../lib/api.ts";

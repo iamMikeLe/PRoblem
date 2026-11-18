@@ -15,7 +15,7 @@ import type {
   PendingApproval,
   ReviewStatus,
   StoredEntry,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { describeApproval, describeTurnEnd } from "./format.ts";

@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { AppEvent, Finding, FindingCounts, SetVerdictRequest } from "@reviewroom/shared";
+import type { AppEvent, Finding, FindingCounts, SetVerdictRequest } from "@problem/shared";
 import { AppFailure } from "../errors.ts";
 import { getReviewRecord } from "../reviews/repository.ts";
 import { applyReport, type ReportOutcome } from "./report.ts";

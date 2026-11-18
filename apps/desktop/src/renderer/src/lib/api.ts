@@ -13,15 +13,15 @@ import {
   ipcSchemas,
   type OpenInEditorRequest,
   type PendingApproval,
+  type ProblemBridge,
   type Project,
   type Review,
-  type ReviewRoomBridge,
   type SendMessageRequest,
   type SetVerdictRequest,
   type StoredEntry,
   type UpdateProjectRequest,
   type UpdateSettingsRequest,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 
 /** A failed call to the main process, with the contract's error code. */
 export class AppRequestError extends Error {
@@ -34,9 +34,9 @@ export class AppRequestError extends Error {
   }
 }
 
-function bridge(): ReviewRoomBridge {
-  const value = window.reviewroom;
-  if (!value) throw new AppRequestError("no_bridge", "ReviewRoom must run inside its desktop app");
+function bridge(): ProblemBridge {
+  const value = window.problem;
+  if (!value) throw new AppRequestError("no_bridge", "PRoblem must run inside its desktop app");
   return value;
 }
 

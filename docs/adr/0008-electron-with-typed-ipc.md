@@ -4,7 +4,7 @@
 - Date: 2026-11-17
 
 ## Context
-ReviewRoom started as a local web app: a Fastify server on `127.0.0.1` plus a React UI in the
+PRoblem started as a local web app: a Fastify server on `127.0.0.1` plus a React UI in the
 browser. The product is a desktop tool for one person, and it should feel like one (own window,
 native folder picker, notifications, dock badge). A local HTTP server is also an attack surface:
 any web page in the user's browser can try to reach it (CSRF, DNS rebinding), which needed an
@@ -37,7 +37,7 @@ only from our own frame (`ipc/trust.ts`), no navigation and no new windows, sing
 - The origin guard, host allowlist and WebSocket hub are gone; there is nothing listening.
 - Services stay Electron-free (`projects/service.ts`, `db/`, `git/`), so they are tested in plain
   Node; only `index.ts`, `window.ts` and `ipc/register.ts` touch Electron.
-- UI tests stub `window.reviewroom` and parse inputs with the same contract.
+- UI tests stub `window.problem` and parse inputs with the same contract.
 - Builds use electron-vite (main, preload as CommonJS for the sandbox, renderer) and
   electron-builder. Signing and notarization are open (Phase 9).
 - The browser can no longer be used for quick UI checks; `pnpm dev` opens the Electron window

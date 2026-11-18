@@ -1,4 +1,4 @@
-import type { Finding, OpenInEditorRequest, SetVerdictRequest } from "@reviewroom/shared";
+import type { Finding, OpenInEditorRequest, SetVerdictRequest } from "@problem/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api.ts";
 

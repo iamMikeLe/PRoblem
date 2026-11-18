@@ -13,7 +13,7 @@ export function createMainWindow(preload: string, source: RendererSource): Brows
     minWidth: 960,
     minHeight: 600,
     show: false,
-    title: "ReviewRoom",
+    title: "PRoblem",
     backgroundColor: BACKGROUND,
     // Our Teams-style title bar is the window's title bar: hide the native one.
     titleBarStyle: "hidden",

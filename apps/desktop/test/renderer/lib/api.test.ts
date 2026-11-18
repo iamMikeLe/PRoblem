@@ -1,4 +1,4 @@
-import type { IpcResult, ReviewRoomBridge } from "@reviewroom/shared";
+import type { IpcResult, ProblemBridge } from "@problem/shared";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppRequestError, api } from "../../../src/renderer/src/lib/api.ts";
 import { removeBridge } from "../stubBridge.ts";
@@ -20,8 +20,8 @@ function bridgeAnswering(result: IpcResult<unknown>) {
     invoke,
     onEvent: () => () => {},
     platform: "darwin",
-  } as unknown as ReviewRoomBridge;
-  Object.defineProperty(window, "reviewroom", { value: bridge, configurable: true });
+  } as unknown as ProblemBridge;
+  Object.defineProperty(window, "problem", { value: bridge, configurable: true });
   return invoke;
 }
 

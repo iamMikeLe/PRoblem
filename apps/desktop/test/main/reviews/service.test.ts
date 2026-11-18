@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { type CreateReviewRequest, DEFAULT_REVIEW_PROMPT, type Project } from "@reviewroom/shared";
+import { type CreateReviewRequest, DEFAULT_REVIEW_PROMPT, type Project } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
@@ -112,7 +112,7 @@ describe("review service", () => {
       headSha: fx.featureSha,
       baseBranch: "main",
     });
-    expect(git(fx.repo, "rev-parse", "refs/reviewroom/pull/7")).toBe(fx.featureSha);
+    expect(git(fx.repo, "rev-parse", "refs/problem/pull/7")).toBe(fx.featureSha);
   });
 
   it("rejects pull requests of other repositories and links that are not GitHub PRs", async () => {
@@ -274,7 +274,7 @@ describe("review service", () => {
       const review = await reviews.create(request());
       db.prepare("UPDATE reviews SET workdir = ? WHERE id = ?").run(fx.repo, review.id);
       const { note } = await reviews.close(review.id);
-      expect(note).toMatch(/is not a ReviewRoom worktree/);
+      expect(note).toMatch(/is not a PRoblem worktree/);
       expect(existsSync(join(fx.repo, "a.txt"))).toBe(true);
     });
 

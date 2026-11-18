@@ -10,7 +10,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { ShieldQuestionRegular, WarningRegular } from "@fluentui/react-icons";
-import type { ApprovalDecision, PendingApproval } from "@reviewroom/shared";
+import type { ApprovalDecision, PendingApproval } from "@problem/shared";
 import { useId, useState } from "react";
 import { useDecideApproval } from "./queries.ts";
 import { toolDisplayName } from "./ToolCallCard.tsx";

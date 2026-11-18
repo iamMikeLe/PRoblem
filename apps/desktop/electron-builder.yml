@@ -1,5 +1,5 @@
-appId: app.reviewroom.desktop
-productName: ReviewRoom
+appId: app.problem.desktop
+productName: PRoblem
 directories:
   output: dist
   buildResources: build

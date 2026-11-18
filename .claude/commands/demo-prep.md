@@ -2,7 +2,7 @@
 description: Prepare interview talking points and a demo script from the project's real history
 ---
 
-Prepare me to present ReviewRoom in a technical interview. Use only facts from this repository:
+Prepare me to present PRoblem in a technical interview. Use only facts from this repository:
 `README.md`, `docs/ARCHITECTURE.md`, `docs/adr/`, `docs/ROADMAP.md`, `.claude/`, and `git log`.
 
 Write `docs/DEMO.md` with:

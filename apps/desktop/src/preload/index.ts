@@ -1,12 +1,12 @@
-import type { AppEvent, ReviewRoomBridge } from "@reviewroom/shared";
-import { EVENT_CHANNEL, isIpcChannel } from "@reviewroom/shared/channels";
+import type { AppEvent, ProblemBridge } from "@problem/shared";
+import { EVENT_CHANNEL, isIpcChannel } from "@problem/shared/channels";
 import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
 
 /**
  * The only door between the sandboxed UI and the main process. It exposes a single generic
  * `invoke` limited to the contract's channels, never `ipcRenderer` itself.
  */
-const bridge: ReviewRoomBridge = {
+const bridge: ProblemBridge = {
   invoke: (channel, input) => {
     if (!isIpcChannel(channel)) return Promise.reject(new Error(`Unknown channel ${channel}`));
     return ipcRenderer.invoke(channel, input);
@@ -21,4 +21,4 @@ const bridge: ReviewRoomBridge = {
   platform: process.platform,
 };
 
-contextBridge.exposeInMainWorld("reviewroom", bridge);
+contextBridge.exposeInMainWorld("problem", bridge);

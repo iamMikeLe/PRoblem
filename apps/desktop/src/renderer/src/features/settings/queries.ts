@@ -1,4 +1,4 @@
-import type { UpdateSettingsRequest } from "@reviewroom/shared";
+import type { UpdateSettingsRequest } from "@problem/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api.ts";
 

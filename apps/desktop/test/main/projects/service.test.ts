@@ -1,7 +1,7 @@
 import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { DEFAULT_REVIEW_PROMPT } from "@reviewroom/shared";
+import { DEFAULT_REVIEW_PROMPT } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";

@@ -25,7 +25,7 @@ describe("openDatabase", () => {
   });
 
   it("backfills projects.updated_at from created_at for existing rows", async () => {
-    dir = await mkdtemp(join(tmpdir(), "reviewroom-db-"));
+    dir = await mkdtemp(join(tmpdir(), "problem-db-"));
     const file = join(dir, "test.db");
 
     const v1 = openDatabase(file, migrations.slice(0, 1));

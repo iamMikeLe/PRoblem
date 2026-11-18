@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type Project } from "@reviewroom/shared";
+import { DEFAULT_SETTINGS, type Project } from "@problem/shared";
 import { describe, expect, it, vi } from "vitest";
 import { AppFailure, type Logger, silentLogger } from "../../../src/main/errors.ts";
 import { createDispatcher, type IpcHandlers } from "../../../src/main/ipc/dispatcher.ts";
@@ -95,7 +95,7 @@ describe("IPC dispatcher", () => {
     const dispatch = createDispatcher(
       handlers({
         "projects:list": () => {
-          throw new Error("SQLITE_CORRUPT at /Users/me/.reviewroom/reviewroom.db");
+          throw new Error("SQLITE_CORRUPT at /Users/me/.problem/problem.db");
         },
       }),
       log,

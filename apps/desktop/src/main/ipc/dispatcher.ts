@@ -6,7 +6,7 @@ import {
   type IpcResult,
   ipcSchemas,
   isIpcChannel,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import type { z } from "zod";
 import { AppFailure, type Logger } from "../errors.ts";
 

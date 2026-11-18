@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, editorTemplate, UpdateSettingsRequestSchema } from "@reviewroom/shared";
+import { DEFAULT_SETTINGS, editorTemplate, UpdateSettingsRequestSchema } from "@problem/shared";
 import { describe, expect, it } from "vitest";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { getSettings, updateSettings } from "../../../src/main/settings/repository.ts";

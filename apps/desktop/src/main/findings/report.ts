@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { isAbsolute, posix } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { type Finding, SeveritySchema } from "@reviewroom/shared";
+import { type Finding, SeveritySchema } from "@problem/shared";
 import { z } from "zod";
 import {
   countAllFindings,
@@ -82,7 +82,7 @@ export const ReportShape = {
 export const ReportSchema = z.object(ReportShape);
 export type Report = z.infer<typeof ReportSchema>;
 
-export const REPORT_TOOL_DESCRIPTION = `Save your review findings in ReviewRoom, where the user accepts or dismisses them.
+export const REPORT_TOOL_DESCRIPTION = `Save your review findings in PRoblem, where the user accepts or dismisses them.
 Call it whenever your findings change: add new ones, update existing ones by number, withdraw ones that no longer apply.
 The app assigns numbers (#1, #2, ...) and returns them; refer to findings by these numbers afterwards.
 Report each distinct problem once; do not re-add a finding that already has a number.`;
@@ -258,5 +258,5 @@ export function verdictNote(changes: readonly VerdictChange[]): string | undefin
     (change) =>
       `- ${VERDICT_WORDS[change.verdict]} #${change.number} ${JSON.stringify(change.title)}`,
   );
-  return `[ReviewRoom] Since my last message I have:\n${lines.join("\n")}`;
+  return `[PRoblem] Since my last message I have:\n${lines.join("\n")}`;
 }

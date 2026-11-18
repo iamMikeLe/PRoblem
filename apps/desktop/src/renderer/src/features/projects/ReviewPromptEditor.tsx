@@ -15,7 +15,7 @@ import {
   type Project,
   REVIEW_PROMPT_MAX,
   ReviewPromptSchema,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { useState } from "react";
 import { useUpdateProject } from "./queries.ts";
 

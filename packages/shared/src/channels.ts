@@ -30,7 +30,7 @@ export const IPC_CHANNELS = [
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
 
-export const EVENT_CHANNEL = "reviewroom:event";
+export const EVENT_CHANNEL = "problem:event";
 
 export function isIpcChannel(value: unknown): value is IpcChannel {
   return typeof value === "string" && (IPC_CHANNELS as readonly string[]).includes(value);

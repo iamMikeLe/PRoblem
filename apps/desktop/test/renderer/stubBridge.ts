@@ -13,11 +13,11 @@ import {
   ipcContract,
   ipcSchemas,
   type PendingApproval,
+  type ProblemBridge,
   type Project,
   type Review,
-  type ReviewRoomBridge,
   type StoredEntry,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 
 export interface StubCall {
   channel: IpcChannel;
@@ -75,7 +75,7 @@ export function makeReview(id: string, project: Project, overrides: Partial<Revi
     baseBranch: "main",
     baseSha: SHA("b"),
     mergeBaseSha: SHA("c"),
-    workdir: `/home/me/.reviewroom/worktrees/${project.id}/${id}`,
+    workdir: `/home/me/.problem/worktrees/${project.id}/${id}`,
     isolated: true,
     prompt: project.reviewPrompt,
     status: "idle",
@@ -126,7 +126,7 @@ const ok = <T>(data: T): IpcResult<T> => ({ ok: true, data });
 const fail = (error: StubError): IpcResult<never> => ({ ok: false, error });
 
 /**
- * Installs `window.reviewroom` with an in-memory main process. Inputs are parsed with the
+ * Installs `window.problem` with an in-memory main process. Inputs are parsed with the
  * shared contract, so a test also fails when the UI sends something main would reject.
  * Remove it in `afterEach` with `removeBridge()`.
  */
@@ -310,7 +310,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     return result.ok ? { ok: true, data: ipcSchemas[channel].output.parse(result.data) } : result;
   }
 
-  const bridge: ReviewRoomBridge = {
+  const bridge: ProblemBridge = {
     invoke,
     onEvent: (listener) => {
       listeners.add(listener);
@@ -318,10 +318,10 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     },
     platform: "darwin",
   };
-  Object.defineProperty(window, "reviewroom", { value: bridge, configurable: true });
+  Object.defineProperty(window, "problem", { value: bridge, configurable: true });
   return state;
 }
 
 export function removeBridge(): void {
-  Reflect.deleteProperty(window, "reviewroom");
+  Reflect.deleteProperty(window, "problem");
 }

@@ -1,9 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import {
-  type ConversationEntry,
-  ConversationEntrySchema,
-  type StoredEntry,
-} from "@reviewroom/shared";
+import { type ConversationEntry, ConversationEntrySchema, type StoredEntry } from "@problem/shared";
 import { z } from "zod";
 
 const RowSchema = z.object({

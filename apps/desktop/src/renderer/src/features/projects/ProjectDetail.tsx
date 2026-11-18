@@ -16,7 +16,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DeleteRegular } from "@fluentui/react-icons";
-import type { Project } from "@reviewroom/shared";
+import type { Project } from "@problem/shared";
 import { useState } from "react";
 import { useDeleteProject } from "./queries.ts";
 import { ReviewPromptEditor } from "./ReviewPromptEditor.tsx";
@@ -120,7 +120,7 @@ export function ProjectDetail({ project, onRemoved }: Props) {
             <DialogTitle>Remove {project.name}?</DialogTitle>
             <DialogContent className={styles.dialogContent}>
               <Text>
-                ReviewRoom forgets this project and its review prompt. The repository on disk is not
+                PRoblem forgets this project and its review prompt. The repository on disk is not
                 touched.
               </Text>
               {remove.isError && (

@@ -20,9 +20,7 @@ const current = phases.find((section) => section.includes("- [ ]"));
 if (current) {
   const [title, ...lines] = current.split("\n");
   const open = lines.filter((line) => line.startsWith("- [ ]")).slice(0, 5);
-  console.log(
-    `ReviewRoom roadmap: current phase is "${title}". Next open items:\n${open.join("\n")}`,
-  );
+  console.log(`PRoblem roadmap: current phase is "${title}". Next open items:\n${open.join("\n")}`);
 } else {
-  console.log("ReviewRoom roadmap: all phases are complete.");
+  console.log("PRoblem roadmap: all phases are complete.");
 }

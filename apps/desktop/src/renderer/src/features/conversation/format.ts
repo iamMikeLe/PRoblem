@@ -1,4 +1,4 @@
-import type { ConversationEntry } from "@reviewroom/shared";
+import type { ConversationEntry } from "@problem/shared";
 
 type TurnEnd = Extract<ConversationEntry, { kind: "turn-end" }>;
 

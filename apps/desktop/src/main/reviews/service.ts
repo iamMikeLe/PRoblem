@@ -2,12 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import type {
-  CloseReviewResult,
-  CreateReviewRequest,
-  Review,
-  ReviewSource,
-} from "@reviewroom/shared";
+import type { CloseReviewResult, CreateReviewRequest, Review, ReviewSource } from "@problem/shared";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { GhClient } from "../git/gh.ts";
 import { githubRepoOf, parsePullRequestUrl } from "../git/github.ts";
@@ -42,7 +37,7 @@ import {
 
 export interface ReviewServiceDeps {
   db: DatabaseSync;
-  /** Parent folder of all review worktrees (`~/.reviewroom/worktrees`). */
+  /** Parent folder of all review worktrees (`~/.problem/worktrees`). */
   worktreesDir: string;
   gh: GhClient;
   log: Logger;
@@ -111,7 +106,7 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     }
     const info = await gh.viewPullRequest(repo, ref.number);
     // Fetch into the app's own namespace, so parallel starts never race on FETCH_HEAD.
-    const target = `refs/reviewroom/pull/${ref.number}`;
+    const target = `refs/problem/pull/${ref.number}`;
     await fetchRefspec(root, remote.name, `+refs/pull/${ref.number}/head:${target}`);
     const headSha = await resolveCommit(root, target);
     if (!headSha)
@@ -302,7 +297,7 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
           // Defense in depth: only ever delete `<worktreesDir>/<projectId>/<reviewId>`.
           const parent = await realpath(deps.worktreesDir).catch(() => deps.worktreesDir);
           if (review.workdir !== join(parent, review.projectId, review.id)) {
-            note = `Did not delete ${review.workdir}: it is not a ReviewRoom worktree.`;
+            note = `Did not delete ${review.workdir}: it is not a PRoblem worktree.`;
           } else {
             await removeWorktree(root, review.workdir);
           }

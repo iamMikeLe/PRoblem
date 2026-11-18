@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EDITOR_TEMPLATES } from "@reviewroom/shared";
+import { EDITOR_TEMPLATES } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildEditorCommand,
@@ -25,7 +25,7 @@ describe("opening a file in the editor", () => {
   let bin: string;
 
   beforeEach(() => {
-    base = realpathSync(mkdtempSync(join(tmpdir(), "reviewroom-editor-")));
+    base = realpathSync(mkdtempSync(join(tmpdir(), "problem-editor-")));
     workdir = join(base, "repo");
     bin = join(base, "bin");
     mkdirSync(join(workdir, "src"), { recursive: true });

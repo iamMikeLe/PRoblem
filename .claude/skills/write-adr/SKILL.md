@@ -1,6 +1,6 @@
 ---
 name: write-adr
-description: Write an Architecture Decision Record for ReviewRoom in docs/adr/. Use when a change chooses between real alternatives (library, storage, protocol, security model), when the user asks why something was built a certain way, or when the architect agent flags a decision.
+description: Write an Architecture Decision Record for PRoblem in docs/adr/. Use when a change chooses between real alternatives (library, storage, protocol, security model), when the user asks why something was built a certain way, or when the architect agent flags a decision.
 ---
 
 # Write an ADR

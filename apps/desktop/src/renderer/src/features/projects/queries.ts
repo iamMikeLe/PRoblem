@@ -1,4 +1,4 @@
-import type { CreateProjectRequest, Project, UpdateProjectRequest } from "@reviewroom/shared";
+import type { CreateProjectRequest, Project, UpdateProjectRequest } from "@problem/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api.ts";
 

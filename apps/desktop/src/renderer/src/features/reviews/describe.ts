@@ -1,4 +1,4 @@
-import type { Review } from "@reviewroom/shared";
+import type { Review } from "@problem/shared";
 
 export const shortSha = (sha: string): string => sha.slice(0, 8);
 

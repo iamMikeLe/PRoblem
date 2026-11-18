@@ -3,13 +3,13 @@ import { absolutePathOnly, extractPath } from "../../src/main/env.ts";
 
 describe("extractPath", () => {
   it("finds PATH between the markers, ignoring shell banners", () => {
-    const out = "Welcome!\n__REVIEWROOM_PATH__/opt/homebrew/bin:/usr/bin__REVIEWROOM_PATH__";
+    const out = "Welcome!\n__PROBLEM_PATH__/opt/homebrew/bin:/usr/bin__PROBLEM_PATH__";
     expect(extractPath(out)).toBe("/opt/homebrew/bin:/usr/bin");
   });
 
   it("gives up on missing markers or an empty PATH", () => {
     expect(extractPath("no markers")).toBeUndefined();
-    expect(extractPath("__REVIEWROOM_PATH____REVIEWROOM_PATH__")).toBeUndefined();
+    expect(extractPath("__PROBLEM_PATH____PROBLEM_PATH__")).toBeUndefined();
   });
 });
 

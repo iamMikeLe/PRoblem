@@ -1,4 +1,4 @@
-import type { StoredEntry } from "@reviewroom/shared";
+import type { StoredEntry } from "@problem/shared";
 import { afterEach, describe, expect, it } from "vitest";
 import { describeTurnEnd } from "../../../../src/renderer/src/features/conversation/format.ts";
 import { useConversationStore } from "../../../../src/renderer/src/features/conversation/store.ts";

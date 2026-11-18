@@ -1,5 +1,5 @@
 import { Badge, type BadgeProps } from "@fluentui/react-components";
-import type { Review, ReviewStatus } from "@reviewroom/shared";
+import type { Review, ReviewStatus } from "@problem/shared";
 import { useReviewStatus } from "../conversation/store.ts";
 
 const statusAppearance: Record<

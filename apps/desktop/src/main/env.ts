@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 
-const MARKER = "__REVIEWROOM_PATH__";
+const MARKER = "__PROBLEM_PATH__";
 
 /**
  * A macOS app started from Finder or the Dock gets a minimal PATH (`/usr/bin:/bin:...`), so tools

@@ -12,7 +12,7 @@ import {
   useArrowNavigationGroup,
 } from "@fluentui/react-components";
 import { ComposeRegular, FolderAddRegular } from "@fluentui/react-icons";
-import type { FindingCounts, Project, Review } from "@reviewroom/shared";
+import type { FindingCounts, Project, Review } from "@problem/shared";
 import { useFindingCounts } from "../../features/findings/queries.ts";
 import { describeReview, formatAge } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";

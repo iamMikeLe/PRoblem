@@ -27,7 +27,7 @@ import {
   CheckmarkRegular,
   DismissCircleRegular,
 } from "@fluentui/react-icons";
-import type { Finding, Severity, Verdict } from "@reviewroom/shared";
+import type { Finding, Severity, Verdict } from "@problem/shared";
 import { useState } from "react";
 import { Markdown } from "../conversation/Markdown.tsx";
 import { useFindings, useOpenInEditor, useSetVerdict } from "./queries.ts";

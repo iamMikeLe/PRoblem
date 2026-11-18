@@ -20,7 +20,7 @@ export function reportFindingsTool(report: (input: unknown) => ReportOutcome) {
   );
 }
 
-/** The in-process MCP server a review turn gets (`mcp__reviewroom__report_findings`). */
+/** The in-process MCP server a review turn gets (`mcp__problem__report_findings`). */
 export function findingsServer(
   report: (input: unknown) => ReportOutcome,
 ): McpSdkServerConfigWithInstance {

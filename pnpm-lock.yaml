@@ -30,7 +30,7 @@ importers:
       '@fluentui/react-icons':
         specifier: 2.0.346
         version: 2.0.346(react@19.3.1)
-      '@reviewroom/shared':
+      '@problem/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@tanstack/react-query':

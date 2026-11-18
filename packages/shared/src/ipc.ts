@@ -248,8 +248,8 @@ export type IpcSchemas = {
 };
 export const ipcSchemas: IpcSchemas = ipcContract;
 
-/** The API the preload script exposes as `window.reviewroom`. */
-export interface ReviewRoomBridge {
+/** The API the preload script exposes as `window.problem`. */
+export interface ProblemBridge {
   invoke<C extends IpcChannel>(channel: C, input: IpcInput<C>): Promise<IpcResult<IpcOutput<C>>>;
   /** Subscribes to main-process events; returns the unsubscribe function. */
   onEvent(listener: (event: AppEvent) => void): () => void;

@@ -90,7 +90,7 @@ describe("review permission gate", () => {
     let fixMode: boolean;
 
     beforeEach(() => {
-      root = mkdtempSync(join(tmpdir(), "reviewroom-policy-"));
+      root = mkdtempSync(join(tmpdir(), "problem-policy-"));
       workdir = join(root, "checkout");
       mkdirSync(join(workdir, "src"), { recursive: true });
       mkdirSync(join(workdir, ".git", "hooks"), { recursive: true });
@@ -115,7 +115,7 @@ describe("review permission gate", () => {
       expect(gate("Read", { file_path: "src/app.ts" })).toEqual({ kind: "allow" });
       expect(gate("Grep", { pattern: "retry" })).toEqual({ kind: "allow" });
       expect(gate("Glob", { pattern: "**/*.ts", path: "src" })).toEqual({ kind: "allow" });
-      expect(gate("mcp__reviewroom__report_findings", { add: [] })).toEqual({ kind: "allow" });
+      expect(gate("mcp__problem__report_findings", { add: [] })).toEqual({ kind: "allow" });
     });
 
     it("asks before reading outside the folder (through a symlink, ~, .git or a pattern)", () => {
@@ -244,7 +244,7 @@ describe("review permission gate", () => {
     });
 
     it("refuses every other tool", () => {
-      for (const tool of ["Agent", "Task", "NotebookEdit", "mcp__x__y", "mcp__reviewroom__other"]) {
+      for (const tool of ["Agent", "Task", "NotebookEdit", "mcp__x__y", "mcp__problem__other"]) {
         expect(gate(tool, {})).toMatchObject({ kind: "deny" });
       }
     });

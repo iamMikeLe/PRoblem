@@ -15,7 +15,7 @@ export function git(cwd: string, ...args: string[]): string {
 }
 
 /** A temporary directory (real path, so macOS /var → /private/var does not break comparisons). */
-export async function makeTempDir(prefix = "reviewroom-"): Promise<{
+export async function makeTempDir(prefix = "problem-"): Promise<{
   dir: string;
   cleanup: () => Promise<void>;
 }> {

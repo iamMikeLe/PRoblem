@@ -25,7 +25,7 @@
     "deny": [
       "Read(./.env)",
       "Read(./.env.*)",
-      "Read(~/.reviewroom/**)",
+      "Read(~/.problem/**)",
       "Bash(git push:*)",
       "Bash(rm -rf:*)"
     ]

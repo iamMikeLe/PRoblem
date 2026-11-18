@@ -1,4 +1,4 @@
-import type { AppEvent, PendingApproval, ReviewStatus, StoredEntry } from "@reviewroom/shared";
+import type { AppEvent, PendingApproval, ReviewStatus, StoredEntry } from "@problem/shared";
 import { create } from "zustand";
 
 /**

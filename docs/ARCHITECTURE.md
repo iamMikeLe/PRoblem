@@ -1,6 +1,6 @@
 # Architecture
 
-ReviewRoom is an Electron desktop app (ADR 0008). There is no HTTP server: the sandboxed UI talks
+PRoblem is an Electron desktop app (ADR 0008). There is no HTTP server: the sandboxed UI talks
 to the main process only through a typed IPC contract.
 
 ## Overview
@@ -19,7 +19,7 @@ flowchart LR
     SES[Session service<br/>Agent SDK query per turn]
     GATE[PreToolUse<br/>permission gate]
     MCP[report_findings<br/>in-process MCP tool]
-    DB[(SQLite<br/>~/.reviewroom)]
+    DB[(SQLite<br/>~/.problem)]
   end
   CC[Claude Code<br/>local login]
   UI --> Q -- invoke --> P --> D --> SVC --> DB
@@ -45,7 +45,7 @@ flowchart LR
 | `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
-| `src/preload/index.ts` | `window.reviewroom` bridge | yes |
+| `src/preload/index.ts` | `window.problem` bridge | yes |
 | `src/renderer/` | React app | no (browser APIs) |
 
 Everything without Electron is tested in plain Node (`test/main`) or jsdom (`test/renderer`).
@@ -55,7 +55,7 @@ Everything without Electron is tested in plain Node (`test/main`) or jsdom (`tes
 `packages/shared/src/ipc.ts` maps each channel (`projects:create`, `dialog:pickFolder`, ...) to a
 zod input and output schema.
 
-1. The renderer calls `api.projects.create(body)` → `window.reviewroom.invoke("projects:create", body)`.
+1. The renderer calls `api.projects.create(body)` → `window.problem.invoke("projects:create", body)`.
 2. The preload forwards only channels from `IPC_CHANNELS` to `ipcRenderer.invoke`.
 3. Main rejects calls from any frame that is not our UI, then the dispatcher parses the input.
    On failure it returns `{ ok: false, error: { code: "invalid_request" } }`.
@@ -85,15 +85,24 @@ channel, validated by `AppEventSchema`.
    `idle`, or `failed`. Stop calls `interrupt()` and kills the turn if it does not end in 10 s.
 7. Claude calls `report_findings` (in-process MCP server, one per turn). Main checks the whole
    report, assigns stable numbers, saves it in one transaction and broadcasts `review.findings`.
-   Verdicts the user changes go into the next message as a `[ReviewRoom]` note (ADR 0004).
+   Verdicts the user changes go into the next message as a `[PRoblem]` note (ADR 0004).
 
 ## Storage
 
-`~/.reviewroom/` (override with `REVIEWROOM_HOME`):
+`~/.problem/` (override with `PROBLEM_HOME`):
 
-- `reviewroom.db`: projects, reviews, conversation entries, findings, app settings (later
+- `problem.db`: projects, reviews, conversation entries, findings, app settings (later
   approvals); WAL mode
 - `worktrees/<project>/<review-id>/`: isolated checkouts
+
+The app was called ReviewRoom until 2026-11-18. On the first start after the rename,
+`main/legacy.ts` runs these steps once:
+- It moves `~/.reviewroom` (with `reviewroom.db` and its WAL files) to `~/.problem`.
+- It rewrites the reviews' folders and runs `git worktree repair` for open isolated reviews.
+- It moves the UI's local storage out of the old `ReviewRoom` app folder.
+
+Pull request heads are now fetched to `refs/problem/pull/<n>`. Refs that earlier versions
+fetched to `refs/reviewroom/pull/<n>` stay in the repositories until deleted.
 
 ## Security model
 

@@ -1,6 +1,6 @@
 {
-  "name": "@reviewroom/desktop",
-  "productName": "ReviewRoom",
+  "name": "@problem/desktop",
+  "productName": "PRoblem",
   "version": "0.1.0",
   "description": "Run many Claude Code reviews side by side",
   "private": true,
@@ -19,7 +19,7 @@
     "@anthropic-ai/claude-agent-sdk": "0.3.326",
     "@fluentui/react-components": "9.75.2",
     "@fluentui/react-icons": "2.0.346",
-    "@reviewroom/shared": "workspace:*",
+    "@problem/shared": "workspace:*",
     "@tanstack/react-query": "5.108.0",
     "@testing-library/react": "16.3.3",
     "@types/node": "24.19.2",

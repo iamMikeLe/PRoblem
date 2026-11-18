@@ -1,6 +1,6 @@
 ---
 name: ui-reviewer
-description: Read-only UI and accessibility reviewer for the ReviewRoom web app. Use after changing React components to check Fluent UI v9 usage, Teams-style layout consistency, theming (dark/light/high contrast) and accessibility. Never edits files.
+description: Read-only UI and accessibility reviewer for the PRoblem web app. Use after changing React components to check Fluent UI v9 usage, Teams-style layout consistency, theming (dark/light/high contrast) and accessibility. Never edits files.
 tools: Read, Grep, Glob
 model: sonnet
 ---

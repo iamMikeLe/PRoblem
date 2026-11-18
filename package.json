@@ -1,5 +1,5 @@
 {
-  "name": "reviewroom",
+  "name": "problem",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm --filter @reviewroom/desktop dev",
-    "build": "pnpm --filter @reviewroom/desktop build",
-    "start": "pnpm --filter @reviewroom/desktop start",
-    "package": "pnpm --filter @reviewroom/desktop package",
+    "dev": "pnpm --filter @problem/desktop dev",
+    "build": "pnpm --filter @problem/desktop build",
+    "start": "pnpm --filter @problem/desktop start",
+    "package": "pnpm --filter @problem/desktop package",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check .",

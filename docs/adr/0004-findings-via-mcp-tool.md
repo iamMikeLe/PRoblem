@@ -32,11 +32,11 @@ free, and the server owns numbering, so stability is guaranteed by construction.
   the repository root. A review keeps at most 200 findings, and titles are one line.
 - **One server per turn.** `createSdkMcpServer` is created for each turn and bound to that
   review. `strictMcpConfig` keeps it the only MCP server, and the gate allows exactly
-  `mcp__reviewroom__report_findings`.
+  `mcp__problem__report_findings`.
 - **Verdicts are the user's.** Claude's updates never change a verdict. A finding Claude changes
   after a verdict is marked "changed since your verdict".
 - **Claude learns the verdicts.** Verdicts changed since the last message start the user's next
-  message as a `[ReviewRoom] …` note, with each title quoted.
+  message as a `[PRoblem] …` note, with each title quoted.
   - They are marked as told only once Claude has started that turn, so a stopped message tells
     Claude again next time.
   - The note is part of the stored user message, so the transcript shows exactly what Claude was told.

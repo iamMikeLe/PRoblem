@@ -1,4 +1,4 @@
-import type { ConversationEntry, StoredEntry } from "@reviewroom/shared";
+import type { ConversationEntry, StoredEntry } from "@problem/shared";
 import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useDrafts } from "../../../../src/renderer/src/features/conversation/drafts.ts";

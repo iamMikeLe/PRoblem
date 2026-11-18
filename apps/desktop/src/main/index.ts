@@ -1,21 +1,23 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { editorTemplate } from "@reviewroom/shared";
+import { editorTemplate } from "@problem/shared";
 import { app, BrowserWindow, dialog, ipcMain, Notification } from "electron";
 import { findExecutable } from "./claude/executable.ts";
 import { createSessionService } from "./claude/sessions.ts";
-import { dataDir } from "./config.ts";
+import { DATABASE_NAME, dataDir } from "./config.ts";
 import { openDatabase } from "./db/database.ts";
 import { createEditorOpener, spawnDetached } from "./editor/open.ts";
 import { absolutePathOnly, loginShellPath } from "./env.ts";
 import type { Logger } from "./errors.ts";
 import { createFindingsService } from "./findings/service.ts";
 import { createGhClient } from "./git/gh.ts";
+import { repairWorktree } from "./git/worktree.ts";
 import { createDispatcher } from "./ipc/dispatcher.ts";
 import { createHandlers } from "./ipc/handlers.ts";
 import { broadcast, registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
+import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
 import { createReviewService } from "./reviews/service.ts";
 import { getSettings, updateSettings } from "./settings/repository.ts";
@@ -25,6 +27,15 @@ const log: Logger = {
   info: (message, details) => console.info(`[main] ${message}`, details ?? ""),
   error: (message, details) => console.error(`[main] ${message}`, details ?? ""),
 };
+
+// Formerly ReviewRoom: keep the UI preferences (local storage) of the old app folder, once.
+// Electron creates the new folder itself at startup, but its local storage only with the window.
+if (app.getPath("userData") === join(app.getPath("appData"), "PRoblem")) {
+  moveFolder(
+    join(app.getPath("appData"), "ReviewRoom", "Local Storage"),
+    join(app.getPath("userData"), "Local Storage"),
+  );
+}
 
 // One instance only: two processes must not share the database and the worktrees.
 if (!app.requestSingleInstanceLock()) {
@@ -46,8 +57,13 @@ async function start(): Promise<void> {
 
   const home = app.getPath("home");
   const dir = dataDir(process.env, home);
+  const legacyDir = migrateLegacyDataDir(process.env, home, dir, DATABASE_NAME);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const db = openDatabase(join(dir, "reviewroom.db"));
+  const db = openDatabase(join(dir, DATABASE_NAME));
+  if (legacyDir) {
+    log.info("moved the ReviewRoom data folder", { from: legacyDir, to: dir });
+    await relocateReviews(db, legacyDir, dir, repairWorktree, log);
+  }
 
   // electron-vite sets ELECTRON_RENDERER_URL while `pnpm dev` runs; packaged builds load the file.
   const devUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;

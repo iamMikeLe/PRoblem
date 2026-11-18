@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { type Review, ReviewSchema, type ReviewStatus } from "@reviewroom/shared";
+import { type Review, ReviewSchema, type ReviewStatus } from "@problem/shared";
 import { z } from "zod";
 
 /** A review as stored, with the fields only the main process needs. */

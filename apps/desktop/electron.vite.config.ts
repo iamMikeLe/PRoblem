@@ -10,7 +10,7 @@ import type { Plugin } from "vite";
 function contentSecurityPolicy(): Plugin {
   let dev = false;
   return {
-    name: "reviewroom-csp",
+    name: "problem-csp",
     configResolved(config) {
       dev = config.command === "serve";
     },

@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
-import type { OpenInEditorRequest } from "@reviewroom/shared";
+import type { OpenInEditorRequest } from "@problem/shared";
 import { findExecutable, isExecutableFile } from "../claude/executable.ts";
 import { AppFailure } from "../errors.ts";
 
@@ -118,7 +118,7 @@ export async function openInEditor(deps: OpenInEditorDeps): Promise<void> {
   }
 }
 
-/** Starts the editor detached from ReviewRoom, without a shell. */
+/** Starts the editor detached from PRoblem, without a shell. */
 export const spawnDetached: Launcher = (program, args, cwd) =>
   new Promise((resolvePromise, reject) => {
     const child = spawn(program, [...args], { cwd, detached: true, stdio: "ignore", shell: false });

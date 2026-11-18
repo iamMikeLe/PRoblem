@@ -17,7 +17,7 @@ import {
   Textarea,
   tokens,
 } from "@fluentui/react-components";
-import { type Project, REVIEW_SOURCE_MAX, type Review } from "@reviewroom/shared";
+import { type Project, REVIEW_SOURCE_MAX, type Review } from "@problem/shared";
 import { type FormEvent, useState } from "react";
 import { AppRequestError } from "../../lib/api.ts";
 import { loadIsolated, saveIsolated } from "./isolationPreference.ts";

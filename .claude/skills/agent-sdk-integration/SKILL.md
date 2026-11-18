@@ -1,6 +1,6 @@
 ---
 name: agent-sdk-integration
-description: How ReviewRoom drives Claude through the Claude Agent SDK - one query() per turn with session resume, streaming SDK messages to the renderer, the report_findings MCP tool, the PreToolUse permission gate, interrupt, and testing with a fake query. Use for any work in apps/desktop/src/main/claude or anything that starts, streams, stops or permissions a Claude turn.
+description: How PRoblem drives Claude through the Claude Agent SDK - one query() per turn with session resume, streaming SDK messages to the renderer, the report_findings MCP tool, the PreToolUse permission gate, interrupt, and testing with a fake query. Use for any work in apps/desktop/src/main/claude or anything that starts, streams, stops or permissions a Claude turn.
 ---
 
 # Claude Agent SDK integration
@@ -59,7 +59,7 @@ Claude reports findings by calling a tool, not by printing JSON:
 - `claude/findingsTool.ts`: `findingsServer(report)` = `createSdkMcpServer` with one
   `tool("report_findings", …, ReportShape, handler)`. It is created per turn in `optionsFor`,
   bound to the review, and is the only entry in `mcpServers` (`strictMcpConfig: true`). Its
-  tool name `mcp__reviewroom__report_findings` (`claude/names.ts`) is allowed by the policy.
+  tool name `mcp__problem__report_findings` (`claude/names.ts`) is allowed by the policy.
   Needs the peer `@modelcontextprotocol/sdk`.
 - `findings/report.ts`: `ReportShape` (`add` / `update` by number / `withdraw` with reason) and
   `applyReport`. It checks everything first, then saves in one transaction, or saves nothing and
@@ -99,4 +99,4 @@ records the options each turn received. Test with an in-memory database (`openDa
 Covered: order and numbering of entries, session id stored and resumed, the gate options, approval cards (allow once, for the review, deny, expire on Stop), fix mode, and the
 gate, busy, Stop (running and queued), the concurrency limit, a missing `claude`, error results,
 recovery after a quit, the catalog. The policy has its own table-driven tests (`policy.test.ts`).
-A real turn is checked by hand in a second app instance (`REVIEWROOM_HOME` + `--user-data-dir`) driven over CDP.
+A real turn is checked by hand in a second app instance (`PROBLEM_HOME` + `--user-data-dir`) driven over CDP.

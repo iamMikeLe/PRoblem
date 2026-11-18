@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import type { Project } from "@reviewroom/shared";
+import type { Project } from "@problem/shared";
 import { z } from "zod";
 
 /** A `projects` row as SQLite returns it, validated instead of cast. */

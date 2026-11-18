@@ -1,6 +1,6 @@
 ---
 name: ipc-contract
-description: How to add or change an IPC channel or main → renderer event in ReviewRoom end to end - zod schemas and channel in packages/shared, Electron-free handler in the main process, typed api method and React Query hook in the renderer, and tests on both sides. Use for any change to what the UI asks the main process or what main pushes to the UI.
+description: How to add or change an IPC channel or main → renderer event in PRoblem end to end - zod schemas and channel in packages/shared, Electron-free handler in the main process, typed api method and React Query hook in the renderer, and tests on both sides. Use for any change to what the UI asks the main process or what main pushes to the UI.
 ---
 
 # Add or change an IPC channel

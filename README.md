@@ -1,8 +1,8 @@
-# ReviewRoom
+# PRoblem
 
 **Run many AI code reviews side by side, without losing your place.**
 
-ReviewRoom is a desktop app (Electron) that runs [Claude Code](https://claude.com/claude-code) reviews of git
+PRoblem is a desktop app (Electron) that runs [Claude Code](https://claude.com/claude-code) reviews of git
 branches and pull requests, many at once and across several repositories. Each review keeps its own
 live conversation and a numbered list of findings you can triage. The UI is laid out like
 Microsoft Teams, in its dark theme.
@@ -12,7 +12,7 @@ Microsoft Teams, in its dark theme.
 ## Why
 
 Reviewing several PRs at once with an AI assistant in a terminal means constant context switching:
-which review was where, what was asked, which findings were already checked. ReviewRoom gives every
+which review was where, what was asked, which findings were already checked. PRoblem gives every
 review its own room:
 
 - **Projects and reviews**: add git repositories; start a review from a branch name or a PR link.
@@ -47,7 +47,7 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` opens the ReviewRoom window with hot reload for the UI.
+`pnpm dev` opens the PRoblem window with hot reload for the UI.
 
 | Script | What it does |
 | --- | --- |
@@ -58,7 +58,7 @@ pnpm dev
 | `pnpm test` | Vitest: main process in Node, UI in jsdom |
 | `pnpm format` | Biome format and safe fixes |
 
-Data lives in `~/.reviewroom` (SQLite database, worktrees); set `REVIEWROOM_HOME` to use another folder.
+Data lives in `~/.problem` (SQLite database, worktrees); set `PROBLEM_HOME` to use another folder.
 
 ## Project structure
 
@@ -67,7 +67,7 @@ review-room/
 ├── apps/
 │   └── desktop/
 │       ├── src/main/        Electron main: IPC dispatcher, services, SQLite, git
-│       ├── src/preload/     window.reviewroom bridge (invoke / onEvent)
+│       ├── src/preload/     window.problem bridge (invoke / onEvent)
 │       ├── src/renderer/    React + Fluent UI, Teams-style shell
 │       └── test/            main (Node) and renderer (jsdom) suites
 ├── packages/

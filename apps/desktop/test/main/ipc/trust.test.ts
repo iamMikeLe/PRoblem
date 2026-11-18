@@ -5,7 +5,7 @@ describe("isTrustedRendererUrl", () => {
   const dev = { kind: "dev-server", url: "http://localhost:5173/" } as const;
   const file = {
     kind: "file",
-    path: "/Applications/ReviewRoom.app/out/renderer/index.html",
+    path: "/Applications/PRoblem.app/out/renderer/index.html",
   } as const;
 
   it("trusts the dev server's origin, any path", () => {

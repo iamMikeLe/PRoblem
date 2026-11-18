@@ -11,7 +11,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { DismissRegular } from "@fluentui/react-icons";
-import type { Finding, Review } from "@reviewroom/shared";
+import type { Finding, Review } from "@problem/shared";
 import { useState } from "react";
 import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";

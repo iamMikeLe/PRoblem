@@ -1,5 +1,5 @@
 import { isAbsolute, relative } from "node:path";
-import { type ConversationEntry, TOOL_TEXT_MAX } from "@reviewroom/shared";
+import { type ConversationEntry, TOOL_TEXT_MAX } from "@problem/shared";
 import { z } from "zod";
 import { REPORT_TOOL_NAME } from "./names.ts";
 

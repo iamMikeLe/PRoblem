@@ -1,4 +1,4 @@
-import type { AppErrorCode } from "@reviewroom/shared";
+import type { AppErrorCode } from "@problem/shared";
 
 /**
  * An expected failure with a stable code for the renderer (bad input, missing project, not a

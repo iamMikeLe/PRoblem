@@ -9,7 +9,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { CheckmarkCircleRegular, DismissCircleRegular, WrenchRegular } from "@fluentui/react-icons";
-import type { ConversationEntry } from "@reviewroom/shared";
+import type { ConversationEntry } from "@problem/shared";
 
 type ToolCall = Extract<ConversationEntry, { kind: "tool-call" }>;
 type ToolResult = Extract<ConversationEntry, { kind: "tool-result" }>;

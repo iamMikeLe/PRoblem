@@ -1,6 +1,6 @@
 import { stat } from "node:fs/promises";
 import { isAbsolute, resolve, sep } from "node:path";
-import type { AppErrorCode } from "@reviewroom/shared";
+import type { AppErrorCode } from "@problem/shared";
 
 /** Expands a leading `~` or `~/` to `home`. `~user` is left as is (and then fails as relative). */
 export function expandHome(input: string, home: string): string {

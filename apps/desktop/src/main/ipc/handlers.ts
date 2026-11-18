@@ -1,4 +1,4 @@
-import type { AppSettings, UpdateSettingsRequest } from "@reviewroom/shared";
+import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
 import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
 import type { FindingsService } from "../findings/service.ts";

@@ -1,4 +1,4 @@
-import { type AppEvent, EVENT_CHANNEL, IPC_CHANNELS } from "@reviewroom/shared";
+import { type AppEvent, EVENT_CHANNEL, IPC_CHANNELS } from "@problem/shared";
 import { BrowserWindow, type IpcMain } from "electron";
 import { failure, type IpcDispatch } from "./dispatcher.ts";
 import { isTrustedRendererUrl, type RendererSource } from "./trust.ts";

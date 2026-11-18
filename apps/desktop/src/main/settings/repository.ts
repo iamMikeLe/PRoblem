@@ -4,7 +4,7 @@ import {
   AppSettingsSchema,
   DEFAULT_SETTINGS,
   type UpdateSettingsRequest,
-} from "@reviewroom/shared";
+} from "@problem/shared";
 import { z } from "zod";
 
 /** App settings as one JSON value per section (`app_settings` table). */
