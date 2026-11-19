@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { findDialog } from "../../dialogs.ts";
+import { dialogClosed, findDialog } from "../../dialogs.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, removeBridge, stubBridge } from "../../stubBridge.ts";
 
@@ -23,7 +23,7 @@ describe("Projects section", () => {
     expect(screen.getByRole("heading", { level: 2, name: "payments-api" })).toBeTruthy();
 
     fireEvent.click(within(pane).getByRole("button", { name: /web-portal/ }));
-    expect(screen.getByRole("heading", { level: 2, name: "web-portal" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 2, name: "web-portal" })).toBeTruthy();
   });
 
   it("shows the server's message inline when adding fails", async () => {
@@ -64,7 +64,7 @@ describe("Projects section", () => {
     fireEvent.click(add);
 
     expect(await screen.findByRole("heading", { level: 2, name: "ledger" })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await dialogClosed();
     expect(api.calls).toContainEqual({
       channel: "projects:create",
       input: { path: "~/code/ledger" },
@@ -96,7 +96,7 @@ describe("Projects section", () => {
     await within(pane).findByText("payments-api");
 
     fireEvent.click(screen.getByRole("button", { name: "Remove" }));
-    const dialog = await screen.findByRole("alertdialog");
+    const dialog = await findDialog(undefined, "alertdialog");
     expect(within(dialog).getByText("Remove payments-api?")).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove project" }));
 
@@ -110,13 +110,13 @@ describe("Projects section", () => {
     api.deleteError = { code: "internal", message: "Something went wrong" };
     await openProjects();
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
-    const dialog = await screen.findByRole("alertdialog");
+    const dialog = await findDialog(undefined, "alertdialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove project" }));
 
     expect(await within(dialog).findByText("Something went wrong")).toBeTruthy();
     expect(api.projects).toHaveLength(1);
     fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await dialogClosed("alertdialog");
     expect(screen.getByRole("heading", { level: 2, name: "payments-api" })).toBeTruthy();
   });
 
@@ -125,7 +125,7 @@ describe("Projects section", () => {
     const pane = await openProjects();
     fireEvent.click(await screen.findByRole("button", { name: "Remove" }));
     fireEvent.click(
-      within(await screen.findByRole("alertdialog")).getByRole("button", {
+      within(await findDialog(undefined, "alertdialog")).getByRole("button", {
         name: "Remove project",
       }),
     );
