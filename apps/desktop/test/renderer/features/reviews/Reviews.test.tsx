@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { findDialog } from "../../dialogs.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "../../stubBridge.ts";
 
@@ -11,7 +12,7 @@ async function openNewReview() {
   if (!header) throw new Error("no New review button");
   await waitFor(() => expect(header.hasAttribute("disabled")).toBe(false));
   fireEvent.click(header);
-  return screen.findByRole("dialog");
+  return findDialog();
 }
 
 const sourceBox = (dialog: HTMLElement) =>
@@ -72,10 +73,10 @@ describe("Reviews", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "New review" }));
-    await waitFor(() =>
-      expect(
-        within(screen.getByRole("dialog")).getByRole("switch", { name: "Isolated worktree" }),
-      ).toHaveProperty("checked", false),
+    const reopened = await findDialog();
+    expect(within(reopened).getByRole("switch", { name: "Isolated worktree" })).toHaveProperty(
+      "checked",
+      false,
     );
   });
 

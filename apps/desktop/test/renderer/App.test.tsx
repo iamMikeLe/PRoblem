@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { findDialog } from "./dialogs.ts";
 import { renderApp } from "./renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "./stubBridge.ts";
 
@@ -88,6 +89,6 @@ describe("App shell", () => {
     const main = screen.getByRole("main");
     expect(within(main).getByRole("heading", { name: "No review selected" })).toBeTruthy();
     fireEvent.click(within(main).getByRole("button", { name: "New review" }));
-    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(await findDialog()).toBeTruthy();
   });
 });

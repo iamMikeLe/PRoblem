@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { findDialog } from "../../dialogs.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, removeBridge, stubBridge } from "../../stubBridge.ts";
 
@@ -33,7 +34,7 @@ describe("Projects section", () => {
     };
     await openProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findDialog();
     fireEvent.change(within(dialog).getByRole("textbox", { name: /Repository folder/ }), {
       target: { value: "/tmp/x" },
     });
@@ -53,7 +54,7 @@ describe("Projects section", () => {
     const api = stubBridge([]);
     await openProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findDialog();
     const add = within(dialog).getByRole("button", { name: "Add" });
     expect(add.hasAttribute("disabled")).toBe(true);
 
@@ -75,7 +76,7 @@ describe("Projects section", () => {
     api.pickedFolder = "/Users/me/code/ledger";
     await openProjects();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findDialog();
     const input = within(dialog).getByRole("textbox", { name: /Repository folder/ });
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Browse for a folder" }));

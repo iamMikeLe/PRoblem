@@ -2,6 +2,7 @@ import type { PostPreview, PrConversation } from "@problem/shared";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { useConversationStore } from "../../../../src/renderer/src/features/conversation/store.ts";
+import { findDialog } from "../../dialogs.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "../../stubBridge.ts";
 
@@ -117,7 +118,7 @@ describe("GitHub", () => {
     api.previews.r1 = preview;
     await openTab(/Findings/);
     fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
-    const dialog = await screen.findByRole("dialog", { name: "Post a review to GitHub" });
+    const dialog = await findDialog("Post a review to GitHub");
     expect(await within(dialog).findByText("Findings (1 of 2 selected)")).toBeTruthy();
     expect(
       (
@@ -162,7 +163,7 @@ describe("GitHub", () => {
     api.previews.r1 = preview;
     await openTab(/Findings/);
     fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
-    const dialog = await screen.findByRole("dialog", { name: "Post a review to GitHub" });
+    const dialog = await findDialog("Post a review to GitHub");
     const text = (await within(dialog).findByRole("textbox", {
       name: "Text of finding #1",
     })) as HTMLTextAreaElement;
@@ -216,7 +217,7 @@ describe("GitHub", () => {
     api.previews.r1 = preview;
     await openTab(/Findings/);
     fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
-    const dialog = await screen.findByRole("dialog", { name: "Post a review to GitHub" });
+    const dialog = await findDialog("Post a review to GitHub");
     fireEvent.change(await within(dialog).findByRole("textbox", { name: /Summary/ }), {
       target: { value: "Looks _mostly_ good." },
     });
@@ -236,7 +237,7 @@ describe("GitHub", () => {
     api.previews.r1 = { ...preview, upToDate: false };
     await openTab(/Findings/);
     fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await findDialog();
     expect(await within(dialog).findByText(/The pull request has new commits/)).toBeTruthy();
     expect(
       within(dialog)
