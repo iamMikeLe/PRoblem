@@ -4,9 +4,14 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { AppEvent } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { reportFindingsTool } from "../../../src/main/claude/findingsTool.ts";
 import { openDatabase } from "../../../src/main/db/database.ts";
-import { normalizeFindingPath, verdictNote } from "../../../src/main/findings/report.ts";
+import {
+  normalizeFindingPath,
+  ReportShape,
+  verdictNote,
+} from "../../../src/main/findings/report.ts";
 import { untoldVerdicts } from "../../../src/main/findings/repository.ts";
 import { createFindingsService, type FindingsService } from "../../../src/main/findings/service.ts";
 import { markReviewClosed } from "../../../src/main/reviews/repository.ts";
@@ -121,6 +126,18 @@ describe("findings", () => {
       "1. Run `pnpm test`.",
       "1. Open Settings.",
     ]);
+  });
+
+  it("asks for steps to reproduce on every finding that can be shown, in add and update", () => {
+    // What Claude sees: the tool's JSON schema.
+    const schema = JSON.stringify(z.toJSONSchema(z.object(ReportShape)));
+    const descriptions = [...schema.matchAll(/"reproduction":\{[^}]*"description":"([^"]*)"/g)];
+    expect(descriptions).toHaveLength(2);
+    for (const [, description] of descriptions) {
+      expect(description).toMatch(/every finding/);
+      expect(description).toMatch(/expected and the actual result/);
+      expect(description).toMatch(/style nit/);
+    }
   });
 
   it("clears the line when the file changes without one, and can clear the file", () => {
