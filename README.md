@@ -115,3 +115,7 @@ assistant works by the same rules as a human contributor:
 
 The workflow: `/phase N` → `architect` plans → implement contract-first with tests → `/review` runs the
 reviewers in parallel → `/verify` → tick the roadmap.
+
+## License
+
+[MIT](LICENSE) © 2026 Mike Le
