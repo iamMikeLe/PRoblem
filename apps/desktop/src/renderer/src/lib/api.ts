@@ -104,6 +104,11 @@ export const api = {
     files: (id: string): Promise<ChangeSet> => call("changes:files", { id }),
     file: (id: string, path: string): Promise<FileDiff> => call("changes:file", { id, path }),
   },
+  app: {
+    reportError: async (report: IpcInput<"app:reportError">): Promise<void> => {
+      await call("app:reportError", report);
+    },
+  },
   search: {
     query: (text: string): Promise<SearchResults> => call("search:query", { text }),
   },

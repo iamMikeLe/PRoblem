@@ -132,6 +132,8 @@ export interface StubState {
   opened: string[];
   /** What `search:query` returns (whatever the text). */
   searchResults: SearchResults;
+  /** Crashes the window reported (`app:reportError`). */
+  errors: IpcInput<"app:reportError">[];
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
   settings: AppSettings;
@@ -174,6 +176,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     posts: [],
     opened: [],
     searchResults: { reviews: [], findings: [], files: [] },
+    errors: [],
     settings: DEFAULT_SETTINGS,
     catalog: {
       models: [
@@ -362,6 +365,9 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.findings[id] ?? []);
       }
+      case "app:reportError":
+        state.errors.push(ipcContract[channel].input.parse(raw));
+        return ok(null);
       case "search:query":
         return ok(state.searchResults);
       case "findings:counts": {

@@ -37,6 +37,7 @@ import {
   type Review,
 } from "@problem/shared";
 import { useMemo, useState } from "react";
+import { LoadingRows } from "../../app/LoadingRows.tsx";
 import { type PanelLimits, usePanel } from "../../lib/panel.ts";
 import { ResizeHandle } from "../../lib/ResizeHandle.tsx";
 import { useIsBusy } from "../conversation/store.ts";
@@ -246,7 +247,7 @@ export function ChangesTab({ review, project, initialFile, onShowFinding }: Prop
               />
             )}
             <div className={styles.tree}>
-              {changes.isLoading && <Spinner size="small" label="Loading changes" />}
+              {changes.isLoading && <LoadingRows label="Loading changes" rows={5} />}
               {changes.error && (
                 <MessageBar intent="error">
                   <MessageBarBody>{changes.error.message}</MessageBarBody>

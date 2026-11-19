@@ -30,6 +30,7 @@ export const IPC_CHANNELS = [
   "findings:list",
   "findings:counts",
   "search:query",
+  "app:reportError",
   "findings:setVerdict",
   "settings:get",
   "settings:update",

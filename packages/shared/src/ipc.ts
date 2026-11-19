@@ -264,6 +264,15 @@ export const ipcContract = {
     output: z.array(FindingSchema),
   },
   /** Open findings and blockers of every open review, by review id (for the list pane). */
+  /** A crash in the window (error boundary, uncaught error), written to the app's log. */
+  "app:reportError": {
+    input: z.strictObject({
+      message: z.string().max(2_000),
+      stack: z.string().max(20_000).nullable(),
+      componentStack: z.string().max(20_000).nullable(),
+    }),
+    output: z.null(),
+  },
   /** Reviews, findings and changed files of open reviews that contain every word. */
   "search:query": { input: SearchRequestSchema, output: SearchResultsSchema },
   "findings:counts": {

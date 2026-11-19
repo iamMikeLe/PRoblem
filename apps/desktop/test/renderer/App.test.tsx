@@ -85,6 +85,9 @@ describe("App shell", () => {
     stubBridge([makeProject("p1", "payments-api")]);
     renderApp();
     expect(await screen.findByText("No open reviews.")).toBeTruthy();
-    expect(screen.getByText("Select a review or start a new one.")).toBeTruthy();
+    const main = screen.getByRole("main");
+    expect(within(main).getByRole("heading", { name: "No review selected" })).toBeTruthy();
+    fireEvent.click(within(main).getByRole("button", { name: "New review" }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
   });
 });

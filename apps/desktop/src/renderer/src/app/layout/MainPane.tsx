@@ -13,7 +13,7 @@ import {
   Tooltip,
   tokens,
 } from "@fluentui/react-components";
-import { DismissRegular } from "@fluentui/react-icons";
+import { ComposeRegular, DismissRegular } from "@fluentui/react-icons";
 import type { Finding, Review } from "@problem/shared";
 import { useState } from "react";
 import { ChangesTab } from "../../features/changes/ChangesTab.tsx";
@@ -32,6 +32,7 @@ import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx"
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
 import type { SearchTarget } from "../../features/search/GlobalSearch.tsx";
+import { ErrorBoundary } from "../ErrorBoundary.tsx";
 
 type ReviewTab = "conversation" | "findings" | "changes" | "comments";
 const TABS: readonly ReviewTab[] = ["conversation", "findings", "changes", "comments"];
@@ -85,6 +86,14 @@ const useStyles = makeStyles({
     whiteSpace: "nowrap",
     maxWidth: "100%",
   },
+  welcome: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: tokens.spacingVerticalM,
+    textAlign: "center",
+    maxWidth: "420px",
+  },
   body: {
     display: "grid",
     placeItems: "center",
@@ -129,9 +138,11 @@ interface Props {
   /** A search result to show in this review (a new object each time one is chosen). */
   focus?: SearchTarget | undefined;
   onClosed: (note: string | null) => void;
+  /** Starts a review; undefined while there is no project to review. */
+  onNewReview?: (() => void) | undefined;
 }
 
-export function MainPane({ review, focus, onClosed }: Props) {
+export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
   const styles = useStyles();
   const [tab, setTab] = useState<ReviewTab>("conversation");
   const [closing, setClosing] = useState(false);
@@ -166,7 +177,19 @@ export function MainPane({ review, focus, onClosed }: Props) {
         <div />
         <div />
         <div className={styles.body}>
-          <Text>Select a review or start a new one.</Text>
+          <div className={styles.welcome}>
+            <Subtitle1 as="h2">No review selected</Subtitle1>
+            <Text>
+              {onNewReview
+                ? "Pick a review on the left, or start one for a branch or a pull request."
+                : "Add a project first: a Git repository on this machine."}
+            </Text>
+            {onNewReview && (
+              <Button appearance="primary" icon={<ComposeRegular />} onClick={onNewReview}>
+                New review
+              </Button>
+            )}
+          </div>
         </div>
       </main>
     );
@@ -252,45 +275,48 @@ export function MainPane({ review, focus, onClosed }: Props) {
           </MessageBar>
         )}
       </div>
-      {tab === "conversation" ? (
-        <ConversationTab
-          key={review.id}
-          review={review}
-          autoFocus={asking === review.id}
-          onFocused={() => setAsking(undefined)}
-        />
-      ) : tab === "findings" ? (
-        <>
-          <FindingsTab
-            key={`${review.id}:${shownFinding ?? ""}`}
-            reviewId={review.id}
-            onAsk={ask}
-            initialSelected={shownFinding}
-            onPost={() => setPosting(true)}
-          />
-          {/* The last grid row holds the composer on the Conversation tab. */}
-          <div />
-        </>
-      ) : tab === "changes" ? (
-        <>
-          <ChangesTab
-            key={`${review.id}:${shownFile ?? ""}`}
+      {/* One tab failing leaves the header, the other tabs and the review list working. */}
+      <ErrorBoundary resetKey={`${review.id}:${tab}`} what="This tab">
+        {tab === "conversation" ? (
+          <ConversationTab
+            key={review.id}
             review={review}
-            initialFile={shownFile}
-            project={project}
-            onShowFinding={(finding) => {
-              setShownFinding(finding.number);
-              setTab("findings");
-            }}
+            autoFocus={asking === review.id}
+            onFocused={() => setAsking(undefined)}
           />
-          <div />
-        </>
-      ) : (
-        <>
-          <CommentsTab key={review.id} reviewId={review.id} onPost={() => setPosting(true)} />
-          <div />
-        </>
-      )}
+        ) : tab === "findings" ? (
+          <>
+            <FindingsTab
+              key={`${review.id}:${shownFinding ?? ""}`}
+              reviewId={review.id}
+              onAsk={ask}
+              initialSelected={shownFinding}
+              onPost={() => setPosting(true)}
+            />
+            {/* The last grid row holds the composer on the Conversation tab. */}
+            <div />
+          </>
+        ) : tab === "changes" ? (
+          <>
+            <ChangesTab
+              key={`${review.id}:${shownFile ?? ""}`}
+              review={review}
+              initialFile={shownFile}
+              project={project}
+              onShowFinding={(finding) => {
+                setShownFinding(finding.number);
+                setTab("findings");
+              }}
+            />
+            <div />
+          </>
+        ) : (
+          <>
+            <CommentsTab key={review.id} reviewId={review.id} onPost={() => setPosting(true)} />
+            <div />
+          </>
+        )}
+      </ErrorBoundary>
       {posting && (
         <PostReviewDialog
           reviewId={review.id}

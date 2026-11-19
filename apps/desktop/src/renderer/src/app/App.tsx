@@ -19,6 +19,7 @@ import { useReviews } from "../features/reviews/queries.ts";
 import type { SearchTarget } from "../features/search/GlobalSearch.tsx";
 import { SettingsPage } from "../features/settings/SettingsPage.tsx";
 import { usePanel } from "../lib/panel.ts";
+import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
@@ -34,6 +35,10 @@ const useStyles = makeStyles({
   },
   // The reviews list collapsed to a strip of buttons.
   listCollapsed: { gridTemplateColumns: "68px auto minmax(0, 1fr)" },
+  // Where a pane's error message goes when that pane fails.
+  listArea: { gridArea: "list" },
+  mainArea: { gridArea: "main" },
+  wideArea: { gridColumn: "2 / -1", gridRow: 2 },
 });
 
 /** Teams-style shell: title bar, app rail, list pane, main pane. */
@@ -94,25 +99,48 @@ export function App() {
       <AppRail selected={section} onSelect={setSection} />
       {section === "projects" ? (
         <>
-          <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
-          <ProjectDetail project={selectedProject} onRemoved={() => setProjectId(undefined)} />
+          <ErrorBoundary what="The project list" className={styles.listArea}>
+            <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
+          </ErrorBoundary>
+          <ErrorBoundary
+            resetKey={selectedProject?.id}
+            what="This project"
+            className={styles.mainArea}
+          >
+            <ProjectDetail project={selectedProject} onRemoved={() => setProjectId(undefined)} />
+          </ErrorBoundary>
         </>
       ) : section === "settings" ? (
-        <SettingsPage />
+        <ErrorBoundary what="Settings" className={styles.wideArea}>
+          <SettingsPage />
+        </ErrorBoundary>
       ) : (
         <>
-          <ListPane
-            projects={projects.data}
-            error={loadError}
-            reviews={reviewList}
-            selectedId={selectedReview?.id}
-            onSelect={setReviewId}
-            onAddProject={() => setSection("projects")}
-            onNewReview={() => setCreating(true)}
-            collapsed={reviewsList.collapsed}
-            onCollapsedChange={reviewsList.setCollapsed}
-          />
-          <MainPane review={selectedReview} focus={focus} onClosed={reviewClosed} />
+          <ErrorBoundary what="The review list" className={styles.listArea}>
+            <ListPane
+              projects={projects.data}
+              error={loadError}
+              reviews={reviewList}
+              selectedId={selectedReview?.id}
+              onSelect={setReviewId}
+              onAddProject={() => setSection("projects")}
+              onNewReview={() => setCreating(true)}
+              collapsed={reviewsList.collapsed}
+              onCollapsedChange={reviewsList.setCollapsed}
+            />
+          </ErrorBoundary>
+          <ErrorBoundary
+            resetKey={selectedReview?.id}
+            what="This review"
+            className={styles.mainArea}
+          >
+            <MainPane
+              review={selectedReview}
+              focus={focus}
+              onClosed={reviewClosed}
+              onNewReview={projects.data?.length ? () => setCreating(true) : undefined}
+            />
+          </ErrorBoundary>
         </>
       )}
       {creating && projects.data && (

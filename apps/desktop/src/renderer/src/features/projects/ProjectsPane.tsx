@@ -4,7 +4,6 @@ import {
   MessageBarBody,
   makeStyles,
   mergeClasses,
-  Spinner,
   Subtitle2,
   Text,
   Tooltip,
@@ -14,6 +13,7 @@ import {
 import { AddRegular } from "@fluentui/react-icons";
 import type { Project } from "@problem/shared";
 import { useState } from "react";
+import { LoadingRows } from "../../app/LoadingRows.tsx";
 import { useListItemStyles } from "../../app/layout/listItemStyles.ts";
 import { AddProjectDialog } from "./AddProjectDialog.tsx";
 import { useProjects } from "./queries.ts";
@@ -69,7 +69,7 @@ export function ProjectsPane({ selectedId, onSelect }: Props) {
           <Button appearance="subtle" icon={<AddRegular />} onClick={() => setAdding(true)} />
         </Tooltip>
       </div>
-      {projects.isPending && <Spinner className={styles.status} size="small" label="Loading" />}
+      {projects.isPending && <LoadingRows label="Loading projects" />}
       {projects.isError && (
         <MessageBar intent="error" className={styles.status}>
           <MessageBarBody>Could not load projects: {projects.error.message}</MessageBarBody>

@@ -4,7 +4,6 @@ import {
   MessageBarBody,
   makeStyles,
   mergeClasses,
-  Spinner,
   Subtitle2,
   Text,
   Tooltip,
@@ -21,6 +20,7 @@ import type { FindingCounts, Project, Review } from "@problem/shared";
 import { useFindingCounts } from "../../features/findings/queries.ts";
 import { describeReview, formatAge } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
+import { LoadingRows } from "../LoadingRows.tsx";
 import { useListItemStyles } from "./listItemStyles.ts";
 
 const useStyles = makeStyles({
@@ -155,9 +155,7 @@ export function ListPane({
           <MessageBarBody>{error}</MessageBarBody>
         </MessageBar>
       )}
-      {projects === undefined && error === undefined && (
-        <Spinner className={styles.status} size="small" label="Loading" />
-      )}
+      {projects === undefined && error === undefined && <LoadingRows label="Loading reviews" />}
       {projects?.length === 0 && (
         <div className={styles.empty}>
           <Text className={item.muted}>Add a project to start reviewing.</Text>

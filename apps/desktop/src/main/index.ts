@@ -150,6 +150,7 @@ async function start(): Promise<void> {
         changes,
         github,
         search,
+        log,
         openExternal: (url) => shell.openExternal(url),
         settings,
         editor,

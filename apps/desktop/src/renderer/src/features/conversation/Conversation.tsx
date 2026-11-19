@@ -17,6 +17,7 @@ import type {
   StoredEntry,
 } from "@problem/shared";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { LoadingRows } from "../../app/LoadingRows.tsx";
 import { ApprovalCard } from "./ApprovalCard.tsx";
 import { describeApproval, describeTurnEnd } from "./format.ts";
 import { Markdown } from "./Markdown.tsx";
@@ -130,6 +131,7 @@ export function Conversation({ entries, live, status, loading = false, approvals
     <div className={styles.frame}>
       <div ref={scroller} className={styles.scroller} onScroll={onScroll}>
         <div className={styles.column} role="log" aria-label="Conversation">
+          {entries.length === 0 && loading && <LoadingRows label="Loading the conversation" />}
           {entries.length === 0 && !busy && !loading && (
             <Text className={styles.empty}>No messages yet. Ask Claude something below.</Text>
           )}

@@ -2,7 +2,7 @@ import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
 import type { ChangesService } from "../changes/service.ts";
 import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
-import { AppFailure } from "../errors.ts";
+import { AppFailure, type Logger } from "../errors.ts";
 import type { FindingsService } from "../findings/service.ts";
 import type { GitHubService } from "../github/service.ts";
 import type { ProjectService } from "../projects/service.ts";
@@ -18,6 +18,7 @@ export interface HandlerDeps {
   changes: ChangesService;
   github: GitHubService;
   search: SearchService;
+  log: Logger;
   /** Opens a URL in the user's browser (already checked to be a github.com link). */
   openExternal: (url: string) => Promise<void>;
   settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
@@ -50,6 +51,7 @@ export function createHandlers({
   changes,
   github,
   search,
+  log,
   openExternal,
   settings,
   editor,
@@ -89,6 +91,10 @@ export function createHandlers({
     "reviews:refresh": ({ id }) => sessions.withoutTurns(id, () => reviews.refresh(id)),
     "changes:files": ({ id }) => changes.files(id),
     "search:query": ({ text }) => search.query(text),
+    "app:reportError": (report) => {
+      log.error("renderer error", report);
+      return null;
+    },
     "github:conversation": ({ id }) => github.conversation(id),
     "github:preview": ({ id }) => github.preview(id),
     "github:post": (input) => github.post(input),

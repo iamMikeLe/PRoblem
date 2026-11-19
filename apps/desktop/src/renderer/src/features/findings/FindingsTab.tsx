@@ -13,7 +13,6 @@ import {
   MessageBar,
   MessageBarBody,
   makeStyles,
-  Spinner,
   Subtitle2,
   Tab,
   TabList,
@@ -30,6 +29,7 @@ import {
 } from "@fluentui/react-icons";
 import type { Finding, Severity, Verdict } from "@problem/shared";
 import { useState } from "react";
+import { LoadingRows } from "../../app/LoadingRows.tsx";
 import { Markdown } from "../conversation/Markdown.tsx";
 import { useFindings, useOpenInEditor, useSetVerdict } from "./queries.ts";
 
@@ -264,9 +264,7 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
           </MessageBar>
         )}
         {findings.isLoading ? (
-          <div className={styles.empty}>
-            <Spinner size="small" label="Loading findings" />
-          </div>
+          <LoadingRows label="Loading findings" />
         ) : shown.length === 0 ? (
           <div className={styles.empty}>
             <Text>
