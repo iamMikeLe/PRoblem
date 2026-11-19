@@ -397,6 +397,7 @@ describe("session service", () => {
         summary: "npm test",
         reason: "It runs a command that is not a read-only git command.",
         canAllowForReview: true,
+        canAllowAllCommands: true,
       });
       expect(status()).toBe("needs-input");
       expect(events).toContainEqual({ type: "review.approval", approval });
@@ -454,6 +455,7 @@ describe("session service", () => {
       const result = request("WebFetch", { url: "https://example.com/?q=secret", prompt: "x" });
       await vi.waitFor(() => expect(sessions.approvals()).toHaveLength(1));
       expect(sessions.approvals()[0]?.canAllowForReview).toBe(false);
+      expect(sessions.approvals()[0]?.canAllowAllCommands).toBe(false);
       sessions.decide({
         reviewId: review.id,
         id: sessions.approvals()[0]?.id ?? "",
@@ -544,6 +546,50 @@ describe("session service", () => {
       );
       void request("Bash", { command: "npm test" }, "t4");
       await vi.waitFor(() => expect(sessions.approvals()).toHaveLength(1));
+      claude.turns[0]?.release();
+    });
+
+    it('"Allow all commands" runs every later command, and the ones already waiting', async () => {
+      const { claude, sessions, request } = await heldTurn();
+      const gate = claude.turns[0]?.options.hooks?.PreToolUse?.[0]?.hooks[0];
+      const first = request("Bash", { command: "npm test" });
+      const waiting = request("Bash", { command: "ls -la" }, "t2");
+      void request("WebFetch", { url: "https://example.com", prompt: "x" }, "t3");
+      await vi.waitFor(() => expect(sessions.approvals()).toHaveLength(3));
+      sessions.decide({
+        reviewId: review.id,
+        id: sessions.approvals()[0]?.id ?? "",
+        decision: "allow-all-commands",
+      });
+      expect(await first).toMatchObject({ behavior: "allow" });
+      expect(await waiting).toMatchObject({ behavior: "allow" });
+      // The web card still waits: it never gets a review-wide grant.
+      expect(sessions.approvals().map((card) => card.toolName)).toEqual(["WebFetch"]);
+      expect(lastEntry()).toMatchObject({
+        kind: "approval",
+        summary: "ls -la",
+        decision: "allow-all-commands",
+      });
+
+      // An edit in fix mode keeps the grant (unlike an exact one).
+      sessions.setFixMode(review.id, true);
+      await gate?.(
+        {
+          hook_event_name: "PreToolUse",
+          tool_name: "Edit",
+          tool_input: { file_path: join(dir, "package.json") },
+          tool_use_id: "t4",
+          session_id: "s",
+          transcript_path: "",
+          cwd: dir,
+        },
+        "t4",
+        { signal: new AbortController().signal },
+      );
+      expect(await request("Bash", { command: "npm test && rm -rf build" }, "t5")).toMatchObject({
+        behavior: "allow",
+      });
+      expect(sessions.approvals()).toHaveLength(1);
       claude.turns[0]?.release();
     });
 

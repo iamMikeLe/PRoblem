@@ -39,7 +39,8 @@ Before you start:
    - Say: "Claude reports findings through a tool, so the numbers never change. If Claude re-checks
      after a new commit, it updates or withdraws #3 instead of renumbering."
 5. **Permission gate (40 s).** Turn on **Fix mode** and ask Claude to run the tests.
-   - An approval card appears with the exact command: allow once, allow for this review, or deny.
+   - An approval card appears with the exact command: allow once, allow for this review, allow
+     all commands (the whole review, still sandboxed), or deny.
    - Say: "A PreToolUse hook decides every tool call. Approved commands run in Claude Code's OS
      sandbox, with writes only inside the review's folder and no network."
 6. **Changes (30 s).** Press `3`.
@@ -107,6 +108,7 @@ Three places worth opening:
 | 0013 | Own diff parser; compare merge base with head, commits only | No new dependency; findings point at head lines and are re-checked after a refresh |
 | 0014 | `gh` for reading the discussion and posting a review | Reuses the user's GitHub login; long discussions are truncated, and the UI says so |
 | 0015 | A stored Activity feed written by the services, not derived from other tables | Read state and events with no history of their own (commits, comments); one more table and a call at each source |
+| 0016 | "Allow all commands" for one review | One click per review instead of per command; an injected command runs unasked, inside the sandbox |
 | 0017 | The user edits each finding's text before posting; main posts exactly that text | The user's words under their name; main can no longer promise that edited text mentions no one, so Claude's text stays neutralized and the dialog says what an edit does |
 | 0018 | Syntax highlighting with lowlight rendered as React elements, Material Icon Theme icons, bundled JetBrains Mono, rainbow indentation | No CSP change and nothing loaded at startup; the Changes chunk grows (icon tables) and one file holds hard-coded syntax colors |
 

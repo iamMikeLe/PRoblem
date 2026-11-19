@@ -7,6 +7,7 @@ import {
   makeStyles,
   Text,
   Textarea,
+  Tooltip,
   tokens,
 } from "@fluentui/react-components";
 import { ShieldQuestionRegular, WarningRegular } from "@fluentui/react-icons";
@@ -129,6 +130,16 @@ export function ApprovalCard({ approval }: { approval: PendingApproval }) {
             <Button disabled={decide.isPending} onClick={() => answer("allow-review")}>
               Allow for this review
             </Button>
+          )}
+          {approval.canAllowAllCommands && (
+            <Tooltip
+              relationship="description"
+              content="Every command of this review runs without asking, still in its sandbox: no network, and writes only inside the review's folder."
+            >
+              <Button disabled={decide.isPending} onClick={() => answer("allow-all-commands")}>
+                Allow all commands
+              </Button>
+            </Tooltip>
           )}
           <Button disabled={decide.isPending} onClick={() => setDenying(true)}>
             Deny…

@@ -39,7 +39,7 @@ import {
 import { type ApprovalAnswer, createApprovalQueue } from "./approvals.ts";
 import { appendEntry, listEntries } from "./entries.ts";
 import { findingsServer } from "./findingsTool.ts";
-import { addGrant, hasGrant, removeGrants } from "./grants.ts";
+import { ALL_COMMANDS, addGrant, hasGrant, removeExactGrants } from "./grants.ts";
 import { FINDINGS_SERVER } from "./names.ts";
 import { toSignals } from "./normalize.ts";
 import { decideToolUse, type GateDecision, REVIEW_TOOLS } from "./policy.ts";
@@ -266,10 +266,11 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
 
   /**
    * After an edit was allowed, "Allow for this review" Bash commands no longer mean what the user
-   * approved (`npm test` runs the edited code), so they ask again.
+   * approved (`npm test` runs the edited code), so they ask again. "Allow all commands" stays: it
+   * already lets Bash change and run any file in the folder (ADR 0016).
    */
   function afterAllowed(reviewId: string, toolName: string): void {
-    if (toolName === "Edit" || toolName === "Write") removeGrants(db, reviewId, "Bash");
+    if (toolName === "Edit" || toolName === "Write") removeExactGrants(db, reviewId, "Bash");
   }
 
   /** Shows an approval card and waits for the user's answer (ADR 0012). */
@@ -299,6 +300,8 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       };
     }
     const first = approvals.count(review.id) === 0;
+    // Only a Bash card that could be allowed for the review can allow every command.
+    const allowsAll = toolName === "Bash" && decision.grant !== null;
     const { approval, answer } = approvals.add(
       {
         reviewId: review.id,
@@ -308,6 +311,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
         detail,
         reason: decision.reason,
         canAllowForReview: decision.grant !== null,
+        canAllowAllCommands: allowsAll,
       },
       signal,
     );
@@ -346,12 +350,22 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     if (result.decision === "allow-review" && decision.grant && !closing) {
       addGrant(db, review.id, decision.grant, now());
     }
-    if ((result.decision === "allow-once" || result.decision === "allow-review") && !closing) {
+    if (result.decision === "allow-all-commands" && allowsAll && !closing) {
+      addGrant(db, review.id, ALL_COMMANDS, now());
+      // The review's other waiting commands are covered by the same click.
+      for (const other of approvals.list()) {
+        if (other.reviewId === review.id && other.toolName === "Bash" && other.id !== approval.id) {
+          approvals.answer(review.id, other.id, { decision: "allow-all-commands" });
+        }
+      }
+    }
+    if (result.decision !== "deny" && result.decision !== "expired" && !closing) {
       afterAllowed(review.id, toolName);
     }
     switch (result.decision) {
       case "allow-once":
       case "allow-review":
+      case "allow-all-commands":
         return { behavior: "allow", updatedInput: input };
       case "deny":
         return {

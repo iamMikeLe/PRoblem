@@ -8,8 +8,16 @@ import { z } from "zod";
 /** Long tool inputs and outputs are cut to this many characters before they are stored. */
 export const TOOL_TEXT_MAX = 20_000;
 
-/** What the user can answer on an approval card. */
-export const ApprovalDecisionSchema = z.enum(["allow-once", "allow-review", "deny"]);
+/**
+ * What the user can answer on an approval card. `allow-review` allows exactly this command or
+ * path for the review; `allow-all-commands` every Bash command of the review (ADR 0016).
+ */
+export const ApprovalDecisionSchema = z.enum([
+  "allow-once",
+  "allow-review",
+  "allow-all-commands",
+  "deny",
+]);
 export type ApprovalDecision = z.infer<typeof ApprovalDecisionSchema>;
 
 /** A tool call waiting for the user. Lives in memory only: an app restart ends the turn. */
@@ -26,6 +34,8 @@ export const PendingApprovalSchema = z.object({
   reason: z.string(),
   /** Whether "Allow for this review" is offered (exact Bash commands and paths only). */
   canAllowForReview: z.boolean(),
+  /** Whether "Allow all commands" is offered (Bash only; ADR 0016). */
+  canAllowAllCommands: z.boolean(),
   requestedAt: z.iso.datetime(),
 });
 export type PendingApproval = z.infer<typeof PendingApprovalSchema>;
