@@ -52,7 +52,7 @@ describe("Reviews", () => {
 
   it("sends an explicit base and remembers in-place mode per project", async () => {
     const api = stubBridge([makeProject("p1", "payments-api")]);
-    let dialog = await openNewReview();
+    const dialog = await openNewReview();
     fireEvent.change(sourceBox(dialog), { target: { value: "feature/login" } });
     fireEvent.change(within(dialog).getByRole("combobox", { name: /Base branch/ }), {
       target: { value: "release/1.0" },
@@ -60,7 +60,9 @@ describe("Reviews", () => {
     fireEvent.click(within(dialog).getByRole("switch", { name: "Isolated worktree" }));
     expect(within(dialog).getByText(/Checks out the code in your project folder/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Start review" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Gone from the DOM, not only hidden: a closing dialog that lingers (slow CI) would make the
+    // next one's focus trap start hidden.
+    await waitFor(() => expect(screen.queryByRole("dialog", { hidden: true })).toBeNull());
 
     expect(api.calls).toContainEqual(
       expect.objectContaining({
@@ -70,10 +72,10 @@ describe("Reviews", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "New review" }));
-    dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByRole("switch", { name: "Isolated worktree" })).toHaveProperty(
-      "checked",
-      false,
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole("dialog")).getByRole("switch", { name: "Isolated worktree" }),
+      ).toHaveProperty("checked", false),
     );
   });
 
