@@ -364,12 +364,23 @@ describe("GitHub service", () => {
       expect(preview.items[1]?.text).toContain("**Major: Outside the diff** (`src/app.ts:90`)");
     });
 
+    /** The findings with the preview's text, as the dialog sends them when nothing was edited. */
+    async function unedited(...numbers: number[]) {
+      const preview = await github.preview("r1");
+      if (preview.status !== "ok") throw new Error(preview.status);
+      return numbers.map((number) => {
+        const item = preview.items.find((i) => i.number === number);
+        if (!item) throw new Error(`#${number} is not offered`);
+        return { number, text: item.text };
+      });
+    }
+
     it("posts inline comments and the summary at the review's head, then marks them posted", async () => {
       const result = await github.post({
         id: "r1",
         event: "REQUEST_CHANGES",
         body: "Two things.",
-        findings: [1, 3],
+        findings: await unedited(1, 3),
       });
       expect(result).toEqual({ url: `${PR_URL}#pullrequestreview-1` });
       expect(activity.list().map((item) => item.detail)).toEqual([
@@ -397,13 +408,41 @@ describe("GitHub service", () => {
       });
     });
 
+    it("posts the text the user edited, as written, at the place the preview decides", async () => {
+      const [inline, summary] = await unedited(1, 3);
+      if (!inline || !summary) throw new Error("not offered");
+      const edited = "**Major: Retries never stop**\n\ncc @alice, see `retry()`.";
+      await github.post({
+        id: "r1",
+        event: "COMMENT",
+        body: "",
+        findings: [{ number: 1, text: edited }, summary],
+      });
+      expect(gh.postReview).toHaveBeenCalledWith("acme/payments", 7, {
+        commit_id: SHA("a"),
+        event: "COMMENT",
+        // Unedited: Claude's text, mentions neutralized.
+        body: "**Major: Whole change**\n\np\n\n**Suggestion:** s",
+        comments: [
+          // Edited: the user's own words, a mention they typed included.
+          { path: "src/app.ts", line: 11, side: "RIGHT", body: edited },
+        ],
+      });
+      expect(inline.text).toContain("@\u200Balice");
+    });
+
     it("never lists the user's own post as new comments, even when GitHub's clock is ahead", async () => {
       await github.conversation("r1");
       gh.postReview.mockResolvedValue({
         html_url: `${PR_URL}#pullrequestreview-2`,
         submitted_at: "2099-01-01T00:00:00Z",
       });
-      await github.post({ id: "r1", event: "COMMENT", body: "", findings: [1] });
+      await github.post({
+        id: "r1",
+        event: "COMMENT",
+        body: "",
+        findings: [{ number: 1, text: "t" }],
+      });
       graphqlAnswer = answer({
         comments: [comment("MINE", "me", "My finding", "2099-01-01T00:00:00Z")],
       });
@@ -412,15 +451,20 @@ describe("GitHub service", () => {
     });
 
     it("never posts a finding twice, and marks a post GitHub did not confirm as posted", async () => {
-      await github.post({ id: "r1", event: "COMMENT", body: "", findings: [1] });
+      await github.post({
+        id: "r1",
+        event: "COMMENT",
+        body: "",
+        findings: [{ number: 1, text: "t" }],
+      });
       await expect(
-        github.post({ id: "r1", event: "COMMENT", body: "", findings: [1] }),
+        github.post({ id: "r1", event: "COMMENT", body: "", findings: [{ number: 1, text: "t" }] }),
       ).rejects.toMatchObject({
         code: "already_posted",
       });
       gh.postReview.mockRejectedValueOnce(new AppFailure("post_uncertain", "?"));
       await expect(
-        github.post({ id: "r1", event: "COMMENT", body: "", findings: [3] }),
+        github.post({ id: "r1", event: "COMMENT", body: "", findings: [{ number: 3, text: "t" }] }),
       ).rejects.toMatchObject({
         code: "post_uncertain",
       });
@@ -440,11 +484,14 @@ describe("GitHub service", () => {
       );
     });
 
-    it("refuses a summary longer than GitHub accepts", async () => {
-      add("Huge", null, null, "x".repeat(9_000));
-      setVerdict(db, "r1", 6, "accepted", at);
+    it("refuses a summary longer than GitHub accepts, counting the edited texts", async () => {
       await expect(
-        github.post({ id: "r1", event: "COMMENT", body: "y".repeat(59_000), findings: [6] }),
+        github.post({
+          id: "r1",
+          event: "COMMENT",
+          body: "y".repeat(59_000),
+          findings: [{ number: 3, text: "x".repeat(9_000) }],
+        }),
       ).rejects.toMatchObject({ code: "invalid_request" });
       expect(gh.postReview).not.toHaveBeenCalled();
     });
@@ -452,16 +499,38 @@ describe("GitHub service", () => {
     it("refuses when the pull request moved on, or a finding cannot be posted", async () => {
       gh.viewPullRequest.mockResolvedValue(prInfo(SHA("f")));
       await expect(
-        github.post({ id: "r1", event: "COMMENT", body: "x", findings: [1] }),
+        github.post({
+          id: "r1",
+          event: "COMMENT",
+          body: "x",
+          findings: [{ number: 1, text: "t" }],
+        }),
       ).rejects.toMatchObject({
         code: "pr_moved",
       });
       gh.viewPullRequest.mockResolvedValue(prInfo(SHA("a")));
       await expect(
-        github.post({ id: "r1", event: "COMMENT", body: "x", findings: [4] }),
+        github.post({
+          id: "r1",
+          event: "COMMENT",
+          body: "x",
+          findings: [{ number: 4, text: "t" }],
+        }),
       ).rejects.toMatchObject({
         code: "finding_not_found",
       });
+      // A number the review does not have, even next to a postable one.
+      await expect(
+        github.post({
+          id: "r1",
+          event: "COMMENT",
+          body: "x",
+          findings: [
+            { number: 1, text: "t" },
+            { number: 99, text: "t" },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "finding_not_found" });
       expect(gh.postReview).not.toHaveBeenCalled();
     });
   });

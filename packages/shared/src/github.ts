@@ -77,7 +77,7 @@ export const PostItemSchema = z.object({
   placement: z.enum(["inline", "summary"]),
   /** Why it goes into the summary, e.g. "line 120 is not part of the diff". */
   reason: z.string().nullable(),
-  /** Exactly the markdown that would be posted. */
+  /** The markdown Claude's finding becomes, mentions neutralized; the user may edit it (ADR 0017). */
   text: z.string(),
   /** Pre-selected in the preview (accepted findings). */
   selected: z.boolean(),
@@ -102,15 +102,42 @@ export type PostPreview = z.infer<typeof PostPreviewSchema>;
 export const REVIEW_BODY_MAX = 60_000;
 export const GITHUB_BODY_MAX = 65_000;
 
+/** GitHub's limit for one comment's body. */
+export const COMMENT_TEXT_MAX = 65_536;
+export const POST_FINDINGS_MAX = 200;
+/** All findings' texts together, so one request stays a reasonable size. */
+export const POST_TEXT_TOTAL_MAX = 1_000_000;
+
+/**
+ * One finding to post, with its final text (ADR 0017). The text is posted exactly as sent: never
+ * trimmed, so what the user saw is what GitHub gets.
+ */
+export const PostFindingSchema = z.strictObject({
+  number: z.number().int().positive(),
+  text: z
+    .string()
+    .max(COMMENT_TEXT_MAX, "A finding's text is longer than GitHub allows (65,536 characters).")
+    .refine((text) => text.trim() !== "", "A finding's text cannot be empty."),
+});
+export type PostFinding = z.infer<typeof PostFindingSchema>;
+
 export const PostReviewRequestSchema = z
   .strictObject({
     id: z.string().min(1),
     event: ReviewEventSchema,
     body: z.string().max(REVIEW_BODY_MAX),
+    /** Each selected finding with the exact text the user saw (and maybe edited) in the dialog. */
     findings: z
-      .array(z.number().int().positive())
-      .max(200)
-      .refine((numbers) => new Set(numbers).size === numbers.length, "A finding is listed twice."),
+      .array(PostFindingSchema)
+      .max(POST_FINDINGS_MAX)
+      .refine(
+        (findings) => new Set(findings.map((f) => f.number)).size === findings.length,
+        "A finding is listed twice.",
+      )
+      .refine(
+        (findings) => findings.reduce((sum, f) => sum + f.text.length, 0) <= POST_TEXT_TOTAL_MAX,
+        "The findings' texts are too long to post together. Post fewer findings at a time.",
+      ),
   })
   .refine((value) => value.event !== "REQUEST_CHANGES" || value.body.trim() !== "", {
     message: "Requesting changes needs a summary.",

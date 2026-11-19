@@ -300,7 +300,10 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
         "The pull request has new commits. Refresh the review in the Changes tab, then post.",
       );
     }
-    const chosen = request.findings.map((number) => {
+    // Only findings the preview offers (not dismissed, withdrawn or posted), at the place the
+    // preview decides. The text is the user's final text from the dialog, posted as is: unedited,
+    // it is the preview's text, mentions neutralized; edited, it is the user's words (ADR 0017).
+    const chosen = request.findings.map(({ number, text }) => {
       const item = plan.items.find((i) => i.number === number);
       if (!item) throw new AppFailure("finding_not_found", `Finding #${number} cannot be posted`);
       if (item.postedUrl !== null) {
@@ -309,8 +312,9 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
           `Finding #${number} was already posted (${item.postedUrl}).`,
         );
       }
-      return item;
+      return { ...item, text, edited: text !== item.text };
     });
+    const numbers = chosen.map((item) => item.number);
     const findings = new Map(listFindings(db, request.id).map((f) => [f.number, f]));
     const inline = chosen.filter((i) => i.placement === "inline");
     const summary = chosen.filter((i) => i.placement === "summary");
@@ -337,7 +341,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     } catch (error) {
       // GitHub may have posted it: never offer these findings again as if they were not.
       if (error instanceof AppFailure && error.code === "post_uncertain") {
-        markPosted(db, request.id, request.findings, plan.pullRequest.url);
+        markPosted(db, request.id, numbers, plan.pullRequest.url);
       }
       throw error;
     }
@@ -345,16 +349,17 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
       .object({ html_url: z.string(), submitted_at: z.string().nullish() })
       .safeParse(answer);
     const url = parsed.success ? parsed.data.html_url : plan.pullRequest.url;
-    markPosted(db, request.id, request.findings, url);
+    markPosted(db, request.id, numbers, url);
     deps.activity?.record(request.id, {
       kind: "posted",
-      findings: request.findings.length,
+      findings: numbers.length,
       url,
       submittedAt: (parsed.success ? parsed.data.submitted_at : null) ?? null,
     });
     deps.log.info("review posted to GitHub", {
       review: request.id,
-      findings: request.findings.length,
+      findings: numbers.length,
+      edited: chosen.filter((item) => item.edited).length,
     });
     return { url };
   }
