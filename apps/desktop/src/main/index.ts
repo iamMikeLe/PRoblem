@@ -5,6 +5,7 @@ import { editorTemplate } from "@problem/shared";
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
 import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
+import { fakeClaude } from "./claude/fake.ts";
 import { createSessionService } from "./claude/sessions.ts";
 import { DATABASE_NAME, dataDir } from "./config.ts";
 import { openDatabase } from "./db/database.ts";
@@ -30,6 +31,11 @@ const log: Logger = {
   info: (message, details) => console.info(`[main] ${message}`, details ?? ""),
   error: (message, details) => console.error(`[main] ${message}`, details ?? ""),
 };
+
+// The end-to-end test: a scripted Claude, and Electron's own data (local storage, the
+// single-instance lock) beside the test's PROBLEM_HOME, away from the user's app. Never packaged.
+const e2e = !app.isPackaged && process.env.PROBLEM_E2E === "1";
+if (e2e) app.setPath("userData", join(dataDir(process.env, app.getPath("home")), "electron"));
 
 // Formerly ReviewRoom: keep the UI preferences (local storage) of the old app folder, once.
 // Electron creates the new folder itself at startup, but its local storage only with the window.
@@ -113,10 +119,15 @@ async function start(): Promise<void> {
   });
   const sessions = createSessionService({
     db,
-    runQuery: (prompt, options) => query({ prompt, options }),
+    runQuery: e2e
+      ? fakeClaude((workdir, input) => {
+          const review = reviews.list().find((open) => open.workdir === workdir);
+          if (review) findings.report(review.id, workdir, input);
+        })
+      : (prompt, options) => query({ prompt, options }),
     broadcast,
     findings,
-    claudePath: () => findExecutable("claude", process.env.PATH),
+    claudePath: () => (e2e ? "scripted" : findExecutable("claude", process.env.PATH)),
     log,
     // A review waits for an approval: tell the user if they are looking elsewhere (ADR 0012).
     notify: (approval, reviewTitle) => {

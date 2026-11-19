@@ -13,6 +13,7 @@
     "start": "pnpm --filter @problem/desktop start",
     "package": "pnpm --filter @problem/desktop package",
     "test": "pnpm -r test",
+    "e2e": "pnpm --filter @problem/desktop e2e",
     "typecheck": "pnpm -r typecheck",
     "lint": "biome check .",
     "format": "biome check --write .",

@@ -52,6 +52,9 @@ flowchart LR
 | `src/renderer/` | React app | no (browser APIs) |
 
 Everything without Electron is tested in plain Node (`test/main`) or jsdom (`test/renderer`).
+`e2e/` drives the built app with Playwright. `PROBLEM_E2E=1` (ignored in a packaged app) swaps in a
+scripted Claude (`src/main/claude/fake.ts`) that streams a reply and reports a finding through the
+app's permission hook, and keeps Electron's own data under the test's `PROBLEM_HOME`.
 
 ## The IPC contract
 
