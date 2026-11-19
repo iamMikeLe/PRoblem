@@ -1,6 +1,7 @@
 import { parseAppEvent } from "@problem/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
+import { activityKey } from "../activity/queries.ts";
 import { findingCountsKey, findingsKey } from "../findings/queries.ts";
 import { reviewsKey } from "../reviews/queries.ts";
 import { catalogKey } from "./queries.ts";
@@ -26,6 +27,8 @@ export function useAppEvents(onShowReview: (reviewId: string) => void): void {
       receive(event);
       if (event.type === "app.showReview") showReview.current(event.reviewId);
       if (event.type === "review.session") void client.invalidateQueries({ queryKey: reviewsKey });
+      if (event.type === "activity.changed")
+        void client.invalidateQueries({ queryKey: activityKey });
       if (event.type === "review.findings") {
         client.setQueryData(findingsKey(event.reviewId), event.findings);
         void client.invalidateQueries({ queryKey: findingCountsKey });

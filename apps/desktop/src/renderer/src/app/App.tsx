@@ -1,14 +1,18 @@
 import {
   makeStyles,
   mergeClasses,
+  Text,
   Toast,
   ToastBody,
   Toaster,
   ToastTitle,
+  tokens,
   useId,
   useToastController,
 } from "@fluentui/react-components";
 import { lazy, Suspense, useState } from "react";
+import { activityTarget } from "../features/activity/describe.ts";
+import { useActivity, useUnreadActivity } from "../features/activity/queries.ts";
 import { useLoadApprovals } from "../features/conversation/queries.ts";
 import { useAppEvents } from "../features/conversation/useAppEvents.ts";
 import { useProjects } from "../features/projects/queries.ts";
@@ -32,6 +36,9 @@ const ProjectsPane = lazy(() =>
 const ProjectDetail = lazy(() =>
   import("../features/projects/ProjectDetail.tsx").then((m) => ({ default: m.ProjectDetail })),
 );
+const ActivityPane = lazy(() =>
+  import("../features/activity/ActivityPane.tsx").then((m) => ({ default: m.ActivityPane })),
+);
 const SettingsPage = lazy(() =>
   import("../features/settings/SettingsPage.tsx").then((m) => ({ default: m.SettingsPage })),
 );
@@ -50,6 +57,12 @@ const useStyles = makeStyles({
   listArea: { gridArea: "list" },
   mainArea: { gridArea: "main" },
   wideArea: { gridColumn: "2 / -1", gridRow: 2 },
+  placeholder: {
+    gridArea: "main",
+    display: "grid",
+    placeItems: "center",
+    color: tokens.colorNeutralForeground3,
+  },
 });
 
 /** Teams-style shell: title bar, app rail, list pane, main pane. */
@@ -68,6 +81,10 @@ export function App() {
   const [creating, setCreating] = useState(false);
   // The search result to show; a new object each time, so the same result can be opened twice.
   const [focus, setFocus] = useState<SearchTarget>();
+  // The Activity row whose review the Activity section shows.
+  const [activityId, setActivityId] = useState<string>();
+  const activity = useActivity();
+  const unread = useUnreadActivity();
   const toasterId = useId("toaster");
   const { dispatchToast } = useToastController(toasterId);
 
@@ -79,6 +96,9 @@ export function App() {
     projects.data?.find((project) => project.id === projectId) ?? projects.data?.[0];
 
   // The reviews in the order the list shows them: grouped by project.
+  const activityRow = activity.data?.find((row) => row.id === activityId);
+  const activityReview = reviewList.find((review) => review.id === activityRow?.reviewId);
+
   const ordered = (projects.data ?? []).flatMap((project) =>
     reviewList.filter((review) => review.projectId === project.id),
   );
@@ -129,8 +149,36 @@ export function App() {
           setFocus({ ...target });
         }}
       />
-      <AppRail selected={section} onSelect={setSection} />
-      {section === "projects" ? (
+      <AppRail selected={section} onSelect={setSection} badges={{ activity: unread }} />
+      {section === "activity" ? (
+        <>
+          <ErrorBoundary what="Activity" className={styles.listArea}>
+            <Suspense fallback={<LoadingRows label="Loading activity" />}>
+              <ActivityPane
+                selectedId={activityRow?.id}
+                onOpen={(row) => {
+                  setActivityId(row.id);
+                  setReviewId(row.reviewId);
+                  setFocus(activityTarget(row));
+                }}
+              />
+            </Suspense>
+          </ErrorBoundary>
+          {activityReview ? (
+            <ErrorBoundary
+              resetKey={activityReview.id}
+              what="This review"
+              className={styles.mainArea}
+            >
+              <MainPane review={activityReview} focus={focus} onClosed={reviewClosed} />
+            </ErrorBoundary>
+          ) : (
+            <div className={styles.placeholder}>
+              <Text>Choose an activity to see its review.</Text>
+            </div>
+          )}
+        </>
+      ) : section === "projects" ? (
         <>
           <ErrorBoundary what="The project list" className={styles.listArea}>
             <Suspense fallback={<LoadingRows label="Loading projects" />}>

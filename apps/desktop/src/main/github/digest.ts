@@ -24,19 +24,22 @@ export function latestCommentAt(conversation: Conversation): string | null {
   );
 }
 
-/** Comments, replies and reviews newer than `since`, and the newest one's time. */
+/** Comments, replies and reviews newer than `since` (ms since the epoch), and the newest one's time. */
 export function commentsSince(
   conversation: Conversation,
-  since: string,
+  since: number,
 ): { count: number; until: string | null } {
   const times = [
     ...conversation.threads.flatMap((t) => t.comments.map((c) => c.createdAt)),
     ...conversation.comments.map((c) => c.createdAt),
     ...conversation.reviews.flatMap((r) => (r.submittedAt ? [r.submittedAt] : [])),
-  ].filter((time) => time > since);
+  ].filter((time) => Date.parse(time) > since);
   return {
     count: times.length,
-    until: times.reduce<string | null>((max, t) => (max === null || t > max ? t : max), null),
+    until: times.reduce<string | null>(
+      (max, t) => (max === null || Date.parse(t) > Date.parse(max) ? t : max),
+      null,
+    ),
   };
 }
 

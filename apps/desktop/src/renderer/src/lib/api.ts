@@ -1,4 +1,5 @@
 import {
+  type ActivityItem,
   type AppSettings,
   type ChangeSet,
   type ClaudeCatalog,
@@ -132,6 +133,13 @@ export const api = {
   editor: {
     open: async (request: OpenInEditorRequest): Promise<void> => {
       await call("editor:open", request);
+    },
+  },
+  activity: {
+    list: (): Promise<ActivityItem[]> => call("activity:list", undefined),
+    /** Marks the rows as read; all of them when `ids` is omitted. */
+    markRead: async (ids?: readonly string[]): Promise<void> => {
+      await call("activity:markRead", ids === undefined ? {} : { ids: [...ids] });
     },
   },
   dialog: {

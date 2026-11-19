@@ -83,6 +83,24 @@ test("adds a project, reviews a branch, and accepts what Claude found", async ()
     await shot(page, "shortcuts");
     await shortcuts.getByRole("button", { name: "Close" }).click();
 
+    // A follow-up question, then Activity lists both finished turns, newest first.
+    await main.getByRole("tab", { name: "Conversation" }).click();
+    await main.getByRole("textbox", { name: "Message" }).fill("Why is it major?");
+    await page.keyboard.press("Enter");
+    await expect(main.getByText(/^Done ·/)).toHaveCount(2);
+    const rail = page.getByRole("navigation", { name: "Main" });
+    await rail.getByRole("button", { name: "Activity, 2 unread" }).click();
+    const feed = page.getByRole("complementary", { name: "Activity" });
+    await expect(feed.getByRole("button", { name: /Claude finished/ })).toHaveCount(2);
+    await expect(
+      feed.getByRole("button", { name: /Claude finished/ }).first(),
+    ).toHaveAccessibleName(/No new findings/);
+    // The first turn's row opens the finding it reported.
+    await feed.getByRole("button", { name: /1 new finding/ }).click();
+    await expect(main.getByRole("region", { name: "Finding #1" })).toBeVisible();
+    await expect(rail.getByRole("button", { name: "Activity, 1 unread" })).toBeVisible();
+    await shot(page, "activity");
+
     // The light theme applies at once.
     await page
       .getByRole("navigation", { name: "Main" })

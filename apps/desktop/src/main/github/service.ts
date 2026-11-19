@@ -160,7 +160,8 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
       previous ? latestCommentAt(previous) : null,
     ].filter((time): time is string => typeof time === "string");
     if (known.length === 0) return;
-    const since = known.reduce((max, t) => (t > max ? t : max));
+    // Our times and GitHub's differ in format (".000Z"), so compare instants, not strings.
+    const since = Math.max(...known.map((time) => Date.parse(time)));
     const { count, until } = commentsSince(conversation, since);
     if (count > 0 && until !== null) activity.record(reviewId, { kind: "comments", count, until });
   }

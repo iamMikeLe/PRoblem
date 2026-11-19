@@ -15,10 +15,12 @@ import { SeverityBadge } from "../findings/FindingsTab.tsx";
 import { useSearch } from "./queries.ts";
 
 /** Where a search result leads: a review, one of its findings, or one of its changed files. */
+/** Where to take the user in a review: from search, or from an Activity row (`tab`). */
 export type SearchTarget =
   | { kind: "review"; reviewId: string }
   | { kind: "finding"; reviewId: string; number: number }
-  | { kind: "file"; reviewId: string; path: string };
+  | { kind: "file"; reviewId: string; path: string }
+  | { kind: "tab"; reviewId: string; tab: "conversation" | "changes" | "comments" };
 
 interface Option {
   key: string;

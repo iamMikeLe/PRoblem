@@ -1,4 +1,4 @@
-import { makeStyles, mergeClasses, Text, tokens } from "@fluentui/react-components";
+import { CounterBadge, makeStyles, mergeClasses, Text, tokens } from "@fluentui/react-components";
 import {
   AlertFilled,
   AlertRegular,
@@ -64,29 +64,47 @@ const useStyles = makeStyles({
     },
   },
   icon: { fontSize: "24px" },
+  // Unread count on the icon's top right corner, as in Teams.
+  badge: { position: "absolute", top: tokens.spacingVerticalXS, left: "calc(50% + 4px)" },
   label: { fontSize: tokens.fontSizeBase100 },
 });
 
 interface Props {
   selected: RailSection;
   onSelect: (section: RailSection) => void;
+  /** Counts shown on items, e.g. unread Activity. */
+  badges?: Partial<Record<RailSection, number>>;
 }
 
-export function AppRail({ selected, onSelect }: Props) {
+export function AppRail({ selected, onSelect, badges = {} }: Props) {
   const styles = useStyles();
 
-  const renderItem = ({ id, label, icon: Icon }: (typeof items)[number]) => (
-    <button
-      key={id}
-      type="button"
-      aria-current={selected === id ? "page" : undefined}
-      className={mergeClasses(styles.item, selected === id && styles.selected)}
-      onClick={() => onSelect(id)}
-    >
-      <Icon className={styles.icon} filled={selected === id} />
-      <Text className={styles.label}>{label}</Text>
-    </button>
-  );
+  const renderItem = ({ id, label, icon: Icon }: (typeof items)[number]) => {
+    const count = badges[id] ?? 0;
+    return (
+      <button
+        key={id}
+        type="button"
+        aria-current={selected === id ? "page" : undefined}
+        aria-label={count > 0 ? `${label}, ${count} unread` : label}
+        className={mergeClasses(styles.item, selected === id && styles.selected)}
+        onClick={() => onSelect(id)}
+      >
+        <Icon className={styles.icon} filled={selected === id} />
+        {count > 0 && (
+          <CounterBadge
+            className={styles.badge}
+            count={count}
+            overflowCount={99}
+            size="small"
+            color="danger"
+            aria-hidden
+          />
+        )}
+        <Text className={styles.label}>{label}</Text>
+      </button>
+    );
+  };
 
   return (
     <nav className={styles.root} aria-label="Main">

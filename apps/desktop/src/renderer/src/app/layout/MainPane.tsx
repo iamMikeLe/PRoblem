@@ -168,7 +168,13 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
     setShownFinding(focus?.kind === "finding" ? focus.number : undefined);
     setShownFile(focus?.kind === "file" ? focus.path : undefined);
     setTab(
-      focus?.kind === "finding" ? "findings" : focus?.kind === "file" ? "changes" : "conversation",
+      focus?.kind === "finding"
+        ? "findings"
+        : focus?.kind === "file"
+          ? "changes"
+          : focus?.kind === "tab"
+            ? focus.tab
+            : "conversation",
     );
   }
   const projects = useProjects();
