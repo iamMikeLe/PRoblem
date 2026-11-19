@@ -32,6 +32,7 @@ import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx"
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
 import type { SearchTarget } from "../../features/search/GlobalSearch.tsx";
+import { useShortcuts } from "../../lib/shortcuts.ts";
 import { ErrorBoundary } from "../ErrorBoundary.tsx";
 
 type ReviewTab = "conversation" | "findings" | "changes" | "comments";
@@ -171,6 +172,23 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
   const setDraft = useDrafts((state) => state.setDraft);
   const counts = useFindingCounts();
 
+  const selectTab = (value: ReviewTab) => {
+    setAsking(undefined);
+    setShownFinding(undefined);
+    setShownFile(undefined);
+    setTab(value);
+  };
+  const reviewShortcuts = review
+    ? {
+        ...Object.fromEntries(TABS.map((value, index) => [`${index + 1}`, () => selectTab(value)])),
+        r: () => {
+          selectTab("conversation");
+          setAsking(review.id);
+        },
+      }
+    : {};
+  useShortcuts(reviewShortcuts);
+
   if (!review) {
     return (
       <main className={styles.root}>
@@ -217,12 +235,7 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
           className={styles.tabs}
           selectedValue={tab}
           onTabSelect={(_, data) => {
-            if (isReviewTab(data.value)) {
-              setAsking(undefined);
-              setShownFinding(undefined);
-              setShownFile(undefined);
-              setTab(data.value);
-            }
+            if (isReviewTab(data.value)) selectTab(data.value);
           }}
         >
           <Tab value="conversation">Conversation</Tab>

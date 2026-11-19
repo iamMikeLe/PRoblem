@@ -19,11 +19,13 @@ import { useReviews } from "../features/reviews/queries.ts";
 import type { SearchTarget } from "../features/search/GlobalSearch.tsx";
 import { SettingsPage } from "../features/settings/SettingsPage.tsx";
 import { usePanel } from "../lib/panel.ts";
+import { useShortcuts } from "../lib/shortcuts.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
 import { TitleBar } from "./layout/TitleBar.tsx";
+import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
 
 const useStyles = makeStyles({
   shell: {
@@ -67,6 +69,27 @@ export function App() {
   const selectedProject =
     projects.data?.find((project) => project.id === projectId) ?? projects.data?.[0];
 
+  // The reviews in the order the list shows them: grouped by project.
+  const ordered = (projects.data ?? []).flatMap((project) =>
+    reviewList.filter((review) => review.projectId === project.id),
+  );
+  const moveReview = (step: 1 | -1) => {
+    const index = ordered.findIndex((review) => review.id === selectedReview?.id);
+    const next = ordered[Math.min(Math.max(index + step, 0), ordered.length - 1)];
+    setSection("reviews");
+    if (next) setReviewId(next.id);
+  };
+  const [showingShortcuts, setShowingShortcuts] = useState(false);
+  useShortcuts({
+    "alt+ArrowDown": () => moveReview(1),
+    "alt+ArrowUp": () => moveReview(-1),
+    "mod+b": () => {
+      setSection("reviews");
+      reviewsList.setCollapsed(section === "reviews" && !reviewsList.collapsed);
+    },
+    "?": () => setShowingShortcuts(true),
+  });
+
   const loadError = projects.isError
     ? `Could not load projects: ${projects.error.message}`
     : reviews.isError
@@ -90,6 +113,7 @@ export function App() {
       )}
     >
       <TitleBar
+        onShortcuts={() => setShowingShortcuts(true)}
         onOpen={(target) => {
           setSection("reviews");
           setReviewId(target.reviewId);
@@ -155,6 +179,7 @@ export function App() {
           }}
         />
       )}
+      <ShortcutsDialog open={showingShortcuts} onOpenChange={setShowingShortcuts} />
       <Toaster toasterId={toasterId} position="bottom-end" />
     </div>
   );

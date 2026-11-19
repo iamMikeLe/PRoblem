@@ -78,7 +78,7 @@ export function matchCommands(text: string, catalog: ClaudeCatalog | undefined) 
 interface Props {
   review: Pick<Review, "id" | "model" | "fixMode">;
   status: ReviewStatus;
-  /** Focus the message box when mounted (after "Ask about #N"), with the cursor at the end. */
+  /** Focus the message box, cursor at the end, when this becomes true ("Ask about #N", R). */
   autoFocus?: boolean;
   /** Called once the message box took focus because of `autoFocus`. */
   onFocused?: () => void;
@@ -101,14 +101,14 @@ export function Composer({ review, status, autoFocus = false, onFocused }: Props
   const fixMode = setFixMode.isPending ? setFixMode.variables.fixMode : review.fixMode;
   const busy = isBusy(status);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the composer mounts
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each time focus is asked for, not when the callback changes
   useEffect(() => {
     const element = input.current;
     if (!autoFocus || !element) return;
     element.focus();
     element.setSelectionRange(element.value.length, element.value.length);
     onFocused?.();
-  }, []);
+  }, [autoFocus]);
 
   const suggestions = dismissed === text ? [] : matchCommands(text, catalog.data);
   const activeIndex = Math.min(active, Math.max(suggestions.length - 1, 0));

@@ -1,4 +1,13 @@
-import { Avatar, makeStyles, mergeClasses, Text, tokens } from "@fluentui/react-components";
+import {
+  Avatar,
+  Button,
+  makeStyles,
+  mergeClasses,
+  Text,
+  Tooltip,
+  tokens,
+} from "@fluentui/react-components";
+import { KeyboardRegular } from "@fluentui/react-icons";
 import { GlobalSearch, type SearchTarget } from "../../features/search/GlobalSearch.tsx";
 
 const useStyles = makeStyles({
@@ -29,7 +38,13 @@ const useStyles = makeStyles({
   },
 });
 
-export function TitleBar({ onOpen }: { onOpen: (target: SearchTarget) => void }) {
+export function TitleBar({
+  onOpen,
+  onShortcuts,
+}: {
+  onOpen: (target: SearchTarget) => void;
+  onShortcuts: () => void;
+}) {
   const styles = useStyles();
   const platform = window.problem?.platform;
 
@@ -46,6 +61,14 @@ export function TitleBar({ onOpen }: { onOpen: (target: SearchTarget) => void })
         <GlobalSearch onOpen={onOpen} />
       </div>
       <div className={styles.end}>
+        <Tooltip content="Keyboard shortcuts (?)" relationship="label">
+          <Button
+            className={styles.interactive}
+            appearance="subtle"
+            icon={<KeyboardRegular />}
+            onClick={onShortcuts}
+          />
+        </Tooltip>
         <Avatar className={styles.interactive} name="Reviewer" size={28} />
       </div>
     </header>

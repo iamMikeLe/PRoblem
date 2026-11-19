@@ -30,6 +30,7 @@ import {
 import type { Finding, Severity, Verdict } from "@problem/shared";
 import { useState } from "react";
 import { LoadingRows } from "../../app/LoadingRows.tsx";
+import { useShortcuts } from "../../lib/shortcuts.ts";
 import { Markdown } from "../conversation/Markdown.tsx";
 import { useFindings, useOpenInEditor, useSetVerdict } from "./queries.ts";
 
@@ -167,6 +168,14 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
     .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.number - b.number);
   // The detail stays open after a verdict moves the finding out of the current filter.
   const current = all.find((finding) => finding.number === selected);
+  // J/K walk the list as shown; from nothing selected, either key starts at the top.
+  const step = (by: 1 | -1) => {
+    const index = shown.findIndex((finding) => finding.number === selected);
+    const next =
+      index === -1 ? shown[0] : shown[Math.min(Math.max(index + by, 0), shown.length - 1)];
+    if (next) setSelected(next.number);
+  };
+  useShortcuts({ j: () => step(1), k: () => step(-1) });
   const count = (value: FindingFilter) =>
     all.filter((finding) => matchesFilter(finding, value)).length;
 
