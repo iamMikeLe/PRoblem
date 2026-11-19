@@ -162,7 +162,21 @@ test("records the demo", async () => {
     await page.keyboard.press("ArrowDown");
     await pause(page, 500);
     await page.keyboard.press("Enter");
-    await pause(page, 2000);
+    await pause(page, 1800);
+
+    // Activity: what finished, failed or needs you, across every review.
+    await click(
+      page,
+      page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: /^Activity/ }),
+    );
+    const row = page
+      .getByRole("complementary", { name: "Activity" })
+      .getByRole("button", { name: /Claude finished/ });
+    await expect(row).toBeVisible();
+    await pause(page, 1500);
+    await click(page, row);
+    await expect(main.getByRole("region", { name: "Finding #1" })).toBeVisible();
+    await pause(page, 2200);
   } finally {
     await stop();
     await app.close();
