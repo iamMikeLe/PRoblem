@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { renderApp } from "../../renderApp.tsx";
 import {
   makeFinding,
@@ -56,6 +56,11 @@ const selectedTab = () =>
   screen.getAllByRole("tab").find((tab) => tab.getAttribute("aria-selected") === "true");
 
 describe("search", () => {
+  // The Changes tab is a lazy chunk whose first import (with ~1 250 icon modules) is slow under
+  // Vitest; load it before the test that opens it waits for the diff.
+  beforeAll(async () => {
+    await import("../../../../src/renderer/src/features/changes/ChangesTab.tsx");
+  }, 30_000);
   beforeEach(() => window.localStorage.clear());
   afterEach(() => {
     cleanup();

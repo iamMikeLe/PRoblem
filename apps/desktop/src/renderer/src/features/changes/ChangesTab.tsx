@@ -23,6 +23,7 @@ import {
 import {
   ArrowSyncRegular,
   DocumentRegular,
+  FolderOpenRegular,
   FolderRegular,
   PanelLeftContractRegular,
   PanelLeftExpandRegular,
@@ -40,11 +41,13 @@ import { useMemo, useState } from "react";
 import { LoadingRows } from "../../app/LoadingRows.tsx";
 import { type PanelLimits, usePanel } from "../../lib/panel.ts";
 import { ResizeHandle } from "../../lib/ResizeHandle.tsx";
+import { useTheme } from "../../lib/theme.ts";
 import { useIsBusy } from "../conversation/store.ts";
 import { useFindings, useOpenInEditor } from "../findings/queries.ts";
 import { useUpdateProject } from "../projects/queries.ts";
 import { shortSha } from "../reviews/describe.ts";
 import { DiffView, shownNewLines } from "./DiffView.tsx";
+import { fileIconName, folderIconName, type IconTone, iconUrl } from "./fileIcons.ts";
 import { buildTree, type DiffMode, loadDiffMode, saveDiffMode, type TreeNode } from "./model.ts";
 import { useChangeSet, useFileDiff, useRefreshReview, useUpdateCheck } from "./queries.ts";
 
@@ -124,6 +127,8 @@ const useStyles = makeStyles({
     overflowWrap: "anywhere",
     textAlign: "left",
   },
+  // The file-type icons are pictures, at the size of Fluent's small tree icons.
+  icon: { width: "16px", height: "16px", display: "block" },
   fileName: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   selected: { backgroundColor: tokens.colorNeutralBackground1Selected },
   counts: {
@@ -478,9 +483,34 @@ function FileTree({
   onSelect: (path: string) => void;
 }) {
   const nodes = useMemo(() => buildTree(files), [files]);
+  // Folders start open, new ones too (after a refresh); the ones the user closed stay closed.
+  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
+  const openItems = useMemo(
+    () => allFolders(nodes).filter((value) => !closed.has(value)),
+    [nodes, closed],
+  );
   return (
-    <Tree aria-label="Changed files" size="small" defaultOpenItems={allFolders(nodes)}>
-      <TreeNodes nodes={nodes} selected={selected} findings={findings} onSelect={onSelect} />
+    <Tree
+      aria-label="Changed files"
+      size="small"
+      openItems={openItems}
+      onOpenChange={(_, data) => {
+        const value = String(data.value);
+        setClosed((previous) => {
+          const next = new Set(previous);
+          if (data.open) next.delete(value);
+          else next.add(value);
+          return next;
+        });
+      }}
+    >
+      <TreeNodes
+        nodes={nodes}
+        selected={selected}
+        findings={findings}
+        closed={closed}
+        onSelect={onSelect}
+      />
     </Tree>
   );
 }
@@ -491,30 +521,66 @@ function allFolders(nodes: readonly TreeNode[]): string[] {
   );
 }
 
+/** A Material Icon Theme icon; decorative, the tree item's text names the file or folder. */
+function MaterialIcon({
+  name,
+  fallback,
+}: {
+  name: string;
+  fallback: "file" | "folder" | "folder-open";
+}) {
+  const styles = useStyles();
+  const url = iconUrl(name, fallback);
+  if (url === undefined) {
+    return fallback === "file" ? (
+      <DocumentRegular />
+    ) : fallback === "folder" ? (
+      <FolderRegular />
+    ) : (
+      <FolderOpenRegular />
+    );
+  }
+  return <img className={styles.icon} src={url} alt="" aria-hidden draggable={false} />;
+}
+
 function TreeNodes({
   nodes,
   selected,
   findings,
+  closed,
   onSelect,
 }: {
   nodes: readonly TreeNode[];
   selected: string | undefined;
   findings: readonly Finding[];
+  closed: ReadonlySet<string>;
   onSelect: (path: string) => void;
 }) {
   const styles = useStyles();
+  const tone: IconTone = useTheme((state) => (state.name === "light" ? "light" : "dark"));
   return (
     <>
       {nodes.map((node) => {
         if (node.kind === "folder") {
+          const open = !closed.has(`dir:${node.path}`);
           return (
             <TreeItem key={node.path} itemType="branch" value={`dir:${node.path}`}>
-              <TreeItemLayout iconBefore={<FolderRegular />}>{node.name}</TreeItemLayout>
+              <TreeItemLayout
+                iconBefore={
+                  <MaterialIcon
+                    name={folderIconName(node.name, open, tone)}
+                    fallback={open ? "folder-open" : "folder"}
+                  />
+                }
+              >
+                {node.name}
+              </TreeItemLayout>
               <Tree>
                 <TreeNodes
                   nodes={node.children}
                   selected={selected}
                   findings={findings}
+                  closed={closed}
                   onSelect={onSelect}
                 />
               </Tree>
@@ -537,7 +603,7 @@ function TreeNodes({
           >
             <TreeItemLayout
               className={mergeClasses(isSelected && styles.selected)}
-              iconBefore={<DocumentRegular />}
+              iconBefore={<MaterialIcon name={fileIconName(node.name, tone)} fallback="file" />}
               aside={
                 <span className={styles.counts}>
                   {count > 0 && <Caption1>{count} ⚑</Caption1>}
