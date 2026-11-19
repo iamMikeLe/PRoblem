@@ -108,6 +108,7 @@ Three places worth opening:
 | 0014 | `gh` for reading the discussion and posting a review | Reuses the user's GitHub login; long discussions are truncated, and the UI says so |
 | 0015 | A stored Activity feed written by the services, not derived from other tables | Read state and events with no history of their own (commits, comments); one more table and a call at each source |
 | 0017 | The user edits each finding's text before posting; main posts exactly that text | The user's words under their name; main can no longer promise that edited text mentions no one, so Claude's text stays neutralized and the dialog says what an edit does |
+| 0018 | Syntax highlighting with lowlight rendered as React elements, Material Icon Theme icons, bundled JetBrains Mono, rainbow indentation | No CSP change and nothing loaded at startup; the Changes chunk grows (icon tables) and one file holds hard-coded syntax colors |
 
 ## 5. How I work with Claude Code
 

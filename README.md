@@ -119,3 +119,9 @@ reviewers in parallel → `/verify` → tick the roadmap.
 ## License
 
 [MIT](LICENSE) © 2026 Mike Le
+
+The app bundles third-party assets under their own licenses: file icons from
+[Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme) (MIT),
+[highlight.js](https://github.com/highlightjs/highlight.js) grammars (BSD-3-Clause) through
+[lowlight](https://github.com/wooorm/lowlight) (MIT), and the
+[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) font (SIL Open Font License 1.1).
