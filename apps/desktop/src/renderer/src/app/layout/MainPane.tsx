@@ -228,10 +228,16 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
 
   const openCount = counts.data?.[review.id]?.open ?? 0;
   const project = projects.data?.find((p) => p.id === review.projectId);
-  const ask = (finding: Finding) => {
-    const prefix = `About #${finding.number} (${finding.title}): `;
+  const ask = (finding: Finding, request?: string) => {
+    const prefix = request ?? `About #${finding.number} (${finding.title}): `;
+    // A full request keeps what the user had typed, on its own paragraph below.
+    const join = request !== undefined ? "\n\n" : "";
     setDraft(review.id, (current) =>
-      current.startsWith(prefix) ? current : `${prefix}${current}`,
+      current.startsWith(prefix)
+        ? current
+        : current.trim() === ""
+          ? prefix
+          : `${prefix}${join}${current}`,
     );
     setAsking(review.id);
     setTab("conversation");
