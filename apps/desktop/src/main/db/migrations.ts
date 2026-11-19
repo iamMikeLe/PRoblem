@@ -157,4 +157,21 @@ export const migrations: readonly Migration[] = [
       ALTER TABLE findings ADD COLUMN reproduction TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 10,
+    name: "activity",
+    sql: `
+      -- The Activity feed (ADR 0015). \`detail\` is a JSON ActivityDetail; NULL \`read_at\` = unread.
+      CREATE TABLE activity (
+        id        TEXT PRIMARY KEY,
+        review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+        kind      TEXT NOT NULL,
+        detail    TEXT NOT NULL,
+        at        TEXT NOT NULL,
+        read_at   TEXT
+      );
+      CREATE INDEX activity_by_time ON activity (at);
+      CREATE INDEX activity_by_review ON activity (review_id, kind);
+    `,
+  },
 ];

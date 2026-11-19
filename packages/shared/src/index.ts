@@ -1,3 +1,4 @@
+export * from "./activity.ts";
 export * from "./changes.ts";
 export * from "./channels.ts";
 export * from "./conversation.ts";

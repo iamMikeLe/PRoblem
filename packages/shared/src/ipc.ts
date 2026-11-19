@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ActivityItemSchema, MarkActivityReadRequestSchema } from "./activity.ts";
 import {
   ChangeFiltersSchema,
   ChangeSetSchema,
@@ -287,6 +288,10 @@ export const ipcContract = {
   "editor:open": { input: OpenInEditorRequestSchema, output: z.null() },
   /** Opens the native folder picker; `null` when the user cancels. */
   "dialog:pickFolder": { input: z.undefined(), output: z.string().nullable() },
+  /** The Activity feed of open reviews, newest first. */
+  "activity:list": { input: z.undefined(), output: z.array(ActivityItemSchema) },
+  /** Marks Activity rows as read. */
+  "activity:markRead": { input: MarkActivityReadRequestSchema, output: z.null() },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;
 
 // Fails to compile if the contract has a channel that `IPC_CHANNELS` (the preload allowlist) lacks.

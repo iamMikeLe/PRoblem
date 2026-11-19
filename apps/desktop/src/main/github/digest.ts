@@ -24,6 +24,22 @@ export function latestCommentAt(conversation: Conversation): string | null {
   );
 }
 
+/** Comments, replies and reviews newer than `since`, and the newest one's time. */
+export function commentsSince(
+  conversation: Conversation,
+  since: string,
+): { count: number; until: string | null } {
+  const times = [
+    ...conversation.threads.flatMap((t) => t.comments.map((c) => c.createdAt)),
+    ...conversation.comments.map((c) => c.createdAt),
+    ...conversation.reviews.flatMap((r) => (r.submittedAt ? [r.submittedAt] : [])),
+  ].filter((time) => time > since);
+  return {
+    count: times.length,
+    until: times.reduce<string | null>((max, t) => (max === null || t > max ? t : max), null),
+  };
+}
+
 /**
  * What reviewers already said, for Claude (ADR 0014): every thread, comment and review newer than
  * `since` (all when `null`). Their text was written by other people and is quoted as data.

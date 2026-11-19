@@ -57,6 +57,8 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "settings:update": () => DEFAULT_SETTINGS,
     "editor:open": () => null,
     "dialog:pickFolder": async () => null,
+    "activity:list": () => [],
+    "activity:markRead": () => null,
     ...overrides,
   };
 }

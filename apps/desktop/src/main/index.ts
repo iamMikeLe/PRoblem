@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@problem/shared";
 import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
+import { createActivityService } from "./activity/service.ts";
 import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
 import { fakeClaude } from "./claude/fake.ts";
@@ -96,15 +97,24 @@ async function start(): Promise<void> {
 
   const projects = createProjectService({ db, home, log });
   const gh = createGhClient();
+  const activity = createActivityService({ db, broadcast, log });
   const reviews = createReviewService({
     db,
+    activity,
     worktreesDir: join(dir, "worktrees"),
     gh,
     log,
   });
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
-  const github = createGitHubService({ db, gh, review: (id) => reviews.get(id), changes, log });
+  const github = createGitHubService({
+    db,
+    gh,
+    review: (id) => reviews.get(id),
+    changes,
+    log,
+    activity,
+  });
   const search = createSearchService({ db, changes, log });
   const settings = {
     get: () => getSettings(db),
@@ -147,7 +157,16 @@ async function start(): Promise<void> {
     },
     attention: (waiting) => app.setBadgeCount(waiting),
     commentsNote: (id) => github.commentsNote(id),
-    afterTurn: (id) => github.refreshInBackground(id),
+    activity,
+    // After each turn, look for news to list in Activity: PR comments and new commits.
+    afterTurn: (id) => {
+      github.refreshInBackground(id);
+      reviews
+        .checkUpdate(id)
+        .catch((error: unknown) =>
+          log.info("could not check for new commits", { review: id, error }),
+        );
+    },
   });
   sessions.recover();
   registerIpc(
@@ -161,6 +180,7 @@ async function start(): Promise<void> {
         changes,
         github,
         search,
+        activity,
         log,
         openExternal: (url) => shell.openExternal(url),
         settings,

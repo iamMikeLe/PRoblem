@@ -6,6 +6,7 @@ import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
 import type { AppEvent, ConversationEntry, Review } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { createActivityService } from "../../../src/main/activity/service.ts";
 import { listEntries } from "../../../src/main/claude/entries.ts";
 import {
   type ClaudeQuery,
@@ -1004,5 +1005,106 @@ describe("session service", () => {
     expect(entries(sessions)).toHaveLength(stored);
     expect(events).toEqual([]);
     expect(status()).toBe("running");
+  });
+
+  describe("activity", () => {
+    const content = (title: string, severity: "blocker" | "major" | "minor" | "nit") => ({
+      severity,
+      title,
+      file: null,
+      line: null,
+      problem: "p",
+      suggestion: "s",
+      reproduction: "",
+    });
+
+    function withActivity(claude: ReturnType<typeof fakeClaude>) {
+      const activity = createActivityService({ db, broadcast: () => {}, log: silentLogger });
+      const sessions = createSessionService({
+        db,
+        runQuery: claude.runQuery,
+        broadcast: (event) => events.push(event),
+        findings: createFindingsService({ db, broadcast: () => {} }),
+        claudePath: () => "/usr/local/bin/claude",
+        log: silentLogger,
+        activity,
+      });
+      const details = () => activity.list().map((item) => [item.detail, item.read]);
+      return { sessions, details };
+    }
+
+    it("lists a finished turn with the findings it added, most severe first", async () => {
+      insertFinding(db, review.id, content("Old", "blocker"), new Date("2026-01-01T00:00:00Z"));
+      const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()], hold: true }));
+      const { sessions, details } = withActivity(claude);
+      sessions.start(review);
+      await vi.waitFor(() => expect(claude.turns).toHaveLength(1));
+      insertFinding(db, review.id, content("Typo", "nit"), new Date());
+      insertFinding(db, review.id, content("Lost update", "major"), new Date());
+      claude.turns[0]?.release();
+      await settle();
+
+      expect(details()).toEqual([
+        [
+          {
+            kind: "finished",
+            added: 2,
+            top: { number: 3, severity: "major", title: "Lost update" },
+          },
+          false,
+        ],
+      ]);
+    });
+
+    it("lists a failed turn with the first line of its error, and not a stopped one", async () => {
+      const claude = fakeClaude((turn) =>
+        turn === 0
+          ? {
+              messages: [
+                sdk.init(),
+                {
+                  type: "result",
+                  subtype: "error_max_turns",
+                  is_error: true,
+                  errors: ["Too many turns\nmore detail"],
+                },
+              ],
+            }
+          : { messages: [sdk.init(), sdk.success()], hold: true },
+      );
+      const { sessions, details } = withActivity(claude);
+      sessions.start(review);
+      await settle();
+      sessions.send({ id: review.id, text: "again", model: null });
+      await vi.waitFor(() => expect(claude.turns).toHaveLength(2));
+      await sessions.stop(review.id);
+      await settle();
+
+      expect(details()).toEqual([[{ kind: "failed", message: "Too many turns" }, false]]);
+    });
+
+    it("lists one approval row per wait, read once the cards are answered", async () => {
+      const claude = fakeClaude(() => ({ messages: [sdk.init(), sdk.success()], hold: true }));
+      const { sessions, details } = withActivity(claude);
+      sessions.start(review);
+      await vi.waitFor(() => expect(claude.turns).toHaveLength(1));
+      const canUseTool = claude.turns[0]?.options.canUseTool;
+      if (!canUseTool) throw new Error("no canUseTool");
+      const signal = new AbortController().signal;
+      const ask = (id: string) =>
+        canUseTool("Bash", { command: `npm test ${id}` }, { signal, toolUseID: id, requestId: id });
+      const first = ask("t1");
+      const second = ask("t2");
+      await vi.waitFor(() => expect(sessions.approvals()).toHaveLength(2));
+      expect(details()).toEqual([[{ kind: "approval", toolName: "Bash" }, false]]);
+
+      for (const approval of sessions.approvals()) {
+        sessions.decide({ reviewId: review.id, id: approval.id, decision: "deny" });
+      }
+      await Promise.all([first, second]);
+      expect(details()).toEqual([[{ kind: "approval", toolName: "Bash" }, true]]);
+      claude.turns[0]?.release();
+      await settle();
+    });
   });
 });

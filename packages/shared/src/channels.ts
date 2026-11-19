@@ -36,6 +36,8 @@ export const IPC_CHANNELS = [
   "settings:update",
   "editor:open",
   "dialog:pickFolder",
+  "activity:list",
+  "activity:markRead",
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];

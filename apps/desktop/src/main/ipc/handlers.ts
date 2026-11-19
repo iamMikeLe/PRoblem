@@ -1,4 +1,5 @@
 import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
+import type { ActivityService } from "../activity/service.ts";
 import type { ChangesService } from "../changes/service.ts";
 import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
@@ -18,6 +19,7 @@ export interface HandlerDeps {
   changes: ChangesService;
   github: GitHubService;
   search: SearchService;
+  activity: ActivityService;
   log: Logger;
   /** Opens a URL in the user's browser (already checked to be a github.com link). */
   openExternal: (url: string) => Promise<void>;
@@ -51,6 +53,7 @@ export function createHandlers({
   changes,
   github,
   search,
+  activity,
   log,
   openExternal,
   settings,
@@ -126,5 +129,10 @@ export function createHandlers({
       return null;
     },
     "dialog:pickFolder": () => pickFolder(),
+    "activity:list": () => activity.list(),
+    "activity:markRead": (input) => {
+      activity.markRead(input);
+      return null;
+    },
   };
 }

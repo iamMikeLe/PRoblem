@@ -17,9 +17,15 @@ import {
   type SendMessageRequest,
   TOOL_TEXT_MAX,
 } from "@problem/shared";
+import type { ActivityService } from "../activity/service.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import { verdictNote } from "../findings/report.ts";
-import { markVerdictsTold, untoldVerdicts, type VerdictChange } from "../findings/repository.ts";
+import {
+  findingsAddedSince,
+  markVerdictsTold,
+  untoldVerdicts,
+  type VerdictChange,
+} from "../findings/repository.ts";
 import type { FindingsService } from "../findings/service.ts";
 import {
   clearMovedFrom,
@@ -66,6 +72,8 @@ export interface SessionServiceDeps {
   afterTurn?: (reviewId: string) => void;
   /** Number of reviews waiting for the user changed (dock badge). */
   attention?: (waitingReviews: number) => void;
+  /** The Activity feed: approvals asked, turns finished or failed (ADR 0015). */
+  activity?: Pick<ActivityService, "record" | "resolve">;
   /** Turns that may run at the same time; the rest wait as `queued`. */
   maxConcurrent?: number;
   /** How long Stop waits for Claude to wind down before killing the turn. */
@@ -306,7 +314,10 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     broadcast({ type: "review.approval", approval });
     setStatus(review.id, "needs-input");
     // One notification per review while it waits, not one per card.
-    if (first) deps.notify?.(approval, review.title);
+    if (first) {
+      deps.notify?.(approval, review.title);
+      deps.activity?.record(review.id, { kind: "approval", toolName });
+    }
     deps.attention?.(approvals.waitingReviews());
 
     let result: ApprovalAnswer;
@@ -315,8 +326,10 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     } finally {
       if (!closing) {
         broadcast({ type: "review.approvalDone", reviewId: review.id, id: approval.id });
-        if (approvals.count(review.id) === 0 && running.has(review.id)) {
-          setStatus(review.id, "running");
+        if (approvals.count(review.id) === 0) {
+          // Answered (or stopped): the Activity row no longer asks for anything.
+          deps.activity?.resolve(review.id, "approval");
+          if (running.has(review.id)) setStatus(review.id, "running");
         }
         deps.attention?.(approvals.waitingReviews());
       }
@@ -434,6 +447,29 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     message,
   });
 
+  /** A finished or failed turn in the Activity feed; a stopped one is the user's own doing. */
+  function recordTurn(
+    reviewId: string,
+    entry: Extract<ConversationEntry, { kind: "turn-end" }>,
+    startedAt: Date,
+  ): void {
+    if (!deps.activity) return;
+    if (entry.outcome === "success") {
+      const added = findingsAddedSince(db, reviewId, startedAt);
+      deps.activity.record(reviewId, {
+        kind: "finished",
+        added: added.length,
+        top: added[0] ?? null,
+      });
+    } else if (entry.outcome === "error") {
+      const firstLine = (entry.message ?? "").trim().split("\n", 1)[0] ?? "";
+      deps.activity.record(reviewId, {
+        kind: "failed",
+        message: firstLine.length > 300 ? `${firstLine.slice(0, 300)}…` : firstLine,
+      });
+    }
+  }
+
   async function runTurn({
     reviewId,
     prompt,
@@ -453,6 +489,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
       gated: new Set(),
     };
     running.set(reviewId, turn);
+    const startedAt = now();
     let ended: ConversationEntry | undefined;
     const end = (entry: ConversationEntry) => {
       ended = entry;
@@ -525,6 +562,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
         }
         const failed = ended?.kind === "turn-end" && ended.outcome === "error";
         setStatus(reviewId, failed ? "failed" : "idle");
+        if (!closing && ended?.kind === "turn-end") recordTurn(reviewId, ended, startedAt);
       } catch (error) {
         log.error("could not record the end of a turn", { review: reviewId, error });
       }

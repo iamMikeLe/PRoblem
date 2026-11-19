@@ -1,4 +1,5 @@
 import {
+  type ActivityItem,
   type AppErrorCode,
   type AppEvent,
   type AppSettings,
@@ -74,6 +75,25 @@ export function makeFinding(
   };
 }
 
+/** An Activity row as the main process would return it, for seeding the stub. */
+export function makeActivity(
+  id: string,
+  review: Review,
+  detail: ActivityItem["detail"],
+  overrides: Partial<ActivityItem> = {},
+): ActivityItem {
+  return {
+    id,
+    reviewId: review.id,
+    reviewTitle: review.title,
+    projectName: "shop",
+    at: "2026-11-19T10:00:00.000Z",
+    read: false,
+    detail,
+    ...overrides,
+  };
+}
+
 /** A review as the main process would return it, for seeding the stub. */
 export function makeReview(id: string, project: Project, overrides: Partial<Review> = {}): Review {
   return {
@@ -136,6 +156,8 @@ export interface StubState {
   errors: IpcInput<"app:reportError">[];
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
+  /** The Activity feed, newest first. */
+  activity: ActivityItem[];
   settings: AppSettings;
   editorError?: StubError | undefined;
   /** What the native folder picker "chooses"; `null` = the user cancels. */
@@ -168,6 +190,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     calls: [],
     entries: {},
     findings: {},
+    activity: [],
     approvals: [],
     changes: {},
     diffs: {},
@@ -397,6 +420,15 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
       case "editor:open":
         ipcContract[channel].input.parse(raw);
         return state.editorError ? fail(state.editorError) : ok(null);
+      case "activity:list":
+        return ok(state.activity);
+      case "activity:markRead": {
+        const { ids } = ipcContract[channel].input.parse(raw);
+        state.activity = state.activity.map((item) =>
+          ids === undefined || ids.includes(item.id) ? { ...item, read: true } : item,
+        );
+        return ok(null);
+      }
     }
   }
 

@@ -27,6 +27,8 @@ export const AppEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("review.approvalDone"), reviewId: z.string(), id: z.string() }),
   /** The user clicked a notification about a review: show it. */
   z.object({ type: z.literal("app.showReview"), reviewId: z.string() }),
+  /** The Activity feed changed (a row was added or marked read): load it again. */
+  z.object({ type: z.literal("activity.changed") }),
   z.object({
     type: z.literal("review.findings"),
     reviewId: z.string(),

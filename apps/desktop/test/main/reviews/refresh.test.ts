@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { DEFAULT_REVIEW_PROMPT, type Project } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type ActivityService, createActivityService } from "../../../src/main/activity/service.ts";
 import { createChangesService } from "../../../src/main/changes/service.ts";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
@@ -21,6 +22,7 @@ describe("checking for new commits and refreshing a review", () => {
   let project: Project;
   let reviews: ReviewService;
   let other: string;
+  let activity: ActivityService;
 
   /** Pushes a commit to `feature` (and PR #7) from another clone, like a teammate would. */
   function pushCommit(file: string, message: string, force = false): string {
@@ -42,8 +44,10 @@ describe("checking for new commits and refreshing a review", () => {
     project = await createProjectService({ db, home: dir, log: silentLogger }).create({
       path: fx.repo,
     });
+    activity = createActivityService({ db, broadcast: () => {}, log: silentLogger });
     reviews = createReviewService({
       db,
+      activity,
       worktreesDir: join(dir, "worktrees"),
       gh: {
         viewPullRequest: vi.fn(async () => ({
@@ -99,6 +103,23 @@ describe("checking for new commits and refreshing a review", () => {
       ],
       rewritten: false,
     });
+  });
+
+  it("lists new commits in Activity once per new head", async () => {
+    const review = await start("feature");
+    await reviews.checkUpdate(review.id);
+    expect(activity.list()).toEqual([]);
+
+    const first = pushCommit("c.txt", "add c");
+    await reviews.checkUpdate(review.id);
+    await reviews.checkUpdate(review.id);
+    const second = pushCommit("d.txt", "add d");
+    await reviews.checkUpdate(review.id);
+
+    expect(activity.list().map((item) => item.detail)).toEqual([
+      { kind: "commits", newCommits: 2, latestSha: second, rewritten: false },
+      { kind: "commits", newCommits: 1, latestSha: first, rewritten: false },
+    ]);
   });
 
   it("notices rewritten history (force-push)", async () => {

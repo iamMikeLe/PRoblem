@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { FileDiff, Review } from "@problem/shared";
 import { neutralizeMentions } from "@problem/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type ActivityService, createActivityService } from "../../../src/main/activity/service.ts";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import { insertFinding, setVerdict } from "../../../src/main/findings/repository.ts";
@@ -131,6 +132,7 @@ describe("GitHub service", () => {
   let github: GitHubService;
   let projectId: string;
   let graphqlAnswer: unknown;
+  let activity: ActivityService;
 
   function addReview(id: string, source: Review["source"]): Review {
     const review: Review = {
@@ -169,9 +171,11 @@ describe("GitHub service", () => {
       graphql: vi.fn(async () => graphqlAnswer),
       postReview: vi.fn(async () => ({ html_url: `${PR_URL}#pullrequestreview-1` })),
     };
+    activity = createActivityService({ db, broadcast: () => {}, log: silentLogger });
     github = createGitHubService({
       db,
       gh,
+      activity,
       review: (id) => {
         const record = getReviewRecord(db, id);
         if (!record) throw new Error(id);
@@ -271,6 +275,29 @@ describe("GitHub service", () => {
     expect(github.commentsNote("r1")).toBeUndefined();
   });
 
+  it("lists new comments in Activity once, never the discussion a review started with", async () => {
+    const review = addReview("r1", prSource);
+    // Never seen before: reading it is not news.
+    await github.conversation("r1");
+    expect(activity.list()).toEqual([]);
+
+    await github.firstDigest(review);
+    await github.conversation("r1");
+    expect(activity.list()).toEqual([]);
+
+    graphqlAnswer = answer({
+      comments: [
+        comment("I2", "dave", "One more thing", "2026-11-18T11:00:00Z"),
+        comment("I3", "erin", "And another", "2026-11-18T11:05:00Z"),
+      ],
+    });
+    await github.conversation("r1");
+    await github.conversation("r1");
+    expect(activity.list().map((item) => item.detail)).toEqual([
+      { kind: "comments", count: 2, until: "2026-11-18T11:05:00Z" },
+    ]);
+  });
+
   it("does not stop a review from starting when GitHub cannot be read", async () => {
     gh.graphql.mockRejectedValue(new Error("offline"));
     expect(await github.firstDigest(addReview("r1", prSource))).toBeUndefined();
@@ -328,6 +355,9 @@ describe("GitHub service", () => {
         findings: [1, 3],
       });
       expect(result).toEqual({ url: `${PR_URL}#pullrequestreview-1` });
+      expect(activity.list().map((item) => item.detail)).toEqual([
+        { kind: "posted", findings: 2, url: `${PR_URL}#pullrequestreview-1` },
+      ]);
       expect(gh.postReview).toHaveBeenCalledWith("acme/payments", 7, {
         commit_id: SHA("a"),
         event: "REQUEST_CHANGES",

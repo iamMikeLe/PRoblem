@@ -13,6 +13,7 @@ import {
   type Review,
 } from "@problem/shared";
 import { z } from "zod";
+import type { ActivityService } from "../activity/service.ts";
 import type { ChangesService } from "../changes/service.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import { listFindings, markPosted } from "../findings/repository.ts";
@@ -22,7 +23,7 @@ import { listRemotes, primaryRemote } from "../git/refs.ts";
 import { getProject } from "../projects/repository.ts";
 import { markCommentsTold } from "../reviews/repository.ts";
 import { parseConversation } from "./conversation.ts";
-import { commentsDigest, latestCommentAt } from "./digest.ts";
+import { commentsDigest, commentsSince, latestCommentAt } from "./digest.ts";
 
 /**
  * The review's pull request on GitHub (ADR 0014): reading its discussion, telling Claude about
@@ -46,6 +47,8 @@ export interface GitHubServiceDeps {
   review: (id: string) => Review;
   changes: Pick<ChangesService, "file">;
   log: Logger;
+  /** The Activity feed: new PR comments, posted reviews (ADR 0015). */
+  activity?: Pick<ActivityService, "record" | "last">;
 }
 
 const SEVERITY_LABEL = { blocker: "Blocker", major: "Major", minor: "Minor", nit: "Nit" } as const;
@@ -131,8 +134,35 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
 
   async function read(review: Review): Promise<PrConversation> {
     const conversation = await fetchConversation(review);
-    if (conversation.status === "ok") latest.set(review.id, conversation);
+    if (conversation.status === "ok") {
+      noteNewComments(review.id, conversation);
+      latest.set(review.id, conversation);
+    }
     return conversation;
+  }
+
+  /**
+   * Lists comments in the Activity feed that arrived since the newest one already known: listed
+   * before, told to Claude, read earlier in this run, or posted by the user from here. A review
+   * whose discussion was never seen lists nothing (that is the first digest, not news).
+   */
+  function noteNewComments(
+    reviewId: string,
+    conversation: Extract<PrConversation, { status: "ok" }>,
+  ): void {
+    const activity = deps.activity;
+    if (!activity) return;
+    const previous = latest.get(reviewId);
+    const known = [
+      activity.last(reviewId, "comments")?.detail.until,
+      activity.last(reviewId, "posted")?.at,
+      toldAt(reviewId),
+      previous ? latestCommentAt(previous) : null,
+    ].filter((time): time is string => typeof time === "string");
+    if (known.length === 0) return;
+    const since = known.reduce((max, t) => (t > max ? t : max));
+    const { count, until } = commentsSince(conversation, since);
+    if (count > 0 && until !== null) activity.record(reviewId, { kind: "comments", count, until });
   }
 
   function toldAt(reviewId: string): string | null {
@@ -308,6 +338,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     const parsed = z.object({ html_url: z.string() }).safeParse(answer);
     const url = parsed.success ? parsed.data.html_url : plan.pullRequest.url;
     markPosted(db, request.id, request.findings, url);
+    deps.activity?.record(request.id, { kind: "posted", findings: request.findings.length, url });
     deps.log.info("review posted to GitHub", {
       review: request.id,
       findings: request.findings.length,

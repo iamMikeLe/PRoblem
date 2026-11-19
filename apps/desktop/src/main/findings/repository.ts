@@ -71,6 +71,23 @@ export function countAllFindings(db: DatabaseSync, reviewId: string): number {
   return Number(row?.n ?? 0);
 }
 
+/** Findings of a review created at or after `since`, most severe first (then by number). */
+export function findingsAddedSince(
+  db: DatabaseSync,
+  reviewId: string,
+  since: Date,
+): Pick<Finding, "number" | "severity" | "title">[] {
+  return db
+    .prepare(
+      `SELECT ${COLUMNS} FROM findings WHERE review_id = ? AND created_at >= ?
+        ORDER BY CASE severity WHEN 'blocker' THEN 0 WHEN 'major' THEN 1 WHEN 'minor' THEN 2 ELSE 3 END,
+                 number`,
+    )
+    .all(reviewId, since.toISOString())
+    .map(toFinding)
+    .map(({ number, severity, title }) => ({ number, severity, title }));
+}
+
 export function listFindings(db: DatabaseSync, reviewId: string): Finding[] {
   return db
     .prepare(`SELECT ${COLUMNS} FROM findings WHERE review_id = ? ORDER BY number`)

@@ -9,6 +9,7 @@ import type {
   ReviewSource,
   UpdateCheck,
 } from "@problem/shared";
+import type { ActivityService } from "../activity/service.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { GhClient } from "../git/gh.ts";
 import { githubRepoOf, parsePullRequestUrl } from "../git/github.ts";
@@ -50,6 +51,8 @@ export interface ReviewServiceDeps {
   worktreesDir: string;
   gh: GhClient;
   log: Logger;
+  /** The Activity feed: new commits found by a check (ADR 0015). */
+  activity?: Pick<ActivityService, "record" | "last">;
   now?: () => Date;
 }
 
@@ -359,6 +362,15 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     }
     const rewritten = !(await isAncestor(root, review.headSha, latest.headSha));
     const { count, commits } = await commitsBetween(root, review.headSha, latest.headSha, 20);
+    // Once per new head, however often it is checked.
+    if (deps.activity && deps.activity.last(id, "commits")?.detail.latestSha !== latest.headSha) {
+      deps.activity.record(id, {
+        kind: "commits",
+        newCommits: count,
+        latestSha: latest.headSha,
+        rewritten,
+      });
+    }
     return {
       headSha: review.headSha,
       latestSha: latest.headSha,
