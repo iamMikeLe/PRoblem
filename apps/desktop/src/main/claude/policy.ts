@@ -1,6 +1,6 @@
 import { lstatSync, realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import type { Grant } from "./grants.ts";
+import { ALL_COMMANDS, type Grant } from "./grants.ts";
 import { REPORT_TOOL_NAME } from "./names.ts";
 
 /**
@@ -8,7 +8,7 @@ import { REPORT_TOOL_NAME } from "./names.ts";
  * `decideToolUse`, which allows it, refuses it, or asks the user through an approval card.
  * Only reading inside the review's folder, plain read-only git commands and the app's own
  * `report_findings` run without asking (plus edits in fix mode, and what the user allowed for the
- * review). An allowed git command may come back rewritten (`updatedInput`) with safety options.
+ * review: an exact command or path, or every command with "Allow all commands", ADR 0016). An allowed git command may come back rewritten (`updatedInput`) with safety options.
  */
 export type ToolDecision =
   | { allow: true; updatedInput?: Record<string, unknown> }
@@ -500,6 +500,8 @@ export function decideToolUse(
         const git = typeof checked === "string" ? checked : command.trim();
         return allow({ ...args, command: pinToFolder(git, workdir) });
       }
+      // "Allow all commands" (ADR 0016): the command still runs in the review's sandbox.
+      if (context.granted(ALL_COMMANDS)) return allow();
       return askUnlessGranted(context, "It runs a command that is not a read-only git command.", {
         tool: "Bash",
         scope: command,

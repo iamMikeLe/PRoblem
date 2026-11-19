@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { Grant } from "../../../src/main/claude/grants.ts";
+import { ALL_COMMANDS, type Grant } from "../../../src/main/claude/grants.ts";
 import {
   decideBashCommand,
   decideToolUse,
@@ -161,6 +161,21 @@ describe("review permission gate", () => {
         });
       }
       expect(gate("Bash", { command: " " })).toMatchObject({ kind: "deny" });
+    });
+
+    it('"Allow all commands" runs any command, but never an empty one or a web call', () => {
+      grants = [ALL_COMMANDS];
+      for (const command of ["npm test", "rm -rf .", "cat a | grep b"]) {
+        expect(gate("Bash", { command }), command).toEqual({ kind: "allow" });
+      }
+      // Plain git is still pinned to the folder.
+      expect(gate("Bash", { command: "git status" })).toEqual({
+        kind: "allow",
+        updatedInput: { command: `git -C '${workdir}' status` },
+      });
+      expect(gate("Bash", { command: "" })).toMatchObject({ kind: "deny" });
+      expect(gate("WebFetch", { url: "https://example.com" })).toMatchObject({ kind: "ask" });
+      expect(gate("Read", { file_path: "../secret.txt" })).toMatchObject({ kind: "ask" });
     });
 
     it("pins git to the review's folder, quoted for the shell", () => {

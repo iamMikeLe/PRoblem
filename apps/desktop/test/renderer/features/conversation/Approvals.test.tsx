@@ -19,6 +19,7 @@ function approval(overrides: Partial<PendingApproval> = {}): PendingApproval {
     detail: '{\n  "command": "npm test"\n}',
     reason: "It runs a command that is not a read-only git command.",
     canAllowForReview: true,
+    canAllowAllCommands: true,
     requestedAt: "2026-11-18T10:00:00.000Z",
     ...overrides,
   };
@@ -65,12 +66,14 @@ describe("approval cards", () => {
       summary: "WebFetch",
       reason: "It fetches a web page; the URL can carry data out.",
       canAllowForReview: false,
+      canAllowAllCommands: false,
     });
     api.approvals = [web];
     act(() => api.emit({ type: "review.approval", approval: web }));
 
     const card = await screen.findByRole("region", { name: "Claude wants to use WebFetch" });
     expect(within(card).queryByRole("button", { name: "Allow for this review" })).toBeNull();
+    expect(within(card).queryByRole("button", { name: "Allow all commands" })).toBeNull();
     fireEvent.click(within(card).getByRole("button", { name: "Deny…" }));
     fireEvent.change(within(card).getByRole("textbox", { name: /Tell Claude why/ }), {
       target: { value: "No network in reviews" },
@@ -79,6 +82,19 @@ describe("approval cards", () => {
     await waitFor(() =>
       expect(decideCalls(api)).toEqual([
         { reviewId: "r1", id: "a2", decision: "deny", message: "No network in reviews" },
+      ]),
+    );
+  });
+
+  it("allows every command of the review from a Bash card", async () => {
+    const api = stubBridge([project], [makeReview("r1", project, { status: "needs-input" })]);
+    api.approvals = [approval()];
+    renderApp();
+    const card = await screen.findByRole("region", { name: "Claude wants to use Bash" });
+    fireEvent.click(within(card).getByRole("button", { name: "Allow all commands" }));
+    await waitFor(() =>
+      expect(decideCalls(api)).toEqual([
+        { reviewId: "r1", id: "a1", decision: "allow-all-commands" },
       ]),
     );
   });

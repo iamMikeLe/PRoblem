@@ -112,3 +112,4 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] Background check for new commits after every turn
 - [x] Activity pane: All / Unread, mark all as read; a row opens its review on the right tab or finding
 - [x] Unread count on the rail; end-to-end test and screenshot
+- [x] "Allow all commands" on Bash cards: one grant per review, still sandboxed (ADR 0016)

@@ -24,6 +24,7 @@ type Approval = Extract<ConversationEntry, { kind: "approval" }>;
 const DECISION_LABEL: Record<Approval["decision"], string> = {
   "allow-once": "You allowed once",
   "allow-review": "You allowed for this review",
+  "allow-all-commands": "You allowed all commands for this review",
   deny: "You denied",
   // The turn was stopped, or Claude Code withdrew the request (e.g. a newer one replaced it).
   expired: "Withdrawn before you answered",

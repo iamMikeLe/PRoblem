@@ -149,5 +149,6 @@ Single user, local machine, untrusted input (PR contents):
 | [0012](adr/0012-approval-cards-and-fix-mode.md) | Approval cards via hook "ask" + `canUseTool`; exact grants; fix mode per review |
 | [0011](adr/0011-open-in-editor.md) | Open `file:line` with an editor preset or template, split into words, no shell |
 | [0015](adr/0015-activity-feed.md) | A stored Activity feed written by the services; read state per row; unread badge |
+| [0016](adr/0016-allow-all-commands.md) | "Allow all commands" for one review: any Bash command, still in the sandbox; survives fix-mode edits |
 | [0017](adr/0017-editable-post-text.md) | The user edits each finding's text (Write / Preview) before posting; main posts exactly that text |
 | [0018](adr/0018-diff-highlighting-and-file-icons.md) | Diff highlighting with lowlight (lazy grammars, React elements), Material file icons, bundled JetBrains Mono; one file of syntax colors |
