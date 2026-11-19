@@ -726,6 +726,8 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
           message: "PRoblem closed while Claude was working. Send a message to continue.",
         });
         setStatus(review.id, "idle");
+        // Its approval cards ended with the app: their Activity rows ask for nothing any more.
+        deps.activity?.resolve(review.id, "approval");
       }
     },
 

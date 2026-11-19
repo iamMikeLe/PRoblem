@@ -25,13 +25,15 @@ Option 2, the `activity` table (migration 10):
     are answered, since it no longer asks for anything;
   - a turn finished, with the findings it added and the most severe of them; or failed, with the
     first line of its error. A stopped turn is the user's own doing and is not listed;
-  - new commits on the branch or pull request: once per new head, however often it is checked.
-    The check also runs in the background after every turn;
+  - new commits on the branch or pull request: once per new head, however often it is checked,
+    and marked read once the review is refreshed to them. The check also runs in the background
+    after a turn (see below);
   - new PR comments: newer than the newest comment already listed, told to Claude, read earlier
     in this run, or the user's own post. A discussion never seen before is not news (it is the
     first digest, ADR 0014). Times are compared as instants, since GitHub's have no
     milliseconds;
-  - a GitHub review posted, with its link.
+  - a GitHub review posted, with its link and GitHub's time of the post (the user's own comments
+    are never news, even when the local clock runs behind GitHub's).
 - **Rows** hold the review id, the kind, a JSON detail checked with zod on the way out (a row a
   later version cannot read is skipped), the time and when it was read. The newest 500 are kept.
   Closed reviews' rows leave the list.
@@ -40,12 +42,32 @@ Option 2, the `activity` table (migration 10):
   `activity:markRead` go through the dispatcher like every other channel.
 - **The UI:** the feed is the list pane, with All and Unread filters and "Mark all as read". A row
   opens its review beside the feed, on the tab or finding it is about, and is marked read. The
-  rail shows the unread count.
+  rail shows the unread count. "Mark all as read" marks the rows on screen, never one that
+  arrived in the meantime.
+
+## Review fixes (2026-11-19)
+The code, security and UI reviewers found, and these were fixed:
+- **The background check raced with Refresh.** It fetched the same refs outside the project's
+  queue, so a user's Refresh could fail with "cannot lock ref". It now runs in that queue, at most
+  once per 5 minutes and one at a time per review, and records nothing if the review was
+  refreshed or closed during the fetch.
+- **Background fetches were interactive.** Nobody asked for them, yet they could show a
+  credential or passphrase dialog and start `git gc`. They now run with
+  `GIT_TERMINAL_PROMPT=0`, `SSH_ASKPASS_REQUIRE=never`, `credential.interactive=never` and no
+  auto maintenance.
+- **The first comments on a PR that had none** were taken as already seen; they are now listed.
+- **Approval rows stayed unread after a quit**: `recover()` marks them read.
+- Reading the newest row can no longer throw into the work it serves; inserting and trimming run
+  in one transaction; ids sent to `activity:markRead` are limited in length.
+- UI: the placeholder is a `main` landmark; closing a review removes its rows at once; rows'
+  labels include the project and age; the unread dot is a Fluent `Badge`.
 
 ## Consequences
 - A new kind of event is one schema case, one `record` call and one line in the UI's description.
 - Every finished turn is a row, including answers to follow-up questions. If that is too noisy,
   rows can be grouped per review later.
-- New commits are noticed only when a check runs: after a turn, or when the Changes tab opens.
-  There is no timer.
+- New commits are noticed only when a check runs: after a turn (at most every 5 minutes per
+  review), or when the Changes tab opens. There is no timer.
+- Comments of a pending GitHub review carry their draft time; when that review is submitted
+  later, its comments can be older than the newest seen and are not listed.
 - The feed is per machine and per app data folder, like everything else.

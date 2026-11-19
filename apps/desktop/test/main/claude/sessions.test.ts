@@ -1008,6 +1008,22 @@ describe("session service", () => {
   });
 
   describe("activity", () => {
+    it("marks approval rows read at the next start: their cards ended with the app", () => {
+      const activity = createActivityService({ db, broadcast: () => {}, log: silentLogger });
+      activity.record(review.id, { kind: "approval", toolName: "Bash" });
+      db.prepare("UPDATE reviews SET status = 'needs-input' WHERE id = ?").run(review.id);
+      createSessionService({
+        db,
+        runQuery: fakeClaude(() => ({ messages: [] })).runQuery,
+        broadcast: () => {},
+        findings: createFindingsService({ db, broadcast: () => {} }),
+        claudePath: () => "/usr/local/bin/claude",
+        log: silentLogger,
+        activity,
+      }).recover();
+      expect(activity.list().map((item) => item.read)).toEqual([true]);
+    });
+
     const content = (title: string, severity: "blocker" | "major" | "minor" | "nit") => ({
       severity,
       title,

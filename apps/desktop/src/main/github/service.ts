@@ -153,15 +153,20 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     const activity = deps.activity;
     if (!activity) return;
     const previous = latest.get(reviewId);
+    const posted = activity.last(reviewId, "posted");
     const known = [
       activity.last(reviewId, "comments")?.detail.until,
-      activity.last(reviewId, "posted")?.at,
+      // GitHub's own time of the user's post when known: the local clock may run behind.
+      posted ? (posted.detail.submittedAt ?? posted.at) : undefined,
       toldAt(reviewId),
       previous ? latestCommentAt(previous) : null,
     ].filter((time): time is string => typeof time === "string");
-    if (known.length === 0) return;
+    // Never read (in this run, or told to Claude before): this is the first look, not news.
+    // Read before with no comments at all: everything now is new.
+    if (known.length === 0 && previous === undefined) return;
     // Our times and GitHub's differ in format (".000Z"), so compare instants, not strings.
-    const since = Math.max(...known.map((time) => Date.parse(time)));
+    const since =
+      known.length === 0 ? Number.NEGATIVE_INFINITY : Math.max(...known.map((t) => Date.parse(t)));
     const { count, until } = commentsSince(conversation, since);
     if (count > 0 && until !== null) activity.record(reviewId, { kind: "comments", count, until });
   }
@@ -336,10 +341,17 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
       }
       throw error;
     }
-    const parsed = z.object({ html_url: z.string() }).safeParse(answer);
+    const parsed = z
+      .object({ html_url: z.string(), submitted_at: z.string().nullish() })
+      .safeParse(answer);
     const url = parsed.success ? parsed.data.html_url : plan.pullRequest.url;
     markPosted(db, request.id, request.findings, url);
-    deps.activity?.record(request.id, { kind: "posted", findings: request.findings.length, url });
+    deps.activity?.record(request.id, {
+      kind: "posted",
+      findings: request.findings.length,
+      url,
+      submittedAt: (parsed.success ? parsed.data.submitted_at : null) ?? null,
+    });
     deps.log.info("review posted to GitHub", {
       review: request.id,
       findings: request.findings.length,

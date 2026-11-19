@@ -14,7 +14,6 @@ import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 
 import { SeverityBadge } from "../findings/FindingsTab.tsx";
 import { useSearch } from "./queries.ts";
 
-/** Where a search result leads: a review, one of its findings, or one of its changed files. */
 /** Where to take the user in a review: from search, or from an Activity row (`tab`). */
 export type SearchTarget =
   | { kind: "review"; reviewId: string }

@@ -122,6 +122,32 @@ describe("checking for new commits and refreshing a review", () => {
     ]);
   });
 
+  it("marks New commits rows read once the review is refreshed to them", async () => {
+    const review = await start("feature");
+    pushCommit("c.txt", "add c");
+    await reviews.checkUpdate(review.id);
+    expect(activity.list().map((item) => item.read)).toEqual([false]);
+    await reviews.refresh(review.id);
+    expect(activity.list().map((item) => item.read)).toEqual([true]);
+  });
+
+  it("checks in the background at most once per review in a while, and lists what it finds", async () => {
+    const review = await start("feature");
+    const latest = pushCommit("c.txt", "add c");
+    reviews.checkInBackground(review.id);
+    reviews.checkInBackground(review.id);
+    await vi.waitFor(() =>
+      expect(activity.list().map((item) => item.detail)).toEqual([
+        { kind: "commits", newCommits: 1, latestSha: latest, rewritten: false },
+      ]),
+    );
+    // Throttled: a newer head waits for a later check.
+    pushCommit("d.txt", "add d");
+    reviews.checkInBackground(review.id);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(activity.list()).toHaveLength(1);
+  });
+
   it("notices rewritten history (force-push)", async () => {
     const review = await start(PR_URL);
     git(other, "reset", "-q", "--hard", fx.mainSha);

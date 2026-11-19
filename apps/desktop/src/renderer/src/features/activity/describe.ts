@@ -29,7 +29,7 @@ export function describeActivity(detail: ActivityDetail): { title: string; summa
         title: detail.rewritten ? "History rewritten" : "New commits",
         summary: detail.rewritten
           ? "The branch was force-pushed; refresh to review the new head"
-          : `${plural(detail.newCommits, "commit")} to refresh to`,
+          : `${plural(detail.newCommits, "new commit")}; refresh to review them`,
       };
     case "comments":
       return { title: "New PR comments", summary: plural(detail.count, "new comment") };

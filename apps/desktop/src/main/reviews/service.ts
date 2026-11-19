@@ -52,7 +52,7 @@ export interface ReviewServiceDeps {
   gh: GhClient;
   log: Logger;
   /** The Activity feed: new commits found by a check (ADR 0015). */
-  activity?: Pick<ActivityService, "record" | "last">;
+  activity?: Pick<ActivityService, "record" | "last" | "resolve">;
   now?: () => Date;
 }
 
@@ -65,6 +65,12 @@ export interface ReviewService {
   branches(projectId: string): Promise<string[]>;
   /** Fetches the review's branch or pull request and compares its head (ADR 0013). */
   checkUpdate(id: string): Promise<UpdateCheck>;
+  /**
+   * The same check without anyone waiting (after a turn): in the project's queue, at most one at
+   * a time per review and once per 5 minutes, never prompting for credentials. Lists new commits
+   * in Activity; failures are only logged.
+   */
+  checkInBackground(id: string): void;
   /** Moves the review's folder to the latest head; the caller makes sure Claude is not working. */
   refresh(id: string): Promise<Review>;
 }
@@ -81,6 +87,11 @@ interface ResolvedHead {
 }
 
 const shortSha = (sha: string) => sha.slice(0, 8);
+
+/** Background checks for new commits of one review run at most this often. */
+const BACKGROUND_CHECK_MS = 5 * 60_000;
+
+type Unattended = { unattended?: boolean };
 
 export function createReviewService(deps: ReviewServiceDeps): ReviewService {
   const { db, gh, log } = deps;
@@ -104,7 +115,11 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     return project;
   }
 
-  async function resolvePullRequest(root: string, url: string): Promise<ResolvedHead> {
+  async function resolvePullRequest(
+    root: string,
+    url: string,
+    options: Unattended = {},
+  ): Promise<ResolvedHead> {
     const ref = parsePullRequestUrl(url);
     if (!ref) {
       throw new AppFailure(
@@ -123,7 +138,7 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     const info = await gh.viewPullRequest(repo, ref.number);
     // Fetch into the app's own namespace, so parallel starts never race on FETCH_HEAD.
     const target = `refs/problem/pull/${ref.number}`;
-    await fetchRefspec(root, remote.name, `+refs/pull/${ref.number}/head:${target}`);
+    await fetchRefspec(root, remote.name, `+refs/pull/${ref.number}/head:${target}`, options);
     const headSha = await resolveCommit(root, target);
     if (!headSha)
       throw new AppFailure("fetch_failed", `Could not fetch pull request #${ref.number}`);
@@ -137,10 +152,14 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     };
   }
 
-  async function resolveBranch(root: string, branch: string): Promise<ResolvedHead> {
+  async function resolveBranch(
+    root: string,
+    branch: string,
+    options: Unattended = {},
+  ): Promise<ResolvedHead> {
     await assertBranchName(root, branch);
     const remote = primaryRemote(await listRemotes(root))?.name;
-    const headSha = await resolveBranchHead(root, remote, branch);
+    const headSha = await resolveBranchHead(root, remote, branch, options);
     return {
       source: { kind: "branch", branch },
       title: branch,
@@ -341,16 +360,20 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
   }
 
   /** The review's branch or pull request as it is now on the remote. */
-  function resolveLatest(review: Review, root: string): Promise<ResolvedHead> {
+  function resolveLatest(
+    review: Review,
+    root: string,
+    options: Unattended = {},
+  ): Promise<ResolvedHead> {
     return review.source.kind === "pull-request"
-      ? resolvePullRequest(root, review.source.url)
-      : resolveBranch(root, review.source.branch);
+      ? resolvePullRequest(root, review.source.url, options)
+      : resolveBranch(root, review.source.branch, options);
   }
 
-  async function checkUpdate(id: string): Promise<UpdateCheck> {
+  async function checkUpdate(id: string, options: Unattended = {}): Promise<UpdateCheck> {
     const { review } = openRecord(id);
     const root = projectOrFail(review.projectId).path;
-    const latest = await resolveLatest(review, root);
+    const latest = await resolveLatest(review, root, options);
     if (latest.headSha === review.headSha) {
       return {
         headSha: review.headSha,
@@ -362,8 +385,15 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     }
     const rewritten = !(await isAncestor(root, review.headSha, latest.headSha));
     const { count, commits } = await commitsBetween(root, review.headSha, latest.headSha, 20);
-    // Once per new head, however often it is checked.
-    if (deps.activity && deps.activity.last(id, "commits")?.detail.latestSha !== latest.headSha) {
+    // Once per new head, however often it is checked; and not when the review was refreshed or
+    // closed while the fetch ran (the row would be about a head it already has).
+    const current = getReviewRecord(db, id);
+    const unchanged = current?.closedAt === null && current.review.headSha === review.headSha;
+    if (
+      deps.activity &&
+      unchanged &&
+      deps.activity.last(id, "commits")?.detail.latestSha !== latest.headSha
+    ) {
       deps.activity.record(id, {
         kind: "commits",
         newCommits: count,
@@ -378,6 +408,32 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
       commits,
       rewritten,
     };
+  }
+
+  /** Reviews whose background check runs, and when each last started one. */
+  const checking = new Set<string>();
+  const lastChecked = new Map<string, number>();
+
+  function checkInBackground(id: string): void {
+    const started = now().getTime();
+    if (
+      checking.has(id) ||
+      started - (lastChecked.get(id) ?? Number.NEGATIVE_INFINITY) < BACKGROUND_CHECK_MS
+    ) {
+      return;
+    }
+    let projectId: string;
+    try {
+      projectId = openRecord(id).review.projectId;
+    } catch {
+      return;
+    }
+    checking.add(id);
+    lastChecked.set(id, started);
+    // In the project's queue, so it never fetches the same refs as a Refresh, start or close.
+    serialized(projectId, () => checkUpdate(id, { unattended: true }))
+      .catch((error: unknown) => log.info("background check failed", { review: id, error }))
+      .finally(() => checking.delete(id));
   }
 
   async function refresh(id: string): Promise<Review> {
@@ -413,6 +469,8 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
         { title: latest.title, headSha: latest.headSha, baseSha, mergeBaseSha },
         now(),
       );
+      // The "New commits" rows asked for this refresh; they no longer ask for anything.
+      deps.activity?.resolve(id, "commits");
       log.info("review refreshed", {
         id,
         from: shortSha(review.headSha),
@@ -423,7 +481,8 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
   }
 
   return {
-    checkUpdate,
+    checkUpdate: (id) => checkUpdate(id),
+    checkInBackground,
     refresh,
     list: () => listOpenReviews(db),
     get(id) {

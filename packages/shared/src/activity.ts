@@ -40,6 +40,8 @@ export const ActivityDetailSchema = z.discriminatedUnion("kind", [
     kind: z.literal("posted"),
     findings: z.number().int().nonnegative(),
     url: z.string(),
+    /** GitHub's time of the post (when it said), so the user's own comments are never news. */
+    submittedAt: z.string().nullable(),
   }),
 ]);
 export type ActivityDetail = z.infer<typeof ActivityDetailSchema>;
@@ -61,6 +63,6 @@ export const ACTIVITY_MAX = 500;
 
 export const MarkActivityReadRequestSchema = z.strictObject({
   /** The rows to mark; omitted = all of them. */
-  ids: z.array(z.string().min(1)).max(ACTIVITY_MAX).optional(),
+  ids: z.array(z.string().min(1).max(64)).max(ACTIVITY_MAX).optional(),
 });
 export type MarkActivityReadRequest = z.infer<typeof MarkActivityReadRequestSchema>;

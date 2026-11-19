@@ -92,7 +92,12 @@ export async function defaultBaseBranch(root: string, remote: string | undefined
  * Fetches `refspec` from `remote`. Failures become `fetch_failed` with git's message, which names
  * the missing branch or the network problem.
  */
-export async function fetchRefspec(root: string, remote: string, refspec: string): Promise<void> {
+export async function fetchRefspec(
+  root: string,
+  remote: string,
+  refspec: string,
+  { unattended = false }: { unattended?: boolean } = {},
+): Promise<void> {
   try {
     await runGit(
       root,
@@ -108,6 +113,7 @@ export async function fetchRefspec(root: string, remote: string, refspec: string
       {
         timeoutMs: FETCH_TIMEOUT_MS,
         noHooks: true,
+        unattended,
       },
     );
   } catch (error) {
@@ -127,10 +133,16 @@ export async function resolveBranchHead(
   root: string,
   remote: string | undefined,
   branch: string,
+  options: { unattended?: boolean } = {},
 ): Promise<string> {
   if (remote) {
     try {
-      await fetchRefspec(root, remote, `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`);
+      await fetchRefspec(
+        root,
+        remote,
+        `+refs/heads/${branch}:refs/remotes/${remote}/${branch}`,
+        options,
+      );
       const sha = await resolveCommit(root, `refs/remotes/${remote}/${branch}`);
       if (sha) return sha;
     } catch (error) {

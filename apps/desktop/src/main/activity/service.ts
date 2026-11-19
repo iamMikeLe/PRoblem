@@ -26,7 +26,7 @@ export interface ActivityService {
   record(reviewId: string, detail: ActivityDetail): void;
   /** Marks a review's unread rows of a kind as read (its approvals were answered). */
   resolve(reviewId: string, kind: ActivityKind): void;
-  /** The newest row of a kind for a review, with its time. */
+  /** The newest row of a kind for a review, with its time; `undefined` also when it cannot be read. */
   last<K extends ActivityKind>(
     reviewId: string,
     kind: K,
@@ -69,6 +69,13 @@ export function createActivityService({
         log.error("could not update activity", { review: reviewId, kind, error });
       }
     },
-    last: (reviewId, kind) => lastActivity(db, reviewId, kind),
+    last(reviewId, kind) {
+      try {
+        return lastActivity(db, reviewId, kind);
+      } catch (error) {
+        log.error("could not read activity", { review: reviewId, kind, error });
+        return undefined;
+      }
+    },
   };
 }

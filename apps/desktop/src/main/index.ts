@@ -161,11 +161,7 @@ async function start(): Promise<void> {
     // After each turn, look for news to list in Activity: PR comments and new commits.
     afterTurn: (id) => {
       github.refreshInBackground(id);
-      reviews
-        .checkUpdate(id)
-        .catch((error: unknown) =>
-          log.info("could not check for new commits", { review: id, error }),
-        );
+      reviews.checkInBackground(id);
     },
   });
   sessions.recover();

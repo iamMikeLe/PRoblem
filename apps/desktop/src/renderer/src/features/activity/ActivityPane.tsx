@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   MessageBar,
   MessageBarBody,
@@ -58,19 +59,17 @@ const useStyles = makeStyles({
     alignItems: "start",
     columnGap: tokens.spacingHorizontalM,
   },
-  icon: { fontSize: "20px", marginTop: "2px" },
+  icon: { fontSize: "20px", marginTop: tokens.spacingVerticalXXS },
   approval: { color: tokens.colorStatusWarningForeground1 },
   finished: { color: tokens.colorStatusSuccessForeground1 },
   failed: { color: tokens.colorStatusDangerForeground1 },
   neutral: { color: tokens.colorBrandForeground1 },
   text: { display: "flex", flexDirection: "column", minWidth: 0 },
-  side: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" },
-  // The unread mark: a brand dot, and the headline in bold.
-  dot: {
-    width: "8px",
-    height: "8px",
-    borderRadius: tokens.borderRadiusCircular,
-    backgroundColor: tokens.colorBrandForeground1,
+  side: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: tokens.spacingVerticalSNudge,
   },
   empty: { padding: tokens.spacingHorizontalL },
   status: { margin: tokens.spacingHorizontalL },
@@ -83,6 +82,16 @@ const ICONS: Record<ActivityKind, FluentIcon> = {
   commits: BranchRegular,
   comments: CommentMultipleRegular,
   posted: SendRegular,
+};
+
+/** The icon's color: approvals warn, results succeed or fail, the rest are news. */
+const TONE: Record<ActivityKind, "approval" | "finished" | "failed" | "neutral"> = {
+  approval: "approval",
+  finished: "finished",
+  failed: "failed",
+  commits: "neutral",
+  comments: "neutral",
+  posted: "neutral",
 };
 
 type Filter = "all" | "unread";
@@ -116,15 +125,6 @@ export function ActivityPane({ selectedId, onOpen }: Props) {
     onOpen(row);
   };
 
-  const iconClass = (kind: ActivityKind) =>
-    kind === "approval"
-      ? styles.approval
-      : kind === "finished"
-        ? styles.finished
-        : kind === "failed"
-          ? styles.failed
-          : styles.neutral;
-
   return (
     <aside className={styles.root} aria-label="Activity">
       <div className={styles.header}>
@@ -136,12 +136,14 @@ export function ActivityPane({ selectedId, onOpen }: Props) {
             appearance="subtle"
             icon={<CheckmarkUnderlineCircleRegular />}
             disabledFocusable={unread === 0}
-            onClick={() => markRead.mutate(undefined)}
+            // The rows on screen only: one that arrived meanwhile was never seen.
+            onClick={() => markRead.mutate(all.filter((row) => !row.read).map((row) => row.id))}
           />
         </Tooltip>
       </div>
       <TabList
         size="small"
+        aria-label="Filter activity"
         className={styles.filters}
         selectedValue={filter}
         onTabSelect={(_event, data) => {
@@ -176,7 +178,8 @@ export function ActivityPane({ selectedId, onOpen }: Props) {
               key={row.id}
               type="button"
               aria-current={row.id === selectedId ? "true" : undefined}
-              aria-label={`${row.read ? "" : "Unread: "}${title}, ${row.reviewTitle}. ${summary}`}
+              // The unread dot and bold headline, in words; plus everything the row shows.
+              aria-label={`${row.read ? "" : "Unread: "}${title}, ${summary}. ${row.reviewTitle} · ${row.projectName}, ${formatAge(row.at)}`}
               className={mergeClasses(
                 item.item,
                 styles.row,
@@ -184,7 +187,7 @@ export function ActivityPane({ selectedId, onOpen }: Props) {
               )}
               onClick={() => open(row)}
             >
-              <Icon className={mergeClasses(styles.icon, iconClass(row.detail.kind))} />
+              <Icon className={mergeClasses(styles.icon, styles[TONE[row.detail.kind]])} />
               <span className={styles.text}>
                 <Text weight={row.read ? "regular" : "semibold"} className={item.ellipsis}>
                   {title}
@@ -200,7 +203,9 @@ export function ActivityPane({ selectedId, onOpen }: Props) {
                 <Text size={200} className={item.muted}>
                   {formatAge(row.at)}
                 </Text>
-                {!row.read && <span className={styles.dot} />}
+                {!row.read && (
+                  <Badge size="extra-small" shape="circular" color="brand" aria-hidden />
+                )}
               </span>
             </button>
           );

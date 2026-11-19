@@ -44,12 +44,13 @@ describe("Activity", () => {
     fireEvent.click(await within(rail()).findByRole("button", { name: "Activity, 2 unread" }));
     const pane = await screen.findByRole("complementary", { name: "Activity" });
     const rows = await within(pane).findAllByRole("button", { name: /Discounts|Checkout/ });
-    expect(rows.map((row) => row.getAttribute("aria-label"))).toEqual([
-      "Unread: Needs your approval, Checkout. Claude wants to use Bash",
-      "Unread: Claude finished, Discounts. 2 new findings · #4 Blocker: Discount applied twice",
-      "Claude failed, Discounts. Too many turns",
+    // The label says everything the row shows, unread in words; the age depends on the clock.
+    expect(rows.map((row) => row.getAttribute("aria-label")?.replace(/, [^,]+$/, ""))).toEqual([
+      "Unread: Needs your approval, Claude wants to use Bash. Checkout · shop",
+      "Unread: Claude finished, 2 new findings · #4 Blocker: Discount applied twice. Discounts · shop",
+      "Claude failed, Too many turns. Discounts · shop",
     ]);
-    expect(screen.getByText("Choose an activity to see its review.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "No activity selected" })).toBeTruthy();
   });
 
   it("opens a row's review on the tab it is about and marks it read", async () => {
@@ -89,7 +90,7 @@ describe("Activity", () => {
       makeActivity(
         "a1",
         r1,
-        { kind: "posted", findings: 1, url: "https://github.com/x" },
+        { kind: "posted", findings: 1, url: "https://github.com/x", submittedAt: null },
         {
           read: true,
         },
@@ -105,7 +106,7 @@ describe("Activity", () => {
 
     fireEvent.click(within(feed()).getByRole("button", { name: "Mark all as read" }));
     expect(await within(feed()).findByText("You're all caught up.")).toBeTruthy();
-    expect(api.calls).toContainEqual({ channel: "activity:markRead", input: {} });
+    expect(api.calls).toContainEqual({ channel: "activity:markRead", input: { ids: ["a2"] } });
     expect(within(rail()).getByRole("button", { name: "Activity" })).toBeTruthy();
 
     api.activity = [

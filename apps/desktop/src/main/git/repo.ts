@@ -65,7 +65,22 @@ export interface RunGitOptions {
   noHooks?: boolean;
   /** Largest output accepted, in bytes (default 1 MB); more fails with `tooMuchOutput`. */
   maxBuffer?: number;
+  /**
+   * Nobody asked for this command (a background check): never show a credential prompt or
+   * passphrase dialog, and leave repository maintenance (auto gc) to the user's own commands.
+   */
+  unattended?: boolean;
 }
+
+const UNATTENDED = [
+  "-c",
+  "credential.interactive=never",
+  "-c",
+  "maintenance.auto=false",
+  "-c",
+  "gc.auto=0",
+] as const;
+const UNATTENDED_ENV = { GIT_TERMINAL_PROMPT: "0", SSH_ASKPASS_REQUIRE: "never" } as const;
 
 /**
  * Settings for commands that touch code under review: no hooks (`core.hooksPath` pointing
@@ -87,16 +102,25 @@ const NO_HOOKS = [
 export function runGit(
   cwd: string,
   args: readonly string[],
-  { timeoutMs = GIT_TIMEOUT_MS, noHooks = false, maxBuffer = 1024 * 1024 }: RunGitOptions = {},
+  {
+    timeoutMs = GIT_TIMEOUT_MS,
+    noHooks = false,
+    maxBuffer = 1024 * 1024,
+    unattended = false,
+  }: RunGitOptions = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
       "git",
-      noHooks ? [...NO_HOOKS, ...args] : [...args],
+      [...(noHooks ? NO_HOOKS : []), ...(unattended ? UNATTENDED : []), ...args],
       {
         cwd,
-        // Git LFS would download objects from a URL the PR can set in `.lfsconfig`; keep pointers.
-        env: noHooks ? { ...gitEnv(), GIT_LFS_SKIP_SMUDGE: "1" } : gitEnv(),
+        env: {
+          ...gitEnv(),
+          // Git LFS would download objects from a URL the PR can set in `.lfsconfig`; keep pointers.
+          ...(noHooks ? { GIT_LFS_SKIP_SMUDGE: "1" } : {}),
+          ...(unattended ? UNATTENDED_ENV : {}),
+        },
         timeout: timeoutMs,
         maxBuffer,
         killSignal: "SIGKILL",

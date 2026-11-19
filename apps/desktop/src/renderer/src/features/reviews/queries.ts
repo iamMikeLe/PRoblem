@@ -1,6 +1,7 @@
 import type { CreateReviewRequest, Review } from "@problem/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api.ts";
+import { activityKey } from "../activity/queries.ts";
 
 export const reviewsKey = ["reviews"] as const;
 
@@ -20,7 +21,12 @@ export function useCloseReview() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.reviews.close(id),
-    onSuccess: () => client.invalidateQueries({ queryKey: reviewsKey }),
+    // A closed review's Activity rows leave the feed.
+    onSuccess: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: reviewsKey }),
+        client.invalidateQueries({ queryKey: activityKey }),
+      ]),
   });
 }
 

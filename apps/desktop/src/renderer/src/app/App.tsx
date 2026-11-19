@@ -1,6 +1,7 @@
 import {
   makeStyles,
   mergeClasses,
+  Subtitle1,
   Text,
   Toast,
   ToastBody,
@@ -57,10 +58,18 @@ const useStyles = makeStyles({
   listArea: { gridArea: "list" },
   mainArea: { gridArea: "main" },
   wideArea: { gridColumn: "2 / -1", gridRow: 2 },
-  placeholder: {
-    gridArea: "main",
-    display: "grid",
-    placeItems: "center",
+  // Where a lazy list pane's loading rows go, looking like the pane they stand for.
+  listFallback: {
+    height: "100%",
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderRight: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+  },
+  placeholder: { gridArea: "main", display: "grid", placeItems: "center" },
+  welcome: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: tokens.spacingVerticalS,
     color: tokens.colorNeutralForeground3,
   },
 });
@@ -153,7 +162,13 @@ export function App() {
       {section === "activity" ? (
         <>
           <ErrorBoundary what="Activity" className={styles.listArea}>
-            <Suspense fallback={<LoadingRows label="Loading activity" />}>
+            <Suspense
+              fallback={
+                <div className={styles.listFallback}>
+                  <LoadingRows label="Loading activity" />
+                </div>
+              }
+            >
               <ActivityPane
                 selectedId={activityRow?.id}
                 onOpen={(row) => {
@@ -173,15 +188,24 @@ export function App() {
               <MainPane review={activityReview} focus={focus} onClosed={reviewClosed} />
             </ErrorBoundary>
           ) : (
-            <div className={styles.placeholder}>
-              <Text>Choose an activity to see its review.</Text>
-            </div>
+            <main className={styles.placeholder}>
+              <div className={styles.welcome}>
+                <Subtitle1 as="h2">No activity selected</Subtitle1>
+                <Text>Choose an activity to see its review.</Text>
+              </div>
+            </main>
           )}
         </>
       ) : section === "projects" ? (
         <>
           <ErrorBoundary what="The project list" className={styles.listArea}>
-            <Suspense fallback={<LoadingRows label="Loading projects" />}>
+            <Suspense
+              fallback={
+                <div className={styles.listFallback}>
+                  <LoadingRows label="Loading projects" />
+                </div>
+              }
+            >
               <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
             </Suspense>
           </ErrorBoundary>

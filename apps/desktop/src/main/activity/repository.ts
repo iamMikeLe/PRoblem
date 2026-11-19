@@ -39,13 +39,27 @@ export function insertActivity(
   now: Date,
   max = ACTIVITY_MAX,
 ): void {
-  db.prepare(
-    "INSERT INTO activity (id, review_id, kind, detail, at, read_at) VALUES (?, ?, ?, ?, ?, NULL)",
-  ).run(randomUUID(), reviewId, detail.kind, JSON.stringify(detail), now.toISOString());
-  // Keep the newest rows only.
-  db.prepare(
-    "DELETE FROM activity WHERE id NOT IN (SELECT id FROM activity ORDER BY at DESC, rowid DESC LIMIT ?)",
-  ).run(max);
+  inTransaction(db, () => {
+    db.prepare(
+      "INSERT INTO activity (id, review_id, kind, detail, at, read_at) VALUES (?, ?, ?, ?, ?, NULL)",
+    ).run(randomUUID(), reviewId, detail.kind, JSON.stringify(detail), now.toISOString());
+    // Keep the newest rows only.
+    db.prepare(
+      "DELETE FROM activity WHERE id NOT IN (SELECT id FROM activity ORDER BY at DESC, rowid DESC LIMIT ?)",
+    ).run(max);
+  });
+}
+
+function inTransaction<T>(db: DatabaseSync, work: () => T): T {
+  db.exec("BEGIN");
+  try {
+    const result = work();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 /** Rows of open reviews, newest first. */
@@ -92,9 +106,9 @@ export function markActivityRead(
     );
   }
   const mark = db.prepare("UPDATE activity SET read_at = ? WHERE id = ? AND read_at IS NULL");
-  let changed = 0;
-  for (const id of ids) changed += Number(mark.run(at, id).changes);
-  return changed;
+  return inTransaction(db, () =>
+    ids.reduce((changed, id) => changed + Number(mark.run(at, id).changes), 0),
+  );
 }
 
 /** Marks a review's unread rows of one kind as read (e.g. its approvals, once answered). */

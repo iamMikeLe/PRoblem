@@ -298,6 +298,23 @@ describe("GitHub service", () => {
     ]);
   });
 
+  it("lists the first comments on a pull request that had none when it was read", async () => {
+    addReview("r1", prSource);
+    const empty = structuredClone(answer());
+    empty.data.repository.pullRequest.reviewThreads.nodes = [];
+    empty.data.repository.pullRequest.comments.nodes = [];
+    empty.data.repository.pullRequest.reviews.nodes = [];
+    graphqlAnswer = empty;
+    await github.conversation("r1");
+    expect(activity.list()).toEqual([]);
+
+    graphqlAnswer = answer();
+    await github.conversation("r1");
+    expect(activity.list().map((item) => item.detail)).toEqual([
+      { kind: "comments", count: 4, until: "2026-11-18T09:30:00Z" },
+    ]);
+  });
+
   it("does not stop a review from starting when GitHub cannot be read", async () => {
     gh.graphql.mockRejectedValue(new Error("offline"));
     expect(await github.firstDigest(addReview("r1", prSource))).toBeUndefined();
@@ -356,8 +373,9 @@ describe("GitHub service", () => {
       });
       expect(result).toEqual({ url: `${PR_URL}#pullrequestreview-1` });
       expect(activity.list().map((item) => item.detail)).toEqual([
-        { kind: "posted", findings: 2, url: `${PR_URL}#pullrequestreview-1` },
+        { kind: "posted", findings: 2, url: `${PR_URL}#pullrequestreview-1`, submittedAt: null },
       ]);
+
       expect(gh.postReview).toHaveBeenCalledWith("acme/payments", 7, {
         commit_id: SHA("a"),
         event: "REQUEST_CHANGES",
@@ -377,6 +395,20 @@ describe("GitHub service", () => {
         postedUrl: `${PR_URL}#pullrequestreview-1`,
         selected: false,
       });
+    });
+
+    it("never lists the user's own post as new comments, even when GitHub's clock is ahead", async () => {
+      await github.conversation("r1");
+      gh.postReview.mockResolvedValue({
+        html_url: `${PR_URL}#pullrequestreview-2`,
+        submitted_at: "2099-01-01T00:00:00Z",
+      });
+      await github.post({ id: "r1", event: "COMMENT", body: "", findings: [1] });
+      graphqlAnswer = answer({
+        comments: [comment("MINE", "me", "My finding", "2099-01-01T00:00:00Z")],
+      });
+      await github.conversation("r1");
+      expect(activity.list().map((item) => item.detail.kind)).toEqual(["posted"]);
     });
 
     it("never posts a finding twice, and marks a post GitHub did not confirm as posted", async () => {

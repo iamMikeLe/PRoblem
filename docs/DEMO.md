@@ -154,7 +154,7 @@ The `.claude/` folder turns Claude Code into a team that follows this project's 
   - A tool that slipped past the hook stops the turn.
   - The renderer is sandboxed with a strict CSP.
 - **How is it tested?**
-  - 349 unit and component tests (Vitest; main process in Node, UI in jsdom).
+  - 354 unit and component tests (Vitest; main process in Node, UI in jsdom).
   - Git code is tested on real repositories.
   - One Playwright end-to-end test drives the built app with a scripted Claude that goes through
     the real permission hook.
