@@ -9,11 +9,11 @@ import {
   makeStyles,
   tokens,
 } from "@fluentui/react-components";
-import { MOD_LABEL } from "../lib/shortcuts.ts";
+import { ALT_LABEL, MOD_LABEL } from "../lib/shortcuts.ts";
 
 const SHORTCUTS: readonly { keys: readonly string[]; what: string }[] = [
   { keys: [`${MOD_LABEL}K`], what: "Search reviews, findings and files" },
-  { keys: ["Alt+↓", "Alt+↑"], what: "Next or previous review" },
+  { keys: [`${ALT_LABEL}↓`, `${ALT_LABEL}↑`], what: "Next or previous review" },
   { keys: ["1", "2", "3", "4"], what: "Conversation, Findings, Changes, PR comments" },
   { keys: ["J", "K"], what: "Next or previous finding (Findings tab)" },
   { keys: ["R"], what: "Reply: focus the message box" },

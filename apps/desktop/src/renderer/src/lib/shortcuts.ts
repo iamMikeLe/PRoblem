@@ -6,7 +6,9 @@ import { useEffect, useRef } from "react";
  */
 export type Bindings = Readonly<Record<string, () => void>>;
 
-export const MOD_LABEL = window.problem?.platform === "darwin" ? "⌘" : "Ctrl+";
+const MAC = window.problem?.platform === "darwin";
+export const MOD_LABEL = MAC ? "⌘" : "Ctrl+";
+export const ALT_LABEL = MAC ? "⌥" : "Alt+";
 
 /** The combo a key press spells, in the form the bindings use. */
 export function comboOf(event: KeyboardEvent): string {
