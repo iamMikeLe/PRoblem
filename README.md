@@ -7,7 +7,8 @@ branches and pull requests, many at once and across several repositories. Each r
 live conversation and a numbered list of findings you can triage. The UI is laid out like
 Microsoft Teams, in its dark theme.
 
-> Status: **Phases 1–8 done** (projects through polish); Phase 9 (showcase) in progress. See
+> Status: **Phases 1–8 and 10 done** (projects through polish, and Activity); Phase 9 (showcase)
+> in progress. See
 > [the roadmap](docs/ROADMAP.md).
 
 ![PRoblem: start a review, triage what Claude found, read the diff, search](docs/demo.gif)
@@ -17,6 +18,8 @@ Microsoft Teams, in its dark theme.
 | ![Conversation](docs/screenshots/conversation.png) | ![Findings](docs/screenshots/findings.png) |
 | **The change, file by file** | **Search everything (⌘K)** |
 | ![Changes](docs/screenshots/changes.png) | ![Search](docs/screenshots/search.png) |
+| **Activity: what finished, failed or needs you** | **The Teams light theme** |
+| ![Activity](docs/screenshots/activity.png) | ![Light theme](docs/screenshots/light.png) |
 
 The screenshots come from the end-to-end test with a scripted Claude, so they show the real app.
 Refresh them with `PROBLEM_SCREENSHOTS="$PWD/docs/screenshots" pnpm e2e`, and the GIF with
@@ -35,6 +38,8 @@ review its own room:
   accept, dismiss or ask about each one.
 - **Safe by default**: Claude is read-only; anything else asks for approval in the review.
 - **Git host integration**: read PR comments and post findings to GitHub, only when you click.
+- **Activity**: one feed of what finished, failed, needs your approval, or got new commits or
+  comments, across every review, with an unread count.
 
 ## Tech stack
 

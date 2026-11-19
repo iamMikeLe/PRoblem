@@ -105,3 +105,10 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] `/demo-prep` → `docs/DEMO.md`
 - [ ] Rehearse the demo
 - [ ] Code signing and notarization for macOS; auto-update
+
+## Phase 10: Activity
+
+- [x] `activity` table and service: approvals asked, turns finished (with new findings) or failed, new commits, new PR comments, posted reviews (ADR 0015)
+- [x] Background check for new commits after every turn
+- [x] Activity pane: All / Unread, mark all as read; a row opens its review on the right tab or finding
+- [x] Unread count on the rail; end-to-end test and screenshot

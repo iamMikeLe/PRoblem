@@ -12,7 +12,7 @@ PR link, many at once and across repositories. Each review keeps its own live co
 list of numbered findings that you accept, dismiss or ask about. Claude is read-only unless you
 approve more. Nothing reaches GitHub until you click Post.
 
-## 2. Demo script (5 minutes)
+## 2. Demo script (5½ minutes)
 
 Before you start:
 
@@ -51,8 +51,12 @@ Before you start:
    - Post it, then show it on GitHub. Say: "Nothing is written to GitHub without this click."
 8. **Find anything (20 s).** Press `⌘K` and type a word. Results come from every open review's
    titles, findings and changed files. Press Enter to jump to the result.
-9. **Close (10 s).** Close a review: its worktree is removed. Then show the theme switch in
-   Settings.
+9. **Activity (20 s).** Click Activity on the rail: the badge counts what you haven't seen.
+   - Rows say what finished (with its new findings), failed, waits for approval, or got new
+     commits or PR comments, across every review.
+   - Click a row: its review opens beside the feed, on the finding or tab it is about.
+10. **Close (10 s).** Close a review: its worktree is removed. Then show the theme switch in
+    Settings.
 
 If Claude is slow or offline, the screenshots in the README come from the end-to-end test
 (`pnpm e2e`), which drives the real app with a scripted Claude.
@@ -102,6 +106,7 @@ Three places worth opening:
 | 0012 | Approval cards, "Allow for this review" by exact match, fix mode, OS sandbox | Safe by default, at the cost of more clicks when fixing |
 | 0013 | Own diff parser; compare merge base with head, commits only | No new dependency; findings point at head lines and are re-checked after a refresh |
 | 0014 | `gh` for reading the discussion and posting a review | Reuses the user's GitHub login; long discussions are truncated, and the UI says so |
+| 0015 | A stored Activity feed written by the services, not derived from other tables | Read state and events with no history of their own (commits, comments); one more table and a call at each source |
 
 ## 5. How I work with Claude Code
 
@@ -149,7 +154,7 @@ The `.claude/` folder turns Claude Code into a team that follows this project's 
   - A tool that slipped past the hook stops the turn.
   - The renderer is sandboxed with a strict CSP.
 - **How is it tested?**
-  - 335 unit and component tests (Vitest; main process in Node, UI in jsdom).
+  - 349 unit and component tests (Vitest; main process in Node, UI in jsdom).
   - Git code is tested on real repositories.
   - One Playwright end-to-end test drives the built app with a scripted Claude that goes through
     the real permission hook.
@@ -166,7 +171,6 @@ The `.claude/` folder turns Claude Code into a team that follows this project's 
   - Signed and notarized macOS builds with auto-update.
   - A packaged `.dmg` checked on a clean machine.
   - Bitbucket Cloud.
-  - The Activity section: its rail item is a placeholder today.
 - **What did Claude Code do, and what did you do?**
   - I set the product, the rules and the reviews; Claude implemented within them.
   - Every phase went through a plan, tests, `pnpm verify` and the reviewer agents.
