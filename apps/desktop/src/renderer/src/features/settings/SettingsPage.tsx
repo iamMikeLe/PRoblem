@@ -23,6 +23,7 @@ import {
   UpdateSettingsRequestSchema,
 } from "@problem/shared";
 import { useState } from "react";
+import { THEMES, ThemeNameSchema, useTheme } from "../../lib/theme.ts";
 import { useSettings, useUpdateSettings } from "./queries.ts";
 
 const useStyles = makeStyles({
@@ -45,7 +46,7 @@ const useStyles = makeStyles({
   actions: { display: "flex", gap: tokens.spacingHorizontalS, alignItems: "center" },
 });
 
-/** App-wide settings. Today: which editor opens `file:line` links. */
+/** App-wide settings: the theme, and which editor opens `file:line` links. */
 export function SettingsPage() {
   const styles = useStyles();
   const settings = useSettings();
@@ -53,6 +54,7 @@ export function SettingsPage() {
     <main className={styles.root}>
       <div className={styles.column}>
         <Subtitle1 as="h2">Settings</Subtitle1>
+        <AppearanceSettings />
         {settings.error && (
           <MessageBar intent="error">
             <MessageBarBody>Could not load the settings: {settings.error.message}</MessageBarBody>
@@ -62,6 +64,32 @@ export function SettingsPage() {
         {settings.data && <EditorSettings saved={settings.data} />}
       </div>
     </main>
+  );
+}
+
+/** Applies at once and is remembered on this machine. */
+function AppearanceSettings() {
+  const styles = useStyles();
+  const name = useTheme((state) => state.name);
+  const setTheme = useTheme((state) => state.setTheme);
+  return (
+    <section className={styles.section} aria-labelledby="theme-heading">
+      <Subtitle2 as="h3" id="theme-heading">
+        Theme
+      </Subtitle2>
+      <RadioGroup
+        aria-labelledby="theme-heading"
+        value={name}
+        onChange={(_, data) => {
+          const value = ThemeNameSchema.safeParse(data.value);
+          if (value.success) setTheme(value.data);
+        }}
+      >
+        {ThemeNameSchema.options.map((option) => (
+          <Radio key={option} value={option} label={THEMES[option].label} />
+        ))}
+      </RadioGroup>
+    </section>
   );
 }
 

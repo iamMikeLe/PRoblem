@@ -6,6 +6,7 @@ body,
 }
 
 body {
+  /* Teams dark until the chosen theme paints (ThemedProvider sets it). */
   background: #1f1f1f;
   overflow: hidden;
 }
