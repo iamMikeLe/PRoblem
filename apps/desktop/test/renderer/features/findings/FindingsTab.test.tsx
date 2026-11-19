@@ -133,6 +133,88 @@ describe("Findings tab", () => {
     expect(document.activeElement).toBe(box);
   });
 
+  it("shows the detail as a titled header with sections for problem, steps and suggestion", async () => {
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    api.findings.r1 = [
+      makeFinding("r1", 3, {
+        title: "Retries never stop",
+        line: 42,
+        reproduction: "1. Stop the server.\n2. Call `pay()`.",
+        verdict: "accepted",
+      }),
+    ];
+    renderApp();
+    fireEvent.click(await screen.findByRole("tab", { name: /Findings/ }));
+    fireEvent.click(await screen.findByRole("tab", { name: /^Accepted/ }));
+    const grid = await screen.findByRole("grid", { name: "Findings" });
+    fireEvent.click(rowOf(grid, "Retries never stop"));
+    const detail = await screen.findByRole("region", { name: "Finding #3" });
+
+    expect(within(detail).getByRole("heading", { level: 3 }).textContent).toBe(
+      "#3Retries never stop",
+    );
+    expect(
+      within(detail)
+        .getAllByRole("heading", { level: 4 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Problem", "How to reproduce", "Suggestion"]);
+    const steps = within(detail).getByRole("region", { name: "How to reproduce" });
+    expect(within(steps).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(steps).getByText("pay()").tagName).toBe("CODE");
+    expect(within(detail).queryByRole("button", { name: "Ask Claude for steps" })).toBeNull();
+    expect(within(detail).getByText("Accepted")).toBeTruthy();
+
+    // The location chip opens the editor.
+    fireEvent.click(within(detail).getByRole("button", { name: "src/app.ts:42" }));
+    await waitFor(() =>
+      expect(api.calls.find((call) => call.channel === "editor:open")?.input).toEqual({
+        id: "r1",
+        file: "src/app.ts",
+        line: 42,
+      }),
+    );
+  });
+
+  it("without steps, offers to ask Claude for them in the composer", async () => {
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    api.findings.r1 = [makeFinding("r1", 2, { title: "Retries never stop", reproduction: " " })];
+    useDrafts.setState({ drafts: { r1: "Also check the timeout." } });
+    const grid = await openFindings();
+
+    fireEvent.click(rowOf(grid, "Retries never stop"));
+    const steps = await screen.findByRole("region", { name: "How to reproduce" });
+    expect(within(steps).getByText("No steps yet.")).toBeTruthy();
+    fireEvent.click(within(steps).getByRole("button", { name: "Ask Claude for steps" }));
+
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    const request =
+      "Please add numbered steps to reproduce #2 (Retries never stop), with the expected and " +
+      "the actual result. Save them by updating finding #2 with report_findings.";
+    // What the user had typed stays, below the request.
+    expect((box as HTMLTextAreaElement).value).toBe(`${request}\n\nAlso check the timeout.`);
+    expect(document.activeElement).toBe(box);
+  });
+
+  it("resizes the detail from the keyboard: up grows it, down shrinks it", async () => {
+    window.localStorage.clear();
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    api.findings.r1 = [makeFinding("r1", 1, { title: "Retries never stop" })];
+    const grid = await openFindings();
+    fireEvent.click(rowOf(grid, "Retries never stop"));
+
+    const handle = await screen.findByRole("separator", { name: "Resize the finding details" });
+    expect(handle.getAttribute("aria-orientation")).toBe("horizontal");
+    expect(handle.getAttribute("aria-valuenow")).toBe("380");
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("396");
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("364");
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("160");
+    window.localStorage.clear();
+  });
+
   it("focuses the composer only once after Ask, not on later review switches", async () => {
     const api = stubBridge([project], [makeReview("r1", project), makeReview("r2", project)]);
     api.findings.r1 = [makeFinding("r1", 2, { title: "Retries never stop" })];

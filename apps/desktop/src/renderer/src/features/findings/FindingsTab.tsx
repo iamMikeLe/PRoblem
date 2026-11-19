@@ -1,5 +1,7 @@
 import {
   Badge,
+  Body1,
+  Body1Strong,
   Button,
   Caption1,
   createTableColumn,
@@ -18,18 +20,26 @@ import {
   TabList,
   type TableColumnDefinition,
   Text,
+  Tooltip,
   tokens,
 } from "@fluentui/react-components";
 import {
   ArrowUndoRegular,
+  BugRegular,
   ChatRegular,
   CheckmarkRegular,
   DismissCircleRegular,
+  DocumentRegular,
+  LightbulbRegular,
   SendRegular,
+  SparkleRegular,
+  TextNumberListLtrRegular,
 } from "@fluentui/react-icons";
 import type { Finding, Severity, Verdict } from "@problem/shared";
-import { useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { LoadingRows } from "../../app/LoadingRows.tsx";
+import { type PanelLimits, usePanel } from "../../lib/panel.ts";
+import { ResizeHandle } from "../../lib/ResizeHandle.tsx";
 import { useShortcuts } from "../../lib/shortcuts.ts";
 import { Markdown } from "../conversation/Markdown.tsx";
 import { useFindings, useOpenInEditor, useSetVerdict } from "./queries.ts";
@@ -69,12 +79,32 @@ const VERDICT_LABEL: Record<Verdict, string> = {
   dismissed: "Dismissed",
 };
 
+const VERDICT_COLOR: Record<Verdict | "withdrawn", "brand" | "success" | "subtle" | "informative"> =
+  {
+    open: "brand",
+    accepted: "success",
+    dismissed: "subtle",
+    withdrawn: "informative",
+  };
+
+/** The detail panel's height; it shrinks below this when the tab is short, the list keeps room. */
+export const DETAIL_LIMITS: PanelLimits = { initial: 380, min: 160, max: 1200 };
+
+/** What "Ask Claude for steps" puts in the composer. */
+export function stepsRequest(finding: Finding): string {
+  return (
+    `Please add numbered steps to reproduce #${finding.number} (${finding.title}), ` +
+    `with the expected and the actual result. Save them by updating finding #${finding.number} ` +
+    "with report_findings."
+  );
+}
+
 const useStyles = makeStyles({
   root: {
-    display: "grid",
-    gridTemplateRows: "auto minmax(0, 1fr) auto",
-    gridTemplateColumns: "minmax(0, 1fr)",
+    display: "flex",
+    flexDirection: "column",
     minHeight: 0,
+    minWidth: 0,
   },
   post: { marginInlineStart: "auto" },
   toolbar: {
@@ -84,7 +114,8 @@ const useStyles = makeStyles({
     padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalL}`,
     borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
   },
-  list: { overflowY: "auto", minHeight: 0 },
+  // The list keeps room for a few rows however tall the detail is.
+  list: { overflowY: "auto", flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: "120px" },
   number: { fontFamily: tokens.fontFamilyMonospace, color: tokens.colorNeutralForeground3 },
   title: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   location: {
@@ -100,25 +131,126 @@ const useStyles = makeStyles({
     padding: tokens.spacingVerticalXXL,
     color: tokens.colorNeutralForeground3,
   },
+  // Its height comes from the resize handle (flex-basis); it gives way before the list does.
   detail: {
     display: "flex",
     flexDirection: "column",
-    gap: tokens.spacingVerticalS,
-    maxHeight: "45vh",
-    overflowY: "auto",
-    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
-    borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
-    backgroundColor: tokens.colorNeutralBackground2,
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: "160px",
+    borderTop: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke1}`,
+    // The body sits on the main background, like the conversation, so markdown reads the same.
+    backgroundColor: tokens.colorNeutralBackground1,
   },
+  // Header: what it is (left) and what to do with it (right). It stays put while the body
+  // scrolls; the actions wrap below the title when the pane is narrow.
   detailHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    columnGap: tokens.spacingHorizontalL,
+    rowGap: tokens.spacingVerticalS,
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalXL}`,
+    backgroundColor: tokens.colorNeutralBackground2,
+    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+  },
+  summary: {
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalS,
+    flexGrow: 1,
+    flexBasis: "320px",
+    minWidth: 0,
+  },
+  headline: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    minWidth: 0,
+  },
+  heading: {
+    minWidth: 0,
+    margin: 0,
+    display: "flex",
+    alignItems: "baseline",
+    gap: tokens.spacingHorizontalS,
+  },
+  headingNumber: {
+    fontFamily: tokens.fontFamilyMonospace,
+    color: tokens.colorNeutralForeground3,
+    fontWeight: tokens.fontWeightRegular,
+  },
+  meta: {
     display: "flex",
     alignItems: "center",
     gap: tokens.spacingHorizontalS,
     flexWrap: "wrap",
   },
-  actions: { display: "flex", gap: tokens.spacingHorizontalS, flexWrap: "wrap" },
+  chip: {
+    fontFamily: tokens.fontFamilyMonospace,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightRegular,
+    minWidth: 0,
+    maxWidth: "100%",
+    paddingInline: tokens.spacingHorizontalS,
+    backgroundColor: tokens.colorNeutralBackground3,
+    borderRadius: tokens.borderRadiusMedium,
+  },
+  chipText: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  actions: {
+    display: "flex",
+    gap: tokens.spacingHorizontalS,
+    flexWrap: "wrap",
+  },
+  body: {
+    flexGrow: 1,
+    minHeight: 0,
+    overflowY: "auto",
+    padding: `${tokens.spacingVerticalL} ${tokens.spacingHorizontalXL} ${tokens.spacingVerticalXXL}`,
+  },
+  // A comfortable line length for prose; code blocks scroll inside it.
+  column: {
+    display: "flex",
+    flexDirection: "column",
+    gap: tokens.spacingVerticalXXL,
+    maxWidth: "860px",
+  },
+  part: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalS, minWidth: 0 },
+  partHeading: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalS,
+    margin: 0,
+    color: tokens.colorNeutralForeground2,
+    paddingBottom: tokens.spacingVerticalXS,
+    borderBottom: `${tokens.strokeWidthThin} solid ${tokens.colorNeutralStroke2}`,
+  },
+  partIcon: { fontSize: tokens.fontSizeBase400, color: tokens.colorNeutralForeground3 },
+  noSteps: {
+    display: "flex",
+    alignItems: "center",
+    gap: tokens.spacingHorizontalM,
+    flexWrap: "wrap",
+  },
   muted: { color: tokens.colorNeutralForeground3 },
 });
+
+/** One titled part of the detail: Problem, How to reproduce, Suggestion. */
+function Part({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  const styles = useStyles();
+  const id = useId();
+  return (
+    <section className={styles.part} aria-labelledby={id}>
+      <Body1Strong as="h4" id={id} className={styles.partHeading}>
+        <span className={styles.partIcon} aria-hidden>
+          {icon}
+        </span>
+        {title}
+      </Body1Strong>
+      {children}
+    </section>
+  );
+}
 
 export function SeverityBadge({ severity }: { severity: Severity }) {
   const { label, color } = SEVERITY[severity];
@@ -142,8 +274,11 @@ const location = (finding: Finding): string | null =>
 
 interface Props {
   reviewId: string;
-  /** "Ask about #N": prefill the composer and switch to the conversation. */
-  onAsk: (finding: Finding) => void;
+  /**
+   * "Ask about #N": prefill the composer and switch to the conversation. With `request`, the
+   * composer starts with that text instead of "About #N (title): ".
+   */
+  onAsk: (finding: Finding, request?: string) => void;
   /** Open with this finding selected (from the Changes tab). */
   initialSelected?: number | undefined;
   /** Opens the "post to GitHub" preview. */
@@ -161,6 +296,7 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
     initialSelected === undefined ? "open" : "all",
   );
   const [selected, setSelected] = useState<number | undefined>(initialSelected);
+  const detailPanel = usePanel("findings.detail", DETAIL_LIMITS);
 
   const all = findings.data ?? [];
   const shown = all
@@ -323,60 +459,126 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
       </div>
 
       {current && (
-        <section className={styles.detail} aria-label={`Finding #${current.number}`}>
-          <div className={styles.detailHeader}>
-            <SeverityBadge severity={current.severity} />
-            <Subtitle2 as="h3">
-              #{current.number} {current.title}
-            </Subtitle2>
-            <Caption1 className={styles.muted}>
-              {location(current) ?? "Whole change"} · {verdictText(current)}
-            </Caption1>
-          </div>
-          {current.changedSinceVerdict && (
-            <MessageBar intent="warning">
-              <MessageBarBody>Claude changed this finding after your verdict.</MessageBarBody>
-            </MessageBar>
-          )}
-          {current.withdrawnReason !== null && (
-            <MessageBar intent="info">
-              <MessageBarBody>Withdrawn by Claude: {current.withdrawnReason}</MessageBarBody>
-            </MessageBar>
-          )}
-          <Markdown text={current.problem} />
-          {current.reproduction.trim() !== "" && (
-            <>
-              <Text weight="semibold">How to reproduce</Text>
-              <Markdown text={current.reproduction} />
-            </>
-          )}
-          {current.suggestion.trim() !== "" && (
-            <>
-              <Text weight="semibold">Suggestion</Text>
-              <Markdown text={current.suggestion} />
-            </>
-          )}
-          <div className={styles.actions}>
-            {current.verdict !== "accepted" && (
-              <Button icon={<CheckmarkRegular />} onClick={() => decide(current, "accepted")}>
-                Accept
-              </Button>
-            )}
-            {current.verdict !== "dismissed" && (
-              <Button icon={<DismissCircleRegular />} onClick={() => decide(current, "dismissed")}>
-                Dismiss
-              </Button>
-            )}
-            {current.verdict !== "open" && (
-              <Button icon={<ArrowUndoRegular />} onClick={() => decide(current, "open")}>
-                Reopen
-              </Button>
-            )}
-            <Button appearance="primary" icon={<ChatRegular />} onClick={() => onAsk(current)}>
-              Ask about #{current.number}
-            </Button>
-          </div>
-        </section>
+        <>
+          <ResizeHandle
+            label="Resize the finding details"
+            orientation="horizontal"
+            width={detailPanel.width}
+            limits={DETAIL_LIMITS}
+            onWidth={detailPanel.setWidth}
+          />
+          <section
+            className={styles.detail}
+            style={{ flexBasis: `${detailPanel.width}px` }}
+            aria-label={`Finding #${current.number}`}
+          >
+            <header className={styles.detailHeader}>
+              <div className={styles.summary}>
+                <div className={styles.headline}>
+                  <SeverityBadge severity={current.severity} />
+                  <Subtitle2 as="h3" className={styles.heading}>
+                    <span className={styles.headingNumber}>#{current.number}</span>
+                    <span>{current.title}</span>
+                  </Subtitle2>
+                </div>
+                <div className={styles.meta}>
+                  {location(current) === null ? (
+                    <Caption1 className={styles.muted}>Whole change</Caption1>
+                  ) : (
+                    <Tooltip content="Open in your editor" relationship="description">
+                      <Button
+                        className={styles.chip}
+                        size="small"
+                        appearance="subtle"
+                        icon={<DocumentRegular />}
+                        onClick={() => open(current)}
+                      >
+                        <span className={styles.chipText}>{location(current)}</span>
+                      </Button>
+                    </Tooltip>
+                  )}
+                  <Badge
+                    appearance="outline"
+                    shape="rounded"
+                    color={
+                      VERDICT_COLOR[
+                        current.withdrawnReason !== null ? "withdrawn" : current.verdict
+                      ]
+                    }
+                  >
+                    {verdictText(current)}
+                  </Badge>
+                  {current.postedUrl && (
+                    <Badge appearance="tint" shape="rounded" color="informative">
+                      Posted
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <div className={styles.actions}>
+                {current.verdict !== "accepted" && (
+                  <Button icon={<CheckmarkRegular />} onClick={() => decide(current, "accepted")}>
+                    Accept
+                  </Button>
+                )}
+                {current.verdict !== "dismissed" && (
+                  <Button
+                    icon={<DismissCircleRegular />}
+                    onClick={() => decide(current, "dismissed")}
+                  >
+                    Dismiss
+                  </Button>
+                )}
+                {current.verdict !== "open" && (
+                  <Button icon={<ArrowUndoRegular />} onClick={() => decide(current, "open")}>
+                    Reopen
+                  </Button>
+                )}
+                <Button appearance="primary" icon={<ChatRegular />} onClick={() => onAsk(current)}>
+                  Ask about #{current.number}
+                </Button>
+              </div>
+            </header>
+            <div className={styles.body}>
+              <div className={styles.column}>
+                {current.changedSinceVerdict && (
+                  <MessageBar intent="warning">
+                    <MessageBarBody>Claude changed this finding after your verdict.</MessageBarBody>
+                  </MessageBar>
+                )}
+                {current.withdrawnReason !== null && (
+                  <MessageBar intent="info">
+                    <MessageBarBody>Withdrawn by Claude: {current.withdrawnReason}</MessageBarBody>
+                  </MessageBar>
+                )}
+                <Part icon={<BugRegular />} title="Problem">
+                  <Markdown text={current.problem} />
+                </Part>
+                <Part icon={<TextNumberListLtrRegular />} title="How to reproduce">
+                  {current.reproduction.trim() !== "" ? (
+                    <Markdown text={current.reproduction} />
+                  ) : (
+                    <div className={styles.noSteps}>
+                      <Body1 className={styles.muted}>No steps yet.</Body1>
+                      <Button
+                        size="small"
+                        icon={<SparkleRegular />}
+                        onClick={() => onAsk(current, stepsRequest(current))}
+                      >
+                        Ask Claude for steps
+                      </Button>
+                    </div>
+                  )}
+                </Part>
+                {current.suggestion.trim() !== "" && (
+                  <Part icon={<LightbulbRegular />} title="Suggestion">
+                    <Markdown text={current.suggestion} />
+                  </Part>
+                )}
+              </div>
+            </div>
+          </section>
+        </>
       )}
     </div>
   );
