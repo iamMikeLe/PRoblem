@@ -55,5 +55,12 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), contentSecurityPolicy()],
+    build: {
+      // electron-vite leaves output unminified; the window loads (and parses) less this way.
+      minify: true,
+      // Fluent and React (~870 kB) load from disk at startup; the web-download default (500 kB)
+      // would warn on every build without pointing at anything to fix.
+      chunkSizeWarningLimit: 1000,
+    },
   },
 });

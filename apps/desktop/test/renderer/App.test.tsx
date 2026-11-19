@@ -78,7 +78,7 @@ describe("App shell", () => {
     renderApp();
     expect(await screen.findByText("Add a project to start reviewing.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Add project" }));
-    expect(screen.getByRole("complementary", { name: "Projects" })).toBeTruthy();
+    expect(await screen.findByRole("complementary", { name: "Projects" })).toBeTruthy();
   });
 
   it("invites starting a review when projects have none", async () => {

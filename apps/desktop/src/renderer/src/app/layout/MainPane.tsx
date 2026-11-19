@@ -15,8 +15,7 @@ import {
 } from "@fluentui/react-components";
 import { ComposeRegular, DismissRegular } from "@fluentui/react-icons";
 import type { Finding, Review } from "@problem/shared";
-import { useState } from "react";
-import { ChangesTab } from "../../features/changes/ChangesTab.tsx";
+import { lazy, Suspense, useState } from "react";
 import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";
 import { useDrafts } from "../../features/conversation/drafts.ts";
@@ -24,7 +23,6 @@ import { useConversation } from "../../features/conversation/queries.ts";
 import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
-import { CommentsTab } from "../../features/github/CommentsTab.tsx";
 import { PostReviewDialog } from "../../features/github/PostReviewDialog.tsx";
 import { useOpenGitHub } from "../../features/github/queries.ts";
 import { useProjects } from "../../features/projects/queries.ts";
@@ -34,6 +32,15 @@ import { StatusDot } from "../../features/reviews/StatusDot.tsx";
 import type { SearchTarget } from "../../features/search/GlobalSearch.tsx";
 import { useShortcuts } from "../../lib/shortcuts.ts";
 import { ErrorBoundary } from "../ErrorBoundary.tsx";
+import { LoadingRows } from "../LoadingRows.tsx";
+
+// The diff viewer and the PR discussion load when their tab is first opened.
+const ChangesTab = lazy(() =>
+  import("../../features/changes/ChangesTab.tsx").then((m) => ({ default: m.ChangesTab })),
+);
+const CommentsTab = lazy(() =>
+  import("../../features/github/CommentsTab.tsx").then((m) => ({ default: m.CommentsTab })),
+);
 
 type ReviewTab = "conversation" | "findings" | "changes" | "comments";
 const TABS: readonly ReviewTab[] = ["conversation", "findings", "changes", "comments"];
@@ -290,45 +297,47 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
       </div>
       {/* One tab failing leaves the header, the other tabs and the review list working. */}
       <ErrorBoundary resetKey={`${review.id}:${tab}`} what="This tab">
-        {tab === "conversation" ? (
-          <ConversationTab
-            key={review.id}
-            review={review}
-            autoFocus={asking === review.id}
-            onFocused={() => setAsking(undefined)}
-          />
-        ) : tab === "findings" ? (
-          <>
-            <FindingsTab
-              key={`${review.id}:${shownFinding ?? ""}`}
-              reviewId={review.id}
-              onAsk={ask}
-              initialSelected={shownFinding}
-              onPost={() => setPosting(true)}
-            />
-            {/* The last grid row holds the composer on the Conversation tab. */}
-            <div />
-          </>
-        ) : tab === "changes" ? (
-          <>
-            <ChangesTab
-              key={`${review.id}:${shownFile ?? ""}`}
+        <Suspense fallback={<LoadingRows label="Loading" />}>
+          {tab === "conversation" ? (
+            <ConversationTab
+              key={review.id}
               review={review}
-              initialFile={shownFile}
-              project={project}
-              onShowFinding={(finding) => {
-                setShownFinding(finding.number);
-                setTab("findings");
-              }}
+              autoFocus={asking === review.id}
+              onFocused={() => setAsking(undefined)}
             />
-            <div />
-          </>
-        ) : (
-          <>
-            <CommentsTab key={review.id} reviewId={review.id} onPost={() => setPosting(true)} />
-            <div />
-          </>
-        )}
+          ) : tab === "findings" ? (
+            <>
+              <FindingsTab
+                key={`${review.id}:${shownFinding ?? ""}`}
+                reviewId={review.id}
+                onAsk={ask}
+                initialSelected={shownFinding}
+                onPost={() => setPosting(true)}
+              />
+              {/* The last grid row holds the composer on the Conversation tab. */}
+              <div />
+            </>
+          ) : tab === "changes" ? (
+            <>
+              <ChangesTab
+                key={`${review.id}:${shownFile ?? ""}`}
+                review={review}
+                initialFile={shownFile}
+                project={project}
+                onShowFinding={(finding) => {
+                  setShownFinding(finding.number);
+                  setTab("findings");
+                }}
+              />
+              <div />
+            </>
+          ) : (
+            <>
+              <CommentsTab key={review.id} reviewId={review.id} onPost={() => setPosting(true)} />
+              <div />
+            </>
+          )}
+        </Suspense>
       </ErrorBoundary>
       {posting && (
         <PostReviewDialog

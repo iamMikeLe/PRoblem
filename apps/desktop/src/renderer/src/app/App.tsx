@@ -8,24 +8,33 @@ import {
   useId,
   useToastController,
 } from "@fluentui/react-components";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useLoadApprovals } from "../features/conversation/queries.ts";
 import { useAppEvents } from "../features/conversation/useAppEvents.ts";
-import { ProjectDetail } from "../features/projects/ProjectDetail.tsx";
-import { ProjectsPane } from "../features/projects/ProjectsPane.tsx";
 import { useProjects } from "../features/projects/queries.ts";
 import { NewReviewDialog } from "../features/reviews/NewReviewDialog.tsx";
 import { useReviews } from "../features/reviews/queries.ts";
 import type { SearchTarget } from "../features/search/GlobalSearch.tsx";
-import { SettingsPage } from "../features/settings/SettingsPage.tsx";
 import { usePanel } from "../lib/panel.ts";
 import { useShortcuts } from "../lib/shortcuts.ts";
 import { ErrorBoundary } from "./ErrorBoundary.tsx";
+import { LoadingRows } from "./LoadingRows.tsx";
 import { AppRail, type RailSection } from "./layout/AppRail.tsx";
 import { ListPane } from "./layout/ListPane.tsx";
 import { MainPane } from "./layout/MainPane.tsx";
 import { TitleBar } from "./layout/TitleBar.tsx";
 import { ShortcutsDialog } from "./ShortcutsDialog.tsx";
+
+// Sections other than Reviews load when first opened, keeping startup to what it shows.
+const ProjectsPane = lazy(() =>
+  import("../features/projects/ProjectsPane.tsx").then((m) => ({ default: m.ProjectsPane })),
+);
+const ProjectDetail = lazy(() =>
+  import("../features/projects/ProjectDetail.tsx").then((m) => ({ default: m.ProjectDetail })),
+);
+const SettingsPage = lazy(() =>
+  import("../features/settings/SettingsPage.tsx").then((m) => ({ default: m.SettingsPage })),
+);
 
 const useStyles = makeStyles({
   shell: {
@@ -124,19 +133,25 @@ export function App() {
       {section === "projects" ? (
         <>
           <ErrorBoundary what="The project list" className={styles.listArea}>
-            <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
+            <Suspense fallback={<LoadingRows label="Loading projects" />}>
+              <ProjectsPane selectedId={selectedProject?.id} onSelect={setProjectId} />
+            </Suspense>
           </ErrorBoundary>
           <ErrorBoundary
             resetKey={selectedProject?.id}
             what="This project"
             className={styles.mainArea}
           >
-            <ProjectDetail project={selectedProject} onRemoved={() => setProjectId(undefined)} />
+            <Suspense fallback={null}>
+              <ProjectDetail project={selectedProject} onRemoved={() => setProjectId(undefined)} />
+            </Suspense>
           </ErrorBoundary>
         </>
       ) : section === "settings" ? (
         <ErrorBoundary what="Settings" className={styles.wideArea}>
-          <SettingsPage />
+          <Suspense fallback={null}>
+            <SettingsPage />
+          </Suspense>
         </ErrorBoundary>
       ) : (
         <>

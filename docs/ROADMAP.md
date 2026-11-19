@@ -91,11 +91,11 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 ## Phase 8: Polish
 
-- [ ] Theme switch: Teams dark, light, high contrast (persisted)
+- [x] Theme switch: Teams dark, light, high contrast (Settings; remembered on this machine)
 - [x] Search in the title bar across reviews, findings and changed files (⌘K / Ctrl+K)
 - [x] Keyboard shortcuts: Alt+↑/↓ reviews, 1–4 tabs, J/K findings, R reply, ⌘B reviews list, ? list
 - [x] Toasts, error boundaries (window, pane, tab; crashes go to the app log), empty states, loading skeletons
-- [ ] Renderer bundle: minify and split routes
+- [x] Renderer bundle: minified, Projects, Settings, Changes and PR comments load on first use (3.1 MB → 1.3 MB)
 
 ## Phase 9: Showcase
 
