@@ -10,6 +10,8 @@ Microsoft Teams, in its dark theme.
 > Status: **Phases 1–8 done** (projects through polish); Phase 9 (showcase) in progress. See
 > [the roadmap](docs/ROADMAP.md).
 
+![PRoblem: start a review, triage what Claude found, read the diff, search](docs/demo.gif)
+
 | A review: Claude's conversation and its findings | Triage a finding, with steps to reproduce it |
 | --- | --- |
 | ![Conversation](docs/screenshots/conversation.png) | ![Findings](docs/screenshots/findings.png) |
@@ -17,7 +19,8 @@ Microsoft Teams, in its dark theme.
 | ![Changes](docs/screenshots/changes.png) | ![Search](docs/screenshots/search.png) |
 
 The screenshots come from the end-to-end test with a scripted Claude, so they show the real app.
-Refresh them with `PROBLEM_SCREENSHOTS="$PWD/docs/screenshots" pnpm e2e`.
+Refresh them with `PROBLEM_SCREENSHOTS="$PWD/docs/screenshots" pnpm e2e`, and the GIF with
+`pnpm --filter @problem/desktop demo:gif` (needs ffmpeg).
 
 ## Why
 

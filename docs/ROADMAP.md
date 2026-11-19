@@ -101,7 +101,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 
 - [x] End-to-end smoke test (Playwright's Electron support) of the main flow with a fake Claude (`pnpm e2e`)
 - [x] Screenshots in the README, taken by the end-to-end test
-- [ ] A short GIF in the README
+- [x] A short GIF in the README (`demo:gif`: recorded by Playwright, assembled by ffmpeg)
 - [x] `/demo-prep` → `docs/DEMO.md`
 - [ ] Rehearse the demo
 - [ ] Code signing and notarization for macOS; auto-update

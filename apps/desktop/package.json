@@ -14,6 +14,7 @@
     "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
     "test": "vitest run",
     "e2e": "electron-vite build && playwright test",
+    "demo:gif": "electron-vite build && PROBLEM_FRAMES=test-results/frames playwright test demo && ffmpeg -loglevel error -y -f concat -i test-results/frames/frames.txt -vf \"fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4\" ../../docs/demo.gif",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },
   "devDependencies": {

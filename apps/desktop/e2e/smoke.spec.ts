@@ -1,44 +1,11 @@
 /// <reference lib="dom" />
 // `page.waitForFunction` callbacks run in the window, hence the DOM types.
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { _electron as electron, expect, type Page, test } from "@playwright/test";
+import { join } from "node:path";
+import { expect, type Page, test } from "@playwright/test";
+import { APP_DIR, launchApp } from "./fixtures.ts";
 
-const APP_DIR = join(import.meta.dirname, "..");
 // PROBLEM_SCREENSHOTS=<folder> refreshes the README images (docs/screenshots).
 const SHOTS = process.env.PROBLEM_SCREENSHOTS ?? join(APP_DIR, "test-results", "screenshots");
-
-/** A repository with `main` and a `feature/discounts` branch that changes one file. */
-function makeRepository(root: string): string {
-  const repo = join(root, "shop");
-  const git = (...args: string[]) =>
-    execFileSync("git", ["-c", "user.name=E2E", "-c", "user.email=e2e@example.invalid", ...args], {
-      cwd: repo,
-      stdio: "pipe",
-    });
-  const write = (path: string, text: string) => {
-    mkdirSync(dirname(join(repo, path)), { recursive: true });
-    writeFileSync(join(repo, path), text);
-  };
-  mkdirSync(repo);
-  git("init", "-q", "-b", "main");
-  write(
-    "src/cart.ts",
-    "export const total = (prices: number[]) =>\n  prices.reduce((a, b) => a + b, 0);\n",
-  );
-  git("add", ".");
-  git("commit", "-q", "-m", "Cart total");
-  git("switch", "-q", "-c", "feature/discounts");
-  write(
-    "src/cart.ts",
-    "export const total = (prices: number[], discount = 0) => {\n  const sum = prices.reduce((a, b) => a + b, 0) - discount;\n  return sum * (1 - discount / 100);\n};\n",
-  );
-  git("commit", "-q", "-am", "Discounts");
-  git("switch", "-q", "main");
-  return repo;
-}
 
 /** Saves a screenshot once Fluent's open/close animations have settled. */
 async function shot(page: Page, name: string): Promise<void> {
@@ -49,19 +16,8 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 test("adds a project, reviews a branch, and accepts what Claude found", async () => {
-  // realpath: macOS's tmpdir is a symlink, and the app stores resolved paths.
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "problem-e2e-")));
-  const repo = makeRepository(root);
-  const { ELECTRON_RENDERER_URL: _devServer, ...env } = process.env;
-  const app = await electron.launch({
-    args: ["."],
-    cwd: APP_DIR,
-    env: { ...env, PROBLEM_HOME: join(root, "data"), PROBLEM_E2E: "1" },
-  });
+  const { app, page, repo, cleanup } = await launchApp();
   try {
-    const page = await app.firstWindow();
-    await page.setViewportSize({ width: 1440, height: 900 });
-
     // No projects yet: add the repository.
     await page.getByRole("button", { name: "Add project" }).click();
     await page
@@ -141,6 +97,6 @@ test("adds a project, reviews a branch, and accepts what Claude found", async ()
     await shot(page, "light");
   } finally {
     await app.close();
-    rmSync(root, { recursive: true, force: true });
+    cleanup();
   }
 });
