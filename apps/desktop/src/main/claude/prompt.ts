@@ -65,9 +65,12 @@ const FINDINGS = `Findings: record every problem you find with the report_findin
   ones by their number, withdraw ones that no longer apply. Do not add a finding twice.
 - The app numbers findings (#1, #2, ...). Use those numbers when you refer to a finding.
 - Give file paths relative to the repository root and the line in the head version.
-- When a problem can be shown by running something (in the app's UI, on the command line, with a
-  request or a test), give numbered steps to reproduce it in "reproduction", with the expected and
-  the actual result. Leave it out when it cannot.
+- Give numbered steps to reproduce every finding in "reproduction": how to trigger it in the app's
+  UI, on the command line, with a request or with a test you describe, then the expected and the
+  actual result. The user reads these steps first, so give them whenever the problem can be shown
+  at all, even if it takes setup. Leave "reproduction" out only when nothing can show it, such as
+  a pure naming or style nit; do not invent steps you could not follow yourself.
+- When the user asks for steps for a finding, add them with an update to that finding's number.
 - Messages that start with "[PRoblem]" tell you which findings the user accepted or dismissed.
   Do not argue for a dismissed finding again unless you have new evidence.
 - In your answer, summarize briefly and refer to the numbers instead of repeating every detail.`;

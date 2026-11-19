@@ -49,7 +49,7 @@ const fields = {
     .trim()
     .max(10_000)
     .describe(
-      "Numbered steps to reproduce the problem (in the UI, on the command line, with a request or a test), with the expected and the actual result (markdown). Omit when the problem cannot be shown by running something.",
+      "Numbered steps to reproduce the problem (in the UI, on the command line, with a request or a test), then the expected and the actual result (markdown). Give them for every finding that can be shown by running something, even when it takes setup; omit only when nothing can show it, such as a pure style nit.",
     ),
 };
 
