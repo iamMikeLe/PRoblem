@@ -149,3 +149,4 @@ Single user, local machine, untrusted input (PR contents):
 | [0012](adr/0012-approval-cards-and-fix-mode.md) | Approval cards via hook "ask" + `canUseTool`; exact grants; fix mode per review |
 | [0011](adr/0011-open-in-editor.md) | Open `file:line` with an editor preset or template, split into words, no shell |
 | [0015](adr/0015-activity-feed.md) | A stored Activity feed written by the services; read state per row; unread badge |
+| [0017](adr/0017-editable-post-text.md) | The user edits each finding's text (Write / Preview) before posting; main posts exactly that text |

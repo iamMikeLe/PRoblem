@@ -1,6 +1,6 @@
 # 0014. Reading a pull request's discussion, and posting findings as a GitHub review
 
-- Status: accepted
+- Status: accepted, amended by [0017](0017-editable-post-text.md) (the user edits each finding's text before posting)
 - Date: 2026-11-18
 
 ## Context
