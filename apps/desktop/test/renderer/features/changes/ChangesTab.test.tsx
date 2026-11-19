@@ -1,6 +1,6 @@
 import type { FileDiff } from "@problem/shared";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { useConversationStore } from "../../../../src/renderer/src/features/conversation/store.ts";
 import { renderApp } from "../../renderApp.tsx";
 import {
@@ -56,6 +56,10 @@ function setup() {
   return api;
 }
 
+/** Matches a line of code in the diff; highlighting splits its text into spans. */
+const codeLine = (text: string) => (_: string, element: Element | null) =>
+  element?.tagName === "CODE" && element.textContent === text;
+
 async function openChanges() {
   renderApp();
   fireEvent.click(await screen.findByRole("tab", { name: "Changes" }));
@@ -63,6 +67,12 @@ async function openChanges() {
 }
 
 describe("Changes tab", () => {
+  // The tab is a lazy chunk; its first import (with ~1 250 icon modules) is slow under Vitest, so
+  // it happens here rather than inside the first test's wait.
+  beforeAll(async () => {
+    await import("../../../../src/renderer/src/features/changes/ChangesTab.tsx");
+  }, 30_000);
+
   afterEach(() => {
     cleanup();
     removeBridge();
@@ -127,7 +137,7 @@ describe("Changes tab", () => {
     setup();
     await openChanges();
     const table = await screen.findByRole("table", { name: "Diff of src/app.ts" });
-    expect(within(table).getByText("retry(Infinity);")).toBeTruthy();
+    expect(within(table).getByText(codeLine("retry(Infinity);"))).toBeTruthy();
     const marker = within(table).getByRole("button", { name: /#1.*Retries never stop/ });
     expect(marker).toBeTruthy();
     // A finding outside the shown lines is listed above the diff.
@@ -135,8 +145,8 @@ describe("Changes tab", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Split" }));
     const split = await screen.findByRole("table", { name: "Diff of src/app.ts" });
-    const row = within(split).getByText("retry(3);").closest("tr");
-    expect(row && within(row).getByText("retry(Infinity);")).toBeTruthy();
+    const row = within(split).getByText(codeLine("retry(3);")).closest("tr");
+    expect(row && within(row).getByText(codeLine("retry(Infinity);"))).toBeTruthy();
   });
 
   it("opens a line in the editor and a finding in the Findings tab", async () => {

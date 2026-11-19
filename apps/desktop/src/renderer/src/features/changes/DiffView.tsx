@@ -6,9 +6,15 @@ import {
   Text,
   tokens,
 } from "@fluentui/react-components";
+import "@fontsource-variable/jetbrains-mono/wght.css";
 import type { DiffLine, FileDiff, Finding } from "@problem/shared";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useMemo } from "react";
+import { useTheme } from "../../lib/theme.ts";
+import { CodeText } from "./CodeText.tsx";
+import { highlightDiff } from "./highlight.ts";
+import { languageFor, useGrammar } from "./language.ts";
 import { type DiffMode, splitRows } from "./model.ts";
+import { useSyntaxThemes } from "./syntaxTheme.ts";
 
 const SEVERITY_COLOR = {
   blocker: "danger",
@@ -22,7 +28,11 @@ const useStyles = makeStyles({
   table: {
     borderCollapse: "collapse",
     width: "100%",
-    fontFamily: tokens.fontFamilyMonospace,
+    // Bundled (font-src 'self'); ligatures off, so code reads exactly as typed.
+    fontFamily: `"JetBrains Mono Variable", ${tokens.fontFamilyMonospace}`,
+    fontVariantLigatures: "none",
+    fontFeatureSettings: '"liga" 0, "calt" 0',
+    tabSize: 4,
     fontSize: tokens.fontSizeBase200,
     lineHeight: tokens.lineHeightBase200,
   },
@@ -95,6 +105,15 @@ interface Props {
 /** One file's diff; findings appear under the line they point to (head version). */
 export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Props) {
   const styles = useStyles();
+  const themes = useSyntaxThemes();
+  const themeName = useTheme((state) => state.name);
+  const language = languageFor(diff.path);
+  const ready = useGrammar(language);
+  // Highlighting is the costly part: once per file (and when its grammar arrives).
+  const code = useMemo(
+    () => highlightDiff(diff, ready ? language : undefined),
+    [diff, language, ready],
+  );
   if (diff.binary) return <Text className={styles.notice}>Binary file; no diff to show.</Text>;
   if (diff.tooLarge) {
     return (
@@ -139,6 +158,13 @@ export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Pr
           : undefined;
   const sign = (line: DiffLine | undefined) =>
     line === undefined ? "" : line.kind === "add" ? "+" : line.kind === "del" ? "−" : " ";
+  const text = (line: DiffLine | undefined, side: "old" | "new"): ReactNode => {
+    if (line === undefined) return null;
+    const tokens = (side === "old" ? code.old : code.new).get(line) ?? [
+      { text: line.text, role: undefined },
+    ];
+    return <CodeText tokens={tokens} indentUnit={code.indentUnit} />;
+  };
   // Color and the sign are visual; screen readers hear what the line is.
   const spoken = (line: DiffLine | undefined) =>
     line?.kind === "add" ? (
@@ -166,7 +192,10 @@ export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Pr
 
   return (
     <div className={styles.scroller}>
-      <table className={styles.table} aria-label={`Diff of ${diff.path}`}>
+      <table
+        className={mergeClasses(styles.table, themes[themeName])}
+        aria-label={`Diff of ${diff.path}`}
+      >
         <tbody>
           {diff.hunks.map((hunk, h) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: hunks never reorder
@@ -188,7 +217,7 @@ export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Pr
                         </td>
                         <td className={styles.code}>
                           {spoken(line)}
-                          {line.text}
+                          {text(line, line.kind === "del" ? "old" : "new")}
                         </td>
                       </tr>
                       {findingRows(line.newLine)}
@@ -206,7 +235,7 @@ export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Pr
                         </td>
                         <td className={mergeClasses(styles.code, tone(left))}>
                           {spoken(left)}
-                          {left?.text}
+                          {text(left, "old")}
                         </td>
                         <td className={mergeClasses(styles.number, styles.split, tone(right))}>
                           {lineNumber(right, "new")}
@@ -216,7 +245,7 @@ export function DiffView({ diff, mode, findings, onOpenLine, onShowFinding }: Pr
                         </td>
                         <td className={mergeClasses(styles.code, tone(right))}>
                           {spoken(right)}
-                          {right?.text}
+                          {text(right, "new")}
                         </td>
                       </tr>
                       {findingRows(right?.newLine)}
