@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findDialog } from "../../dialogs.ts";
+import { dialogClosed, findDialog } from "../../dialogs.ts";
 import { renderApp } from "../../renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "../../stubBridge.ts";
 
@@ -44,7 +44,7 @@ describe("Reviews", () => {
 
     const main = await screen.findByRole("main");
     expect(await within(main).findByRole("heading", { name: "feature/login" })).toBeTruthy();
-    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await dialogClosed();
     expect(api.calls).toContainEqual({
       channel: "reviews:create",
       input: { projectId: "p1", source: "feature/login", isolated: true, prompt: "Find bugs." },
@@ -63,7 +63,7 @@ describe("Reviews", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Start review" }));
     // Gone from the DOM, not only hidden: a closing dialog that lingers (slow CI) would make the
     // next one's focus trap start hidden.
-    await waitFor(() => expect(screen.queryByRole("dialog", { hidden: true })).toBeNull());
+    await dialogClosed();
 
     expect(api.calls).toContainEqual(
       expect.objectContaining({
@@ -117,14 +117,14 @@ describe("Reviews", () => {
     renderApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Close review" }));
-    let confirm = await screen.findByRole("alertdialog");
+    let confirm = await findDialog(undefined, "alertdialog");
     fireEvent.click(within(confirm).getByRole("button", { name: "Close review" }));
     expect(await within(confirm).findByText("Something went wrong in the app")).toBeTruthy();
     fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    await dialogClosed("alertdialog");
 
     fireEvent.click(screen.getByRole("button", { name: "Close review" }));
-    confirm = await screen.findByRole("alertdialog");
+    confirm = await findDialog(undefined, "alertdialog");
     expect(within(confirm).queryByText("Something went wrong in the app")).toBeNull();
   });
 
@@ -135,7 +135,7 @@ describe("Reviews", () => {
     renderApp();
 
     fireEvent.click(await screen.findByRole("button", { name: "Close review" }));
-    const confirm = await screen.findByRole("alertdialog");
+    const confirm = await findDialog(undefined, "alertdialog");
     expect(within(confirm).getByText(/switches back to the branch it was on/)).toBeTruthy();
     fireEvent.click(within(confirm).getByRole("button", { name: "Close review" }));
 
