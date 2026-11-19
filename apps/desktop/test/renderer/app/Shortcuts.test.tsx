@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { findDialog } from "../dialogs.ts";
 import { renderApp } from "../renderApp.tsx";
 import { makeFinding, makeProject, makeReview, removeBridge, stubBridge } from "../stubBridge.ts";
 
@@ -79,12 +80,12 @@ describe("keyboard shortcuts", () => {
     renderApp();
     await screen.findByRole("heading", { name: "feature/r1" });
     press("?", { shiftKey: true });
-    const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" });
+    const dialog = await findDialog("Keyboard shortcuts");
     expect(within(dialog).getByText("Next or previous review")).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 
     fireEvent.click(screen.getByRole("button", { name: "Keyboard shortcuts (?)" }));
-    expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeTruthy();
+    expect(await findDialog("Keyboard shortcuts")).toBeTruthy();
   });
 });
