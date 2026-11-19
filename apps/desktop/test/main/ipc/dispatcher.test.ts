@@ -92,6 +92,34 @@ describe("IPC dispatcher", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it("hands github:post the user's texts untouched, and refuses texts GitHub would not take", async () => {
+    const post = vi.fn<IpcHandlers["github:post"]>(() => ({
+      url: "https://github.com/a/b/pull/1",
+    }));
+    const dispatch = createDispatcher(handlers({ "github:post": post }), silentLogger);
+    const findings = [{ number: 2, text: "  cc @alice\n" }];
+
+    const result = await dispatch("github:post", {
+      id: "r1",
+      event: "COMMENT",
+      body: "",
+      findings,
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(post).toHaveBeenCalledWith({ id: "r1", event: "COMMENT", body: "", findings });
+
+    for (const bad of [[2], [{ number: 2, text: "" }], [{ number: 2, text: "x".repeat(65_537) }]]) {
+      const refused = await dispatch("github:post", {
+        id: "r1",
+        event: "COMMENT",
+        body: "",
+        findings: bad,
+      });
+      expect(refused).toMatchObject({ ok: false, error: { code: "invalid_request" } });
+    }
+    expect(post).toHaveBeenCalledOnce();
+  });
+
   it("keeps the code of an expected failure", async () => {
     const dispatch = createDispatcher(
       handlers({

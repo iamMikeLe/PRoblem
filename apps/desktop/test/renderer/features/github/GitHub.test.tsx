@@ -143,10 +143,92 @@ describe("GitHub", () => {
 
     await waitFor(() =>
       expect(api.posts).toEqual([
-        { id: "r1", event: "REQUEST_CHANGES", body: "Two issues.", findings: [1, 2] },
+        {
+          id: "r1",
+          event: "REQUEST_CHANGES",
+          body: "Two issues.",
+          findings: [
+            { number: 1, text: "**Major: Retries never stop**\n\nIt loops." },
+            { number: 2, text: "**Minor: Naming** (`src/app.ts:90`)\n\nx" },
+          ],
+        },
       ]),
     );
     expect(await screen.findByText("Posted to GitHub.")).toBeTruthy();
+  });
+
+  it("lets the user edit a finding's text, preview it as markdown, reset it, and posts the edit", async () => {
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    api.previews.r1 = preview;
+    await openTab(/Findings/);
+    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Post a review to GitHub" });
+    const text = (await within(dialog).findByRole("textbox", {
+      name: "Text of finding #1",
+    })) as HTMLTextAreaElement;
+    expect(text.value).toBe("**Major: Retries never stop**\n\nIt loops.");
+    expect(within(dialog).getAllByText("Markdown supported").length).toBeGreaterThan(0);
+    expect(within(dialog).queryByRole("button", { name: "Reset to Claude's text" })).toBeNull();
+
+    fireEvent.change(text, { target: { value: "**Retries** never stop, cc @alice" } });
+    expect(within(dialog).getByText("edited")).toBeTruthy();
+    expect(within(dialog).getByText(/an @name you type notifies that person/)).toBeTruthy();
+
+    // Preview renders the markdown as GitHub would.
+    const tabs = within(dialog).getByRole("tablist", {
+      name: "Text of finding #1: write or preview",
+    });
+    fireEvent.click(within(tabs).getByRole("tab", { name: "Preview" }));
+    const shown = within(dialog).getByRole("region", { name: "Preview of Text of finding #1" });
+    expect(within(shown).getByText("Retries").tagName).toBe("STRONG");
+
+    // Reset brings Claude's text back; editing again is what gets posted.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset to Claude's text" }));
+    fireEvent.click(within(tabs).getByRole("tab", { name: "Write" }));
+    const again = within(dialog).getByRole("textbox", {
+      name: "Text of finding #1",
+    }) as HTMLTextAreaElement;
+    expect(again.value).toBe("**Major: Retries never stop**\n\nIt loops.");
+    expect(within(dialog).queryByText("edited")).toBeNull();
+
+    // An empty text cannot be posted.
+    fireEvent.change(again, { target: { value: "   " } });
+    expect(within(dialog).getByRole("alert").textContent).toBe("A finding's text cannot be empty.");
+    const post = within(dialog).getByRole("button", { name: "Post to acme/payments#7" });
+    expect(post.hasAttribute("disabled")).toBe(true);
+
+    fireEvent.change(again, { target: { value: "Retries never stop.\n\n- [ ] add a cap" } });
+    fireEvent.click(post);
+    await waitFor(() =>
+      expect(api.posts).toEqual([
+        {
+          id: "r1",
+          event: "COMMENT",
+          body: "",
+          findings: [{ number: 1, text: "Retries never stop.\n\n- [ ] add a cap" }],
+        },
+      ]),
+    );
+  });
+
+  it("previews the summary as markdown", async () => {
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    api.previews.r1 = preview;
+    await openTab(/Findings/);
+    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Post a review to GitHub" });
+    fireEvent.change(await within(dialog).findByRole("textbox", { name: /Summary/ }), {
+      target: { value: "Looks _mostly_ good." },
+    });
+    fireEvent.click(
+      within(within(dialog).getByRole("tablist", { name: "Summary: write or preview" })).getByRole(
+        "tab",
+        {
+          name: "Preview",
+        },
+      ),
+    );
+    expect(within(dialog).getByText("mostly").tagName).toBe("EM");
   });
 
   it("does not post to a pull request that moved on", async () => {
