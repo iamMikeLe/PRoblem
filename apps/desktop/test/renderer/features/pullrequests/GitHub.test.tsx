@@ -173,7 +173,7 @@ describe("GitHub", () => {
     expect(within(dialog).getByText(/each finding as its own comment/)).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Post to acme/payments#7" }));
     expect(await screen.findByText("Posted to Bitbucket.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Open on Bitbucket" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open pull request" })).toBeTruthy();
   });
 
   it("lets the user edit a finding's text, preview it as markdown, reset it, and posts the edit", async () => {

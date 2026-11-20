@@ -301,7 +301,7 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
               }
             >
               <Button size="small" onClick={() => openLink.mutate(posted.url)}>
-                Open on {hostLabel(posted.url)}
+                Open pull request
               </Button>
             </MessageBarActions>
           </MessageBar>

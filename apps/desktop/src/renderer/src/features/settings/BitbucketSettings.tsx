@@ -23,6 +23,7 @@ import {
 const useStyles = makeStyles({
   section: { display: "flex", flexDirection: "column", gap: tokens.spacingVerticalM },
   muted: { color: tokens.colorNeutralForeground3 },
+  code: { fontFamily: tokens.fontFamilyMonospace },
   actions: {
     display: "flex",
     flexWrap: "wrap",
@@ -54,6 +55,12 @@ export function BitbucketSettings() {
       ? (parsed.error?.issues.find((issue) => issue.path[0] === field)?.message ?? null)
       : null;
   const busy = save.isPending || remove.isPending || test.isPending;
+  /** One action's messages replace the others'. */
+  const clearResults = () => {
+    save.reset();
+    remove.reset();
+    test.reset();
+  };
 
   return (
     <section className={styles.section} aria-labelledby="bitbucket-heading">
@@ -62,9 +69,11 @@ export function BitbucketSettings() {
       </Subtitle2>
       <Text className={styles.muted}>
         To review Bitbucket Cloud pull requests, add your Atlassian account email and an API token
-        with scopes (Atlassian account settings, Security, API tokens). Give it the Bitbucket scopes
-        read:repository, read:pullrequest and write:pullrequest. The token is encrypted with your
-        system keychain and never leaves this Mac except to Bitbucket.
+        with scopes (Atlassian account settings, Security, API tokens), with the Bitbucket scopes{" "}
+        <span className={styles.code}>read:repository</span>,{" "}
+        <span className={styles.code}>read:pullrequest</span> and{" "}
+        <span className={styles.code}>write:pullrequest</span>. The token is encrypted with your
+        system keychain and only ever sent to Bitbucket.
       </Text>
       {status.isLoading && <Spinner size="small" label="Loading" />}
       {status.error && (
@@ -79,7 +88,12 @@ export function BitbucketSettings() {
           {saved.configured ? `Saved for ${saved.email ?? "your account"}.` : "No token saved."}
         </Caption1>
       )}
-      <Field label="Atlassian email" validationMessage={problem("email")}>
+      <Field
+        label="Atlassian email"
+        required
+        {...(saved?.configured ? { hint: "Changing it needs the token again." } : {})}
+        validationMessage={problem("email")}
+      >
         <Input
           type="email"
           value={shownEmail}
@@ -87,19 +101,33 @@ export function BitbucketSettings() {
           onChange={(_, data) => setEmail(data.value)}
         />
       </Field>
-      <Field label="API token" validationMessage={problem("token")}>
+      <Field
+        label="API token"
+        required
+        hint={
+          saved?.configured
+            ? "A token is saved; it is never shown. Paste a new one to replace it."
+            : "Atlassian shows a new token only once: paste it here."
+        }
+        validationMessage={problem("token")}
+      >
         <Input
           type="password"
           value={token}
           autoComplete="off"
-          placeholder={saved?.configured ? "Saved; paste a new token to replace it" : undefined}
           onChange={(_, data) => setToken(data.value)}
         />
       </Field>
-      {[save.error, remove.error, test.error].map(
-        (error) =>
+      {(
+        [
+          ["save", save.error],
+          ["remove", remove.error],
+          ["test", test.error],
+        ] as const
+      ).map(
+        ([action, error]) =>
           error && (
-            <MessageBar key={error.message} intent="error">
+            <MessageBar key={action} intent="error">
               <MessageBarBody>{error.message}</MessageBarBody>
             </MessageBar>
           ),
@@ -116,7 +144,7 @@ export function BitbucketSettings() {
           onClick={() => {
             setTouched(true);
             if (!parsed.success) return;
-            test.reset();
+            clearResults();
             save.mutate(parsed.data, {
               onSuccess: () => {
                 setToken("");
@@ -128,17 +156,24 @@ export function BitbucketSettings() {
         >
           Save credentials
         </Button>
-        <Button disabledFocusable={busy || !saved?.configured} onClick={() => test.mutate()}>
+        {/* It tests what is saved: a pasted, unsaved token would give a misleading answer. */}
+        <Button
+          disabledFocusable={busy || !saved?.configured || token !== ""}
+          onClick={() => {
+            clearResults();
+            test.mutate();
+          }}
+        >
           Test connection
         </Button>
         <Button
           disabledFocusable={busy || !saved?.configured}
           onClick={() => {
-            test.reset();
+            clearResults();
             remove.mutate();
           }}
         >
-          Remove
+          Remove credentials
         </Button>
         {save.isSuccess && token === "" && <Caption1 className={styles.muted}>Saved.</Caption1>}
       </div>
