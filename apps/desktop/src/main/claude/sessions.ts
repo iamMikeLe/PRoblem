@@ -457,6 +457,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
     kind: "turn-end",
     outcome,
     costUsd: null,
+    tokens: null,
     durationMs: null,
     message,
   });
@@ -662,6 +663,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
           kind: "turn-end",
           outcome: "interrupted",
           costUsd: null,
+          tokens: null,
           durationMs: null,
           message: "Stopped before Claude started.",
         });
@@ -736,6 +738,7 @@ export function createSessionService(deps: SessionServiceDeps): SessionService {
           kind: "turn-end",
           outcome: "interrupted",
           costUsd: null,
+          tokens: null,
           durationMs: null,
           message: "PRoblem closed while Claude was working. Send a message to continue.",
         });

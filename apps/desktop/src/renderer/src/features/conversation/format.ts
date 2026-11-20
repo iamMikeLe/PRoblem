@@ -9,13 +9,29 @@ export function formatDuration(ms: number): string {
   return `${minutes} min ${seconds % 60} s`;
 }
 
-/** The divider line under a finished turn, e.g. "Done · 42 s · $0.18". */
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+
+/** A token count for people: "850", "12.4K", "1.2M". */
+export function formatTokens(tokens: number): string {
+  return compact.format(tokens);
+}
+
+/**
+ * The divider line under a finished turn, e.g.
+ * "Done · 42 s · $0.18 · 120K tokens · 667K tokens/$".
+ */
 export function describeTurnEnd(end: TurnEnd): string {
   const head =
     end.outcome === "success" ? "Done" : end.outcome === "interrupted" ? "Stopped" : "Failed";
   const parts = [head];
   if (end.durationMs !== null) parts.push(formatDuration(end.durationMs));
   if (end.costUsd !== null) parts.push(`$${end.costUsd.toFixed(2)}`);
+  if (end.tokens !== null && end.tokens > 0) {
+    parts.push(`${formatTokens(end.tokens)} tokens`);
+    if (end.costUsd !== null && end.costUsd > 0) {
+      parts.push(`${formatTokens(end.tokens / end.costUsd)} tokens/$`);
+    }
+  }
   return parts.join(" · ");
 }
 

@@ -95,8 +95,15 @@ export function fakeClaude(report: (workdir: string, input: unknown) => void): R
         subtype: "success",
         is_error: false,
         result: text,
-        total_cost_usd: 0,
+        // Plausible numbers, so the demo shows a real turn summary.
+        total_cost_usd: 0.18,
         duration_ms: 100,
+        usage: {
+          input_tokens: 2_400,
+          output_tokens: 1_150,
+          cache_creation_input_tokens: 18_000,
+          cache_read_input_tokens: 96_000,
+        },
       };
     }
 

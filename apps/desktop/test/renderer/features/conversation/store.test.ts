@@ -41,11 +41,36 @@ describe("conversation store", () => {
 
 describe("turn summary", () => {
   it("describes how a turn ended", () => {
-    const base = { kind: "turn-end", costUsd: null, durationMs: null, message: null } as const;
+    const base = {
+      kind: "turn-end",
+      costUsd: null,
+      tokens: null,
+      durationMs: null,
+      message: null,
+    } as const;
     expect(
       describeTurnEnd({ ...base, outcome: "success", durationMs: 125_000, costUsd: 1.234 }),
     ).toBe("Done · 2 min 5 s · $1.23");
     expect(describeTurnEnd({ ...base, outcome: "interrupted" })).toBe("Stopped");
     expect(describeTurnEnd({ ...base, outcome: "error" })).toBe("Failed");
+  });
+
+  it("adds the tokens a turn used and how many tokens a dollar bought", () => {
+    const base = {
+      kind: "turn-end",
+      outcome: "success",
+      durationMs: 42_000,
+      message: null,
+    } as const;
+    expect(describeTurnEnd({ ...base, costUsd: 0.18, tokens: 120_000 })).toBe(
+      "Done · 42 s · $0.18 · 120K tokens · 666.7K tokens/$",
+    );
+    expect(describeTurnEnd({ ...base, costUsd: null, tokens: 850 })).toBe(
+      "Done · 42 s · 850 tokens",
+    );
+    expect(describeTurnEnd({ ...base, costUsd: 0, tokens: 1_250_000 })).toBe(
+      "Done · 42 s · $0.00 · 1.3M tokens",
+    );
+    expect(describeTurnEnd({ ...base, costUsd: 0.18, tokens: 0 })).toBe("Done · 42 s · $0.18");
   });
 });
