@@ -23,7 +23,7 @@ export interface BitbucketApi {
    * A write. A timeout, or an answer that cannot be read, may mean it was done anyway:
    * that fails with `post_uncertain`.
    */
-  post<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+  post<T>(path: string, body: unknown | undefined, schema: z.ZodType<T>): Promise<T>;
 }
 
 /** One path segment (workspace, repository, branch) for a URL. */
@@ -176,7 +176,7 @@ export function createBitbucketApi(deps: BitbucketApiDeps): BitbucketApi {
     async post(path, body, schema) {
       const response = await request(`${BITBUCKET_API}${path}`, {
         method: "POST",
-        body: JSON.stringify(body),
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       if (!response.ok) throw await failure(response);
       let json: unknown;

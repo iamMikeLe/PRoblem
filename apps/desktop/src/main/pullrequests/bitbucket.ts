@@ -52,6 +52,9 @@ const Comment = z.object({
 });
 type Comment = z.infer<typeof Comment>;
 
+/** What Bitbucket answers for a new comment: only its id is used. */
+const PostedComment = z.object({ id: z.number().int() });
+
 /** The pull request's page; built here, never taken from the API's answer. */
 export const bitbucketPrUrl = (repo: string, number: number): string =>
   `https://bitbucket.org/${repo}/pull-requests/${number}`;
@@ -240,8 +243,76 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
       return toConversation(pr, data, values, truncated);
     },
 
-    async post() {
-      throw new AppFailure("internal", "Posting to Bitbucket is not available yet.");
+    /**
+     * Bitbucket has no review to post at once: each finding on a line is its own comment, then one
+     * general comment holds the summary and the other findings, then the approval or change
+     * request. Each finding is marked as soon as its comment exists, so a failure part-way leaves
+     * the rest selectable; the approval is only sent when everything before it was posted.
+     */
+    async post(post, onPosted) {
+      const { repo, number, url: prUrl } = post.pullRequest;
+      const base = `${repoPath(repo)}/pullrequests/${number}`;
+      const steps: { numbers: number[]; send: () => Promise<string | undefined> }[] = [];
+      const comment = async (content: Record<string, unknown>) => {
+        const created = await api.post(`${base}/comments`, content, PostedComment);
+        return `${prUrl}#comment-${created.id}`;
+      };
+      for (const item of post.inline) {
+        steps.push({
+          numbers: [item.number],
+          send: () =>
+            comment({ content: { raw: item.text }, inline: { path: item.path, to: item.line } }),
+        });
+      }
+      if (post.body.trim() !== "") {
+        steps.push({
+          numbers: post.summaryNumbers,
+          send: () => comment({ content: { raw: post.body } }),
+        });
+      }
+      const verdict =
+        post.event === "APPROVE"
+          ? "approve"
+          : post.event === "REQUEST_CHANGES"
+            ? "request-changes"
+            : null;
+      if (verdict !== null) {
+        steps.push({
+          numbers: [],
+          send: async () => {
+            await api.post(`${base}/${verdict}`, undefined, z.unknown());
+            return undefined;
+          },
+        });
+      }
+
+      let url = prUrl;
+      let done = 0;
+      for (const step of steps) {
+        try {
+          const posted = await step.send();
+          if (posted !== undefined) url = posted;
+          if (step.numbers.length > 0) onPosted(step.numbers, url);
+          done++;
+        } catch (error) {
+          // It may exist: never offer it again as if it did not.
+          if (
+            error instanceof AppFailure &&
+            error.code === "post_uncertain" &&
+            step.numbers.length > 0
+          ) {
+            onPosted(step.numbers, prUrl);
+          }
+          if (done === 0 || !(error instanceof AppFailure) || error.code === "post_uncertain")
+            throw error;
+          throw new AppFailure(
+            "post_partial",
+            `Posted ${done} of ${steps.length} parts to Bitbucket, then: ${error.message} The findings not posted are still selectable.`,
+            { cause: error },
+          );
+        }
+      }
+      return { url, submittedAt: null };
     },
   };
 }
