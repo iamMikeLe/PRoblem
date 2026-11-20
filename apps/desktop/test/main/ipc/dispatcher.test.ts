@@ -59,6 +59,9 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "dialog:pickFolder": async () => null,
     "activity:list": () => [],
     "activity:markRead": () => null,
+    "bitbucket:status": () => ({ configured: false, email: null }),
+    "bitbucket:save": () => ({ configured: true, email: "me@example.com" }),
+    "bitbucket:remove": () => ({ configured: false, email: null }),
     ...overrides,
   };
 }
@@ -118,6 +121,34 @@ describe("IPC dispatcher", () => {
       expect(refused).toMatchObject({ ok: false, error: { code: "invalid_request" } });
     }
     expect(post).toHaveBeenCalledOnce();
+  });
+
+  it("passes only well-formed Bitbucket credentials to the handler", async () => {
+    const token = "ATATT3xFfGF0-secret_token=";
+    const save = vi.fn<IpcHandlers["bitbucket:save"]>(({ email }) => ({ configured: true, email }));
+    const dispatch = createDispatcher(handlers({ "bitbucket:save": save }), silentLogger);
+
+    const result = await dispatch("bitbucket:save", {
+      email: "me@example.com",
+      token: ` ${token}\n`,
+    });
+    expect(result).toEqual({ ok: true, data: { configured: true, email: "me@example.com" } });
+    expect(save).toHaveBeenCalledWith({ email: "me@example.com", token });
+
+    for (const bad of [
+      { email: "not an email", token },
+      { email: "me@example.com", token: "" },
+      { email: "me@example.com", token: "two words" },
+      { email: "me@example.com", token: "line\r\nX-Injected: 1" },
+      { email: "me@example.com", token, extra: true },
+    ]) {
+      const refused = await dispatch("bitbucket:save", bad);
+      expect(refused, JSON.stringify(bad)).toMatchObject({
+        ok: false,
+        error: { code: "invalid_request" },
+      });
+    }
+    expect(save).toHaveBeenCalledOnce();
   });
 
   it("keeps the code of an expected failure", async () => {

@@ -2,13 +2,14 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@problem/shared";
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell } from "electron";
 import { createActivityService } from "./activity/service.ts";
 import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
 import { fakeClaude } from "./claude/fake.ts";
 import { createSessionService } from "./claude/sessions.ts";
 import { DATABASE_NAME, dataDir } from "./config.ts";
+import { createCredentialStore, type SecretBox } from "./credentials/store.ts";
 import { openDatabase } from "./db/database.ts";
 import { createEditorOpener, spawnDetached } from "./editor/open.ts";
 import { absolutePathOnly, loginShellPath } from "./env.ts";
@@ -108,6 +109,16 @@ async function start(): Promise<void> {
   });
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
+  // The OS keychain encrypts saved tokens. Linux without a keyring only offers plain text
+  // ("basic_text"): saving is refused there rather than storing a token readable on disk.
+  const secrets: SecretBox = {
+    available: () =>
+      safeStorage.isEncryptionAvailable() &&
+      (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
+    encrypt: (text) => safeStorage.encryptString(text),
+    decrypt: (data) => safeStorage.decryptString(Buffer.from(data)),
+  };
+  const credentials = createCredentialStore({ db, secrets });
   const hosts = [createGitHubHost(gh)];
   const pullRequests = createPullRequestService({
     db,
@@ -178,6 +189,7 @@ async function start(): Promise<void> {
         changes,
         pullRequests,
         hosts,
+        credentials,
         search,
         activity,
         log,

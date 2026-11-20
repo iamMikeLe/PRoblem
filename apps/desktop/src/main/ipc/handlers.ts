@@ -1,7 +1,12 @@
-import type { AppSettings, UpdateSettingsRequest } from "@problem/shared";
+import {
+  type AppSettings,
+  BitbucketStatusSchema,
+  type UpdateSettingsRequest,
+} from "@problem/shared";
 import type { ActivityService } from "../activity/service.ts";
 import type { ChangesService } from "../changes/service.ts";
 import type { SessionService } from "../claude/sessions.ts";
+import type { CredentialStore } from "../credentials/store.ts";
 import type { EditorOpener } from "../editor/open.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { FindingsService } from "../findings/service.ts";
@@ -21,6 +26,8 @@ export interface HandlerDeps {
   pullRequests: PullRequestService;
   /** The supported git hosts: their websites are the links `pr:open` may open. */
   hosts: readonly GitHost[];
+  /** Saved git host credentials; handlers only ever return their status, never a token. */
+  credentials: Pick<CredentialStore, "status" | "save" | "remove">;
   search: SearchService;
   activity: ActivityService;
   log: Logger;
@@ -41,6 +48,7 @@ export function createHandlers({
   changes,
   pullRequests,
   hosts,
+  credentials,
   search,
   activity,
   log,
@@ -113,6 +121,10 @@ export function createHandlers({
     "findings:setVerdict": (input) => findings.setVerdict(input),
     "settings:get": () => settings.get(),
     "settings:update": (input) => settings.update(input),
+    // Parsed on the way out: only `configured` and `email` can ever reach the renderer.
+    "bitbucket:status": () => BitbucketStatusSchema.parse(credentials.status()),
+    "bitbucket:save": (input) => BitbucketStatusSchema.parse(credentials.save(input)),
+    "bitbucket:remove": () => BitbucketStatusSchema.parse(credentials.remove()),
     "editor:open": async (input) => {
       await editor.open(input);
       return null;
