@@ -41,6 +41,7 @@ export const IPC_CHANNELS = [
   "bitbucket:status",
   "bitbucket:save",
   "bitbucket:remove",
+  "bitbucket:test",
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];

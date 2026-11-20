@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api.ts";
 import { findingsKey } from "../findings/queries.ts";
 
-export const conversationKey = (reviewId: string) => ["github", reviewId, "conversation"] as const;
-const previewKey = (reviewId: string) => ["github", reviewId, "preview"] as const;
+export const conversationKey = (reviewId: string) =>
+  ["pullRequests", reviewId, "conversation"] as const;
+const previewKey = (reviewId: string) => ["pullRequests", reviewId, "preview"] as const;
 
 /** The PR's discussion, fetched when the tab opens (and on Reload). */
 export function usePrConversation(reviewId: string) {
@@ -41,6 +42,7 @@ export function usePostReview() {
   });
 }
 
-export function useOpenGitHub() {
+/** Opens a pull request link (GitHub or Bitbucket) in the browser. */
+export function useOpenPullRequestLink() {
   return useMutation({ mutationFn: (url: string) => api.pullRequests.open(url) });
 }

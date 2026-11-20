@@ -122,7 +122,7 @@ describe("GitHub", () => {
     const api = stubBridge([project], [makeReview("r1", project)]);
     api.previews.r1 = preview;
     await openTab(/Findings/);
-    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Post to pull request…" }));
     const dialog = await findDialog("Post a review to GitHub");
     expect(await within(dialog).findByText("Findings (1 of 2 selected)")).toBeTruthy();
     expect(
@@ -163,11 +163,24 @@ describe("GitHub", () => {
     expect(await screen.findByText("Posted to GitHub.")).toBeTruthy();
   });
 
+  it("names Bitbucket and how it posts, for a Bitbucket pull request", async () => {
+    const api = stubBridge([project], [makeReview("r1", project)]);
+    const url = "https://bitbucket.org/acme/payments/pull-requests/7";
+    api.previews.r1 = { ...preview, pullRequest: { ...PR, host: "bitbucket", url } };
+    await openTab(/Findings/);
+    fireEvent.click(await screen.findByRole("button", { name: "Post to pull request…" }));
+    const dialog = await findDialog("Post a review to Bitbucket");
+    expect(within(dialog).getByText(/each finding as its own comment/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Post to acme/payments#7" }));
+    expect(await screen.findByText("Posted to Bitbucket.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Open on Bitbucket" })).toBeTruthy();
+  });
+
   it("lets the user edit a finding's text, preview it as markdown, reset it, and posts the edit", async () => {
     const api = stubBridge([project], [makeReview("r1", project)]);
     api.previews.r1 = preview;
     await openTab(/Findings/);
-    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Post to pull request…" }));
     const dialog = await findDialog("Post a review to GitHub");
     const text = (await within(dialog).findByRole("textbox", {
       name: "Text of finding #1",
@@ -221,7 +234,7 @@ describe("GitHub", () => {
     const api = stubBridge([project], [makeReview("r1", project)]);
     api.previews.r1 = preview;
     await openTab(/Findings/);
-    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Post to pull request…" }));
     const dialog = await findDialog("Post a review to GitHub");
     fireEvent.change(await within(dialog).findByRole("textbox", { name: /Summary/ }), {
       target: { value: "Looks _mostly_ good." },
@@ -241,7 +254,7 @@ describe("GitHub", () => {
     const api = stubBridge([project], [makeReview("r1", project)]);
     api.previews.r1 = { ...preview, upToDate: false };
     await openTab(/Findings/);
-    fireEvent.click(await screen.findByRole("button", { name: "Post to GitHub…" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Post to pull request…" }));
     const dialog = await findDialog();
     expect(await within(dialog).findByText(/The pull request has new commits/)).toBeTruthy();
     expect(

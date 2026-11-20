@@ -12,6 +12,22 @@ export type HostKind = z.infer<typeof HostKindSchema>;
 /** The host's name for people. */
 export const HOST_LABELS: Record<HostKind, string> = { github: "GitHub", bitbucket: "Bitbucket" };
 
+/**
+ * The host whose website `url` is on (exactly github.com or bitbucket.org), for labels only: links
+ * are opened by the main process, which checks them itself.
+ */
+export function hostKindOfUrl(url: string): HostKind | undefined {
+  const match = /^https:\/\/(github\.com|bitbucket\.org)(?:[/?#]|$)/i.exec(url);
+  const host = match?.[1]?.toLowerCase();
+  return host === "github.com" ? "github" : host === "bitbucket.org" ? "bitbucket" : undefined;
+}
+
+/** "GitHub" or "Bitbucket" for a link on that host's website. */
+export function hostLabel(url: string): string {
+  const kind = hostKindOfUrl(url);
+  return kind ? HOST_LABELS[kind] : "the pull request";
+}
+
 export const PullRequestLinkSchema = z.object({
   /** Links saved before Bitbucket support are GitHub's. */
   host: HostKindSchema.default("github"),

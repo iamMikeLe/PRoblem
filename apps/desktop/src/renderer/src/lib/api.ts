@@ -2,6 +2,7 @@ import {
   type ActivityItem,
   type AppSettings,
   type BitbucketStatus,
+  type BitbucketTestResult,
   type ChangeSet,
   type ClaudeCatalog,
   type CloseReviewResult,
@@ -100,6 +101,7 @@ export const api = {
     save: (request: SaveBitbucketCredentials): Promise<BitbucketStatus> =>
       call("bitbucket:save", request),
     remove: (): Promise<BitbucketStatus> => call("bitbucket:remove", undefined),
+    test: (): Promise<BitbucketTestResult> => call("bitbucket:test", undefined),
   },
   pullRequests: {
     conversation: (id: string): Promise<PrConversation> => call("pr:conversation", { id }),

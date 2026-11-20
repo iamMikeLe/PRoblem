@@ -1,6 +1,7 @@
 import {
   type AppSettings,
   BitbucketStatusSchema,
+  type BitbucketTestResult,
   type UpdateSettingsRequest,
 } from "@problem/shared";
 import type { ActivityService } from "../activity/service.ts";
@@ -28,6 +29,8 @@ export interface HandlerDeps {
   hosts: readonly GitHost[];
   /** Saved git host credentials; handlers only ever return their status, never a token. */
   credentials: Pick<CredentialStore, "status" | "save" | "remove">;
+  /** Tries the saved Bitbucket credentials (Settings, "Test connection"). */
+  testBitbucket: () => Promise<BitbucketTestResult>;
   search: SearchService;
   activity: ActivityService;
   log: Logger;
@@ -49,6 +52,7 @@ export function createHandlers({
   pullRequests,
   hosts,
   credentials,
+  testBitbucket,
   search,
   activity,
   log,
@@ -125,6 +129,7 @@ export function createHandlers({
     "bitbucket:status": () => BitbucketStatusSchema.parse(credentials.status()),
     "bitbucket:save": (input) => BitbucketStatusSchema.parse(credentials.save(input)),
     "bitbucket:remove": () => BitbucketStatusSchema.parse(credentials.remove()),
+    "bitbucket:test": () => testBitbucket(),
     "editor:open": async (input) => {
       await editor.open(input);
       return null;

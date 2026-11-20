@@ -281,7 +281,7 @@ interface Props {
   onAsk: (finding: Finding, request?: string) => void;
   /** Open with this finding selected (from the Changes tab). */
   initialSelected?: number | undefined;
-  /** Opens the "post to GitHub" preview. */
+  /** Opens the "post to pull request" preview. */
   onPost: () => void;
 }
 
@@ -398,7 +398,7 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
           ))}
         </TabList>
         <Button className={styles.post} size="small" icon={<SendRegular />} onClick={onPost}>
-          Post to GitHub…
+          Post to pull request…
         </Button>
       </div>
 

@@ -1,3 +1,4 @@
+import type { BitbucketTestResult } from "@problem/shared";
 import { z } from "zod";
 import type { BitbucketCredentials } from "../credentials/store.ts";
 import { AppFailure } from "../errors.ts";
@@ -86,7 +87,7 @@ export function createBitbucketApi(deps: BitbucketApiDeps): BitbucketApi {
         );
       case 403:
         return new AppFailure(
-          "bitbucket_auth_failed",
+          "bitbucket_forbidden",
           `Bitbucket denied access${detail}. Check that the API token has the pull request and repository scopes.`,
         );
       case 404:
@@ -196,4 +197,25 @@ export function createBitbucketApi(deps: BitbucketApiDeps): BitbucketApi {
       return parsed.data;
     },
   };
+}
+
+/**
+ * "Test connection" in Settings, with the saved credentials. A 403 means the email and token were
+ * accepted but the token may not read the profile, which pull requests do not need.
+ */
+export async function testBitbucketConnection(api: BitbucketApi): Promise<BitbucketTestResult> {
+  try {
+    const me = await api.get("/user", z.object({ display_name: z.string() }));
+    return { ok: true, message: `Connected to Bitbucket as ${me.display_name}.` };
+  } catch (error) {
+    if (!(error instanceof AppFailure)) throw error;
+    if (error.code === "bitbucket_forbidden") {
+      return {
+        ok: true,
+        message:
+          "Bitbucket accepted the email and token. The token cannot read your profile, which pull requests do not need.",
+      };
+    }
+    return { ok: false, message: error.message };
+  }
 }
