@@ -7,7 +7,12 @@ import { renderApp } from "../../renderApp.tsx";
 import { makeProject, makeReview, removeBridge, stubBridge } from "../../stubBridge.ts";
 
 const project = makeProject("p1", "payments-api");
-const PR = { repo: "acme/payments", number: 7, url: "https://github.com/acme/payments/pull/7" };
+const PR = {
+  host: "github",
+  repo: "acme/payments",
+  number: 7,
+  url: "https://github.com/acme/payments/pull/7",
+} as const;
 
 const conversation: PrConversation = {
   status: "ok",

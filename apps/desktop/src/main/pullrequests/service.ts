@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
   type Finding,
-  GITHUB_BODY_MAX,
+  HOST_LABELS,
   neutralizeMentions,
   type PostItem,
   type PostPreview,
@@ -17,21 +17,20 @@ import type { ActivityService } from "../activity/service.ts";
 import type { ChangesService } from "../changes/service.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import { listFindings, markPosted } from "../findings/repository.ts";
-import type { GhClient } from "../git/gh.ts";
-import { githubRepoOf } from "../git/github.ts";
 import { listRemotes, primaryRemote } from "../git/refs.ts";
 import { getProject } from "../projects/repository.ts";
 import { markCommentsTold } from "../reviews/repository.ts";
-import { parseConversation } from "./conversation.ts";
 import { commentsDigest, commentsSince, latestCommentAt } from "./digest.ts";
+import { type GitHost, hostByKind, hostOfUrl, type InlinePost } from "./host.ts";
 
 /**
- * The review's pull request on GitHub (ADR 0014): reading its discussion, telling Claude about
- * it, and posting findings as a GitHub review after the user's click in the preview dialog.
+ * The review's pull request on its git host (ADR 0014, 0019): reading its discussion, telling
+ * Claude about it, and posting findings after the user's click in the preview dialog. What
+ * differs between GitHub and Bitbucket lives in each `GitHost`.
  */
-export interface GitHubService {
+export interface PullRequestService {
   conversation(reviewId: string): Promise<PrConversation>;
-  /** The digest for a new review's first message, or `undefined` (no PR, gh failed, no comments). */
+  /** The digest for a new review's first message, or `undefined` (no PR, host failed, no comments). */
   firstDigest(review: Review): Promise<string | undefined>;
   /** Comments newer than what Claude was told (from the latest read), as a note for the next message. */
   commentsNote(reviewId: string): { note: string; until: string } | undefined;
@@ -41,9 +40,9 @@ export interface GitHubService {
   post(request: PostReviewRequest): Promise<PostReviewResult>;
 }
 
-export interface GitHubServiceDeps {
+export interface PullRequestServiceDeps {
   db: DatabaseSync;
-  gh: GhClient;
+  hosts: readonly GitHost[];
   review: (id: string) => Review;
   changes: Pick<ChangesService, "file">;
   log: Logger;
@@ -53,7 +52,7 @@ export interface GitHubServiceDeps {
 
 const SEVERITY_LABEL = { blocker: "Blocker", major: "Major", minor: "Minor", nit: "Nit" } as const;
 
-/** A finding as markdown for GitHub. Claude wrote it, so mentions never notify anyone. */
+/** A finding as markdown for the host. Claude wrote it, so mentions never notify anyone. */
 export function formatFinding(finding: Finding, withLocation: boolean): string {
   const where =
     withLocation && finding.file !== null
@@ -70,33 +69,30 @@ export function formatFinding(finding: Finding, withLocation: boolean): string {
   return neutralizeMentions(parts.join("\n\n"));
 }
 
-const QUERY = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) {
-    pullRequest(number: $number) {
-      title url headRefOid
-      reviewThreads(first: 100) {
-        pageInfo { hasNextPage }
-        nodes { id path line isResolved isOutdated
-          comments(first: 50) { pageInfo { hasNextPage } nodes { id author { login } body createdAt url } } }
-      }
-      comments(first: 100) { pageInfo { hasNextPage } nodes { id author { login } body createdAt url } }
-      reviews(first: 50) { pageInfo { hasNextPage } nodes { id author { login } state body submittedAt url } }
-    }
-  }
-}`;
-
 /** How long creating a review waits for the PR discussion before starting without it. */
 const FIRST_DIGEST_TIMEOUT_MS = 10_000;
 
-export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
-  const { db, gh } = deps;
+interface Linked {
+  host: GitHost;
+  link: PullRequestLink;
+}
+
+export function createPullRequestService(deps: PullRequestServiceDeps): PullRequestService {
+  const { db, hosts } = deps;
   const posting = new Set<string>();
 
+  function linked(link: PullRequestLink): Linked | string {
+    const host = hostByKind(hosts, link.host);
+    return host ? { host, link } : `${HOST_LABELS[link.host]} is not supported.`;
+  }
+
   /** The review's pull request: its source, or (for a branch) the open PR whose head it is. */
-  async function pullRequestOf(review: Review): Promise<PullRequestLink | string> {
+  async function pullRequestOf(review: Review): Promise<Linked | string> {
     if (review.source.kind === "pull-request") {
       const { repo, number, url } = review.source;
-      return { repo, number, url };
+      const host = hostOfUrl(hosts, url);
+      if (!host) return "This pull request is not on a supported host.";
+      return { host, link: { host: host.kind, repo, number, url } };
     }
     const stored = z
       .object({ linked_pr: z.string().nullable() })
@@ -104,29 +100,32 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
       .parse(db.prepare("SELECT linked_pr FROM reviews WHERE id = ?").get(review.id));
     if (stored?.linked_pr) {
       const parsed = PullRequestLinkSchema.safeParse(JSON.parse(stored.linked_pr));
-      if (parsed.success) return parsed.data;
+      if (parsed.success) return linked(parsed.data);
     }
     const project = getProject(db, review.projectId);
     const remote = project ? primaryRemote(await listRemotes(project.path)) : undefined;
-    const repo = remote ? githubRepoOf(remote.url) : undefined;
-    if (!repo) return "This project has no GitHub remote.";
-    const candidates = await gh.pullRequestsForBranch(repo, review.headBranch);
-    const open = candidates.find((pr) => pr.headRefOid === review.headSha) ?? candidates[0];
+    const found = remote
+      ? hosts
+          .map((host) => ({ host, repo: host.repoOfRemote(remote.url) }))
+          .find((entry) => entry.repo !== undefined)
+      : undefined;
+    if (!found?.repo) return "This project has no GitHub or Bitbucket remote.";
+    const { host, repo } = found;
+    const candidates = await host.openPullRequestsForBranch(repo, review.headBranch);
+    const open = candidates.find((pr) => host.isHead(pr.headSha, review.headSha)) ?? candidates[0];
     if (!open) return `No open pull request has ${review.headBranch} as its branch.`;
-    const link: PullRequestLink = { repo, number: open.number, url: open.url };
+    const link: PullRequestLink = { host: host.kind, repo, number: open.number, url: open.url };
     db.prepare("UPDATE reviews SET linked_pr = ? WHERE id = ?").run(
       JSON.stringify(link),
       review.id,
     );
-    return link;
+    return { host, link };
   }
 
   async function fetchConversation(review: Review): Promise<PrConversation> {
     const pr = await pullRequestOf(review);
     if (typeof pr === "string") return { status: "none", reason: pr };
-    const [owner = "", name = ""] = pr.repo.split("/");
-    const answer = await gh.graphql(QUERY, { owner, name, number: pr.number });
-    return parseConversation(pr, answer);
+    return pr.host.conversation(pr.link);
   }
 
   /** The latest discussion read per review: new comments are told from it at send time. */
@@ -156,7 +155,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     const posted = activity.last(reviewId, "posted");
     const known = [
       activity.last(reviewId, "comments")?.detail.until,
-      // GitHub's own time of the user's post when known: the local clock may run behind.
+      // The host's own time of the user's post when known: the local clock may run behind.
       posted ? (posted.detail.submittedAt ?? posted.at) : undefined,
       toldAt(reviewId),
       previous ? latestCommentAt(previous) : null,
@@ -164,7 +163,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     // Never read (in this run, or told to Claude before): this is the first look, not news.
     // Read before with no comments at all: everything now is new.
     if (known.length === 0 && previous === undefined) return;
-    // Our times and GitHub's differ in format (".000Z"), so compare instants, not strings.
+    // Our times and the host's differ in format (".000Z"), so compare instants, not strings.
     const since =
       known.length === 0 ? Number.NEGATIVE_INFINITY : Math.max(...known.map((t) => Date.parse(t)));
     const { count, until } = commentsSince(conversation, since);
@@ -183,10 +182,10 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     const review = deps.review(reviewId);
     const pr = await pullRequestOf(review);
     if (typeof pr === "string") return { status: "none", reason: pr };
-    const info = await gh.viewPullRequest(pr.repo, pr.number);
-    // Lines are checked against our diff; it is GitHub's diff only when both compare with the
-    // same base branch. Otherwise an unknown line would make GitHub reject the whole review.
-    const sameBase = info.baseRefName === review.baseBranch;
+    const info = await pr.host.viewPullRequest(pr.link.repo, pr.link.number);
+    // Lines are checked against our diff; it is the host's diff only when both compare with the
+    // same base branch. Otherwise an unknown line would make the host reject the comment.
+    const sameBase = info.baseBranch === review.baseBranch;
     const findings = listFindings(db, reviewId).filter(
       (f) => f.withdrawnReason === null && f.verdict !== "dismissed",
     );
@@ -210,7 +209,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
     for (const finding of findings) {
       let reason: string | null = null;
       if (!sameBase) {
-        reason = `the pull request targets ${info.baseRefName}, this review compares with ${review.baseBranch}`;
+        reason = `the pull request targets ${info.baseBranch}, this review compares with ${review.baseBranch}`;
       } else if (finding.file === null || finding.line === null) {
         reason = finding.file === null ? "it is about the change as a whole" : "it has no line";
       } else {
@@ -227,7 +226,12 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
         postedUrl: finding.postedUrl,
       });
     }
-    return { status: "ok", pullRequest: pr, upToDate: info.headRefOid === review.headSha, items };
+    return {
+      status: "ok",
+      pullRequest: pr.link,
+      upToDate: pr.host.isHead(info.headSha, review.headSha),
+      items,
+    };
   }
 
   return {
@@ -257,7 +261,7 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
 
     async firstDigest(review) {
       try {
-        // A new review should not wait long for GitHub: without the digest it still starts.
+        // A new review should not wait long for the host: without the digest it still starts.
         const conversation = await Promise.race([
           read(review),
           new Promise<undefined>((resolve) => {
@@ -314,51 +318,46 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
       }
       return { ...item, text, edited: text !== item.text };
     });
-    const numbers = chosen.map((item) => item.number);
     const findings = new Map(listFindings(db, request.id).map((f) => [f.number, f]));
-    const inline = chosen.filter((i) => i.placement === "inline");
-    const summary = chosen.filter((i) => i.placement === "summary");
+    const inline = chosen
+      .filter((item) => item.placement === "inline")
+      .map((item): InlinePost => {
+        const finding = findings.get(item.number);
+        if (finding?.file == null || finding.line === null) {
+          throw new AppFailure(
+            "finding_not_found",
+            `Finding #${item.number} has no line to post on`,
+          );
+        }
+        return { number: item.number, path: finding.file, line: finding.line, text: item.text };
+      });
+    const summary = chosen.filter((item) => item.placement === "summary");
     const body = [request.body.trim(), summary.map((i) => i.text).join("\n\n---\n\n")]
       .filter((part) => part !== "")
       .join("\n\n---\n\n");
-    if (body.length > GITHUB_BODY_MAX) {
-      throw new AppFailure(
-        "invalid_request",
-        "The review's summary is too long for GitHub. Shorten it or post fewer findings in the summary.",
-      );
-    }
-    let answer: unknown;
-    try {
-      answer = await gh.postReview(plan.pullRequest.repo, plan.pullRequest.number, {
-        commit_id: review.headSha,
+    const host = hostByKind(hosts, plan.pullRequest.host);
+    if (!host)
+      throw new AppFailure("no_pull_request", "This pull request's host is not supported.");
+    const { url, submittedAt } = await host.post(
+      {
+        pullRequest: plan.pullRequest,
+        commitId: review.headSha,
         event: request.event,
         body,
-        comments: inline.map((item) => {
-          const finding = findings.get(item.number);
-          return { path: finding?.file, line: finding?.line, side: "RIGHT", body: item.text };
-        }),
-      });
-    } catch (error) {
-      // GitHub may have posted it: never offer these findings again as if they were not.
-      if (error instanceof AppFailure && error.code === "post_uncertain") {
-        markPosted(db, request.id, numbers, plan.pullRequest.url);
-      }
-      throw error;
-    }
-    const parsed = z
-      .object({ html_url: z.string(), submitted_at: z.string().nullish() })
-      .safeParse(answer);
-    const url = parsed.success ? parsed.data.html_url : plan.pullRequest.url;
-    markPosted(db, request.id, numbers, url);
+        inline,
+        summaryNumbers: summary.map((item) => item.number),
+      },
+      (numbers, postedUrl) => markPosted(db, request.id, numbers, postedUrl),
+    );
     deps.activity?.record(request.id, {
       kind: "posted",
-      findings: numbers.length,
+      findings: chosen.length,
       url,
-      submittedAt: (parsed.success ? parsed.data.submitted_at : null) ?? null,
+      submittedAt,
     });
-    deps.log.info("review posted to GitHub", {
+    deps.log.info(`review posted to ${HOST_LABELS[host.kind]}`, {
       review: request.id,
-      findings: numbers.length,
+      findings: chosen.length,
       edited: chosen.filter((item) => item.edited).length,
     });
     return { url };
