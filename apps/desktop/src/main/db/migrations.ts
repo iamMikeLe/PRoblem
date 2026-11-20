@@ -174,4 +174,18 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX activity_by_review ON activity (review_id, kind);
     `,
   },
+  {
+    version: 11,
+    name: "credentials",
+    sql: `
+      -- Git host credentials (ADR 0019): one row per host. \`secret\` is encrypted with the OS
+      -- keychain (Electron safeStorage); it is useless on another machine or account.
+      CREATE TABLE credentials (
+        host       TEXT PRIMARY KEY,
+        account    TEXT NOT NULL,
+        secret     BLOB NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
 ];

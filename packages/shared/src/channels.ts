@@ -38,6 +38,9 @@ export const IPC_CHANNELS = [
   "dialog:pickFolder",
   "activity:list",
   "activity:markRead",
+  "bitbucket:status",
+  "bitbucket:save",
+  "bitbucket:remove",
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];

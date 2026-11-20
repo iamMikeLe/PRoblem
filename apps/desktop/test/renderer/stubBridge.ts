@@ -3,6 +3,7 @@ import {
   type AppErrorCode,
   type AppEvent,
   type AppSettings,
+  type BitbucketStatus,
   type ChangeSet,
   type ClaudeCatalog,
   DEFAULT_CHANGE_FILTERS,
@@ -162,6 +163,8 @@ export interface StubState {
   editorError?: StubError | undefined;
   /** What the native folder picker "chooses"; `null` = the user cancels. */
   pickedFolder: string | null;
+  /** Saved Bitbucket credentials, as the main process would report them. */
+  bitbucket: BitbucketStatus;
   /** When set, the matching call fails with this error. */
   listError?: StubError | undefined;
   createError?: StubError | undefined;
@@ -216,6 +219,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
       ],
     },
     pickedFolder: null,
+    bitbucket: { configured: false, email: null },
     emit: (event) => {
       for (const listener of listeners) listener(event);
     },
@@ -429,6 +433,16 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         );
         return ok(null);
       }
+      case "bitbucket:status":
+        return ok(state.bitbucket);
+      case "bitbucket:save": {
+        const { email } = ipcContract[channel].input.parse(raw);
+        state.bitbucket = { configured: true, email };
+        return ok(state.bitbucket);
+      }
+      case "bitbucket:remove":
+        state.bitbucket = { configured: false, email: null };
+        return ok(state.bitbucket);
     }
   }
 

@@ -1,6 +1,7 @@
 import {
   type ActivityItem,
   type AppSettings,
+  type BitbucketStatus,
   type ChangeSet,
   type ClaudeCatalog,
   type CloseReviewResult,
@@ -23,6 +24,7 @@ import {
   type ProblemBridge,
   type Project,
   type Review,
+  type SaveBitbucketCredentials,
   type SearchResults,
   type SendMessageRequest,
   type SetVerdictRequest,
@@ -92,6 +94,12 @@ export const api = {
   },
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
+  },
+  bitbucket: {
+    status: (): Promise<BitbucketStatus> => call("bitbucket:status", undefined),
+    save: (request: SaveBitbucketCredentials): Promise<BitbucketStatus> =>
+      call("bitbucket:save", request),
+    remove: (): Promise<BitbucketStatus> => call("bitbucket:remove", undefined),
   },
   pullRequests: {
     conversation: (id: string): Promise<PrConversation> => call("pr:conversation", { id }),
