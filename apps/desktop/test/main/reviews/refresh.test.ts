@@ -8,6 +8,7 @@ import { createChangesService } from "../../../src/main/changes/service.ts";
 import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import { createProjectService } from "../../../src/main/projects/service.ts";
+import { createGitHubHost } from "../../../src/main/pullrequests/github.ts";
 import { movedFrom } from "../../../src/main/reviews/repository.ts";
 import { createReviewService, type ReviewService } from "../../../src/main/reviews/service.ts";
 import { type GitHubFixture, git, makeGitHubFixture, makeTempDir } from "../gitFixture.ts";
@@ -49,23 +50,25 @@ describe("checking for new commits and refreshing a review", () => {
       db,
       activity,
       worktreesDir: join(dir, "worktrees"),
-      gh: {
-        viewPullRequest: vi.fn(async () => ({
-          number: 7,
-          title: "Retry webhooks",
-          url: PR_URL,
-          headRefName: "feature",
-          headRefOid: fx.featureSha,
-          baseRefName: "main",
-        })),
-        pullRequestsForBranch: vi.fn(async () => []),
-        graphql: vi.fn(async () => {
-          throw new Error("not used");
+      hosts: [
+        createGitHubHost({
+          viewPullRequest: vi.fn(async () => ({
+            number: 7,
+            title: "Retry webhooks",
+            url: PR_URL,
+            headRefName: "feature",
+            headRefOid: fx.featureSha,
+            baseRefName: "main",
+          })),
+          pullRequestsForBranch: vi.fn(async () => []),
+          graphql: vi.fn(async () => {
+            throw new Error("not used");
+          }),
+          postReview: vi.fn(async () => {
+            throw new Error("not used");
+          }),
         }),
-        postReview: vi.fn(async () => {
-          throw new Error("not used");
-        }),
-      },
+      ],
       log: silentLogger,
     });
   });

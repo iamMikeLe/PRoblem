@@ -2,7 +2,7 @@ import { GITHUB_BODY_MAX } from "@problem/shared";
 import { z } from "zod";
 import { AppFailure } from "../errors.ts";
 import type { GhClient, PullRequestInfo } from "../git/gh.ts";
-import { githubRepoOf } from "../git/github.ts";
+import { githubRepoOf, parsePullRequestUrl } from "../git/github.ts";
 import { parseConversation } from "./githubConversation.ts";
 import { type GitHost, isHttpsLinkTo, type PrInfo } from "./host.ts";
 
@@ -36,6 +36,18 @@ export function createGitHubHost(gh: GhClient): GitHost {
     kind: "github",
     repoOfRemote: githubRepoOf,
     isWebUrl: (url) => isHttpsLinkTo(url, "github.com"),
+    parsePrUrl(input) {
+      const ref = parsePullRequestUrl(input);
+      return ref
+        ? { repo: `${ref.owner}/${ref.repo}`.toLowerCase(), number: ref.number }
+        : undefined;
+    },
+    pullRequestUrl: (repo, number) => `https://github.com/${repo}/pull/${number}`,
+    // GitHub keeps every pull request's head at refs/pull/<n>/head, forks included.
+    fetchSource: (pr, target, remote) => ({
+      from: remote.name,
+      refspec: `+refs/pull/${pr.number}/head:${target}`,
+    }),
     viewPullRequest: async (repo, number) => info(await gh.viewPullRequest(repo, number)),
     openPullRequestsForBranch: async (repo, branch) =>
       (await gh.pullRequestsForBranch(repo, branch)).map(info),

@@ -7,9 +7,9 @@ import type {
 } from "@problem/shared";
 import { z } from "zod";
 import { AppFailure } from "../errors.ts";
-import { bitbucketRepoOf } from "../git/bitbucket.ts";
+import { bitbucketRepoOf, parseBitbucketPullRequestUrl } from "../git/bitbucket.ts";
 import { type BitbucketApi, segment } from "./bitbucketApi.ts";
-import { type GitHost, isHttpsLinkTo, type PrInfo } from "./host.ts";
+import { type FetchSource, type GitHost, isHttpsLinkTo, type PrInfo } from "./host.ts";
 
 const Name = z.object({ display_name: z.string() }).nullish();
 
@@ -75,7 +75,38 @@ function info(repo: string, pr: PullRequest): PrInfo {
     headBranch: pr.source.branch.name,
     headSha: pr.source.commit?.hash ?? "",
     baseBranch: pr.destination.branch.name,
+    sourceRepo: pr.source.repository?.full_name.toLowerCase(),
   };
+}
+
+/** A repository name safe to put into a clone URL. */
+const REPO_NAME = /^[\w.-]+\/[\w.-]+$/;
+
+/**
+ * Bitbucket has no `refs/pull/*`: the head is the source branch, in this repository or in a
+ * fork. A fork is fetched from a URL built here from its checked name, in the scheme of the
+ * project's remote (so the user's own git credentials apply), never from the API's clone links.
+ */
+export function bitbucketFetchSource(
+  pr: PrInfo,
+  target: string,
+  remote: { name: string; url: string },
+): FetchSource {
+  const refspec = `+refs/heads/${pr.headBranch}:${target}`;
+  const repo = bitbucketRepoOf(remote.url);
+  const fork = pr.sourceRepo;
+  if (fork === undefined || fork === repo)
+    return { from: remote.name, refspec, branch: pr.headBranch };
+  if (!REPO_NAME.test(fork) || fork.split("/").some((part) => part === "." || part === "..")) {
+    throw new AppFailure(
+      "fetch_failed",
+      "The pull request comes from a fork with an unexpected name",
+    );
+  }
+  const from = remote.url.trim().toLowerCase().startsWith("https://")
+    ? `https://bitbucket.org/${fork}.git`
+    : `git@bitbucket.org:${fork}.git`;
+  return { from, refspec, branch: pr.headBranch };
 }
 
 /** Comments as the PR comments tab shows them: inline ones as threads, the rest in order. */
@@ -173,6 +204,14 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
     kind: "bitbucket",
     repoOfRemote: bitbucketRepoOf,
     isWebUrl: (url) => isHttpsLinkTo(url, "bitbucket.org"),
+    parsePrUrl(input) {
+      const ref = parseBitbucketPullRequestUrl(input);
+      return ref
+        ? { repo: `${ref.owner}/${ref.repo}`.toLowerCase(), number: ref.number }
+        : undefined;
+    },
+    pullRequestUrl: bitbucketPrUrl,
+    fetchSource: bitbucketFetchSource,
     viewPullRequest: async (repo, number) => info(repo, await pullRequest(repo, number)),
 
     async openPullRequestsForBranch(repo, branch) {

@@ -10,6 +10,9 @@ const fakeHost = (kind: GitHost["kind"], hostname: string): GitHost => ({
   kind,
   repoOfRemote: () => undefined,
   isWebUrl: (url) => isHttpsLinkTo(url, hostname),
+  parsePrUrl: () => undefined,
+  pullRequestUrl: () => "",
+  fetchSource: () => ({ from: "origin", refspec: "" }),
   viewPullRequest: async () => {
     throw new Error("unused");
   },

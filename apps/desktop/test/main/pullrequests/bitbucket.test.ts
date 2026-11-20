@@ -66,6 +66,7 @@ describe("Bitbucket host", () => {
       headBranch: "feature/retry",
       headSha: HEAD,
       baseBranch: "main",
+      sourceRepo: "acme/payments",
     });
   });
 
