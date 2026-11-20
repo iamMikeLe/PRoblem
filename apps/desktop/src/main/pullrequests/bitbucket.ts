@@ -1,0 +1,208 @@
+import type {
+  PrComment,
+  PrConversation,
+  PrReview,
+  PrThread,
+  PullRequestLink,
+} from "@problem/shared";
+import { z } from "zod";
+import { AppFailure } from "../errors.ts";
+import { bitbucketRepoOf } from "../git/bitbucket.ts";
+import { type BitbucketApi, segment } from "./bitbucketApi.ts";
+import { type GitHost, isHttpsLinkTo, type PrInfo } from "./host.ts";
+
+const Name = z.object({ display_name: z.string() }).nullish();
+
+const PullRequest = z.object({
+  id: z.number().int().positive(),
+  title: z.string(),
+  source: z.object({
+    branch: z.object({ name: z.string().min(1) }),
+    commit: z.object({ hash: z.string().regex(/^[0-9a-f]{7,64}$/) }).nullish(),
+    repository: z.object({ full_name: z.string() }).nullish(),
+  }),
+  destination: z.object({ branch: z.object({ name: z.string().min(1) }) }),
+  participants: z
+    .array(
+      z.object({
+        user: Name,
+        state: z.string().nullish(),
+        participated_on: z.string().nullish(),
+      }),
+    )
+    .optional(),
+});
+type PullRequest = z.infer<typeof PullRequest>;
+
+const Comment = z.object({
+  id: z.number().int(),
+  content: z.object({ raw: z.string() }),
+  user: Name,
+  created_on: z.string(),
+  deleted: z.boolean().optional(),
+  inline: z
+    .object({
+      path: z.string(),
+      to: z.number().int().nullish(),
+      outdated: z.boolean().optional(),
+    })
+    .nullish(),
+  parent: z.object({ id: z.number().int() }).nullish(),
+  resolution: z.unknown().optional(),
+});
+type Comment = z.infer<typeof Comment>;
+
+/** The pull request's page; built here, never taken from the API's answer. */
+export const bitbucketPrUrl = (repo: string, number: number): string =>
+  `https://bitbucket.org/${repo}/pull-requests/${number}`;
+
+const repoPath = (repo: string): string => {
+  const [workspace = "", slug = ""] = repo.split("/");
+  return `/repositories/${segment(workspace)}/${segment(slug)}`;
+};
+
+const author = (user: Comment["user"]): string => user?.display_name ?? "Former user";
+
+/** The value of a BBQL string literal: backslashes and quotes escaped. */
+const bbqlString = (value: string): string =>
+  `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+
+function info(repo: string, pr: PullRequest): PrInfo {
+  return {
+    number: pr.id,
+    title: pr.title,
+    url: bitbucketPrUrl(repo, pr.id),
+    headBranch: pr.source.branch.name,
+    headSha: pr.source.commit?.hash ?? "",
+    baseBranch: pr.destination.branch.name,
+  };
+}
+
+/** Comments as the PR comments tab shows them: inline ones as threads, the rest in order. */
+export function toConversation(
+  pr: PullRequestLink,
+  data: PullRequest,
+  comments: Comment[],
+  truncated: boolean,
+): PrConversation {
+  const live = comments.filter((c) => c.deleted !== true);
+  const byId = new Map(live.map((c) => [c.id, c]));
+  /** The first comment of a reply chain that is still there. */
+  const rootOf = (comment: Comment): Comment => {
+    let current = comment;
+    const seen = new Set<number>();
+    while (current.parent && !seen.has(current.id)) {
+      seen.add(current.id);
+      const parent = byId.get(current.parent.id);
+      if (!parent) break;
+      current = parent;
+    }
+    return current;
+  };
+  const url = (comment: Comment) => `${pr.url}#comment-${comment.id}`;
+  const toComment = (comment: Comment): PrComment => ({
+    id: String(comment.id),
+    author: author(comment.user),
+    body: comment.content.raw,
+    createdAt: comment.created_on,
+    url: url(comment),
+  });
+
+  const threads = new Map<number, PrThread>();
+  const general: PrComment[] = [];
+  for (const comment of live) {
+    const root = rootOf(comment);
+    if (!root.inline) {
+      general.push(toComment(comment));
+      continue;
+    }
+    let thread = threads.get(root.id);
+    if (!thread) {
+      const line = root.inline.to ?? null;
+      thread = {
+        id: String(root.id),
+        path: root.inline.path,
+        line: line !== null && line > 0 ? line : null,
+        isResolved: root.resolution !== undefined && root.resolution !== null,
+        isOutdated: root.inline.outdated === true || line === null,
+        comments: [],
+      };
+      threads.set(root.id, thread);
+    }
+    thread.comments.push(toComment(comment));
+  }
+
+  const reviews: PrReview[] = (data.participants ?? []).flatMap((participant) => {
+    const state =
+      participant.state === "approved"
+        ? "APPROVED"
+        : participant.state === "changes_requested"
+          ? "CHANGES_REQUESTED"
+          : undefined;
+    if (!state) return [];
+    const at = participant.participated_on;
+    return [
+      {
+        id: `${state}-${author(participant.user)}`,
+        author: author(participant.user),
+        state,
+        body: "",
+        submittedAt: at && !Number.isNaN(Date.parse(at)) ? at : null,
+        url: pr.url,
+      },
+    ];
+  });
+
+  return {
+    status: "ok",
+    pullRequest: { ...pr, title: data.title, headSha: data.source.commit?.hash ?? "" },
+    threads: [...threads.values()],
+    comments: general,
+    reviews,
+    truncated,
+  };
+}
+
+/** Bitbucket Cloud over its REST API with the saved API token (ADR 0019). */
+export function createBitbucketHost(api: BitbucketApi): GitHost {
+  async function pullRequest(repo: string, number: number): Promise<PullRequest> {
+    return api.get(`${repoPath(repo)}/pullrequests/${number}`, PullRequest);
+  }
+
+  return {
+    kind: "bitbucket",
+    repoOfRemote: bitbucketRepoOf,
+    isWebUrl: (url) => isHttpsLinkTo(url, "bitbucket.org"),
+    viewPullRequest: async (repo, number) => info(repo, await pullRequest(repo, number)),
+
+    async openPullRequestsForBranch(repo, branch) {
+      const query = encodeURIComponent(`source.branch.name = ${bbqlString(branch)}`);
+      const { values } = await api.list(
+        `${repoPath(repo)}/pullrequests?state=OPEN&sort=-updated_on&pagelen=50&q=${query}`,
+        PullRequest,
+      );
+      return (
+        values
+          // Pull requests from forks with a branch of the same name are left out.
+          .filter((pr) => pr.source.repository?.full_name.toLowerCase() === repo)
+          .map((pr) => info(repo, pr))
+      );
+    },
+
+    // Bitbucket reports a 12-character prefix of the head commit.
+    isHead: (prHead, reviewHead) => prHead.length >= 7 && reviewHead.startsWith(prHead),
+
+    async conversation(pr) {
+      const data = await pullRequest(pr.repo, pr.number);
+      const { values, truncated } = await api.list(
+        `${repoPath(pr.repo)}/pullrequests/${pr.number}/comments?pagelen=100`,
+        Comment,
+      );
+      return toConversation(pr, data, values, truncated);
+    },
+
+    async post() {
+      throw new AppFailure("internal", "Posting to Bitbucket is not available yet.");
+    },
+  };
+}
