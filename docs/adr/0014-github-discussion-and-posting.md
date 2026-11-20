@@ -1,6 +1,6 @@
 # 0014. Reading a pull request's discussion, and posting findings as a GitHub review
 
-- Status: accepted, amended by [0017](0017-editable-post-text.md) (the user edits each finding's text before posting)
+- Status: accepted, amended by [0017](0017-editable-post-text.md) (the user edits each finding's text before posting) and [0019](0019-bitbucket-cloud.md) (`pr:*` channels, Bitbucket hosts, mention guard)
 - Date: 2026-11-18
 
 ## Context

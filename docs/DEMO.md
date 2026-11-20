@@ -10,7 +10,7 @@ switching: which review was where, what you asked, which findings you already ch
 desktop app that gives every review its own room. You start a Claude Code review from a branch or a
 PR link, many at once and across repositories. Each review keeps its own live conversation and a
 list of numbered findings that you accept, dismiss or ask about. Claude is read-only unless you
-approve more. Nothing reaches GitHub until you click Post.
+approve more. Nothing reaches GitHub or Bitbucket until you click Post.
 
 ## 2. Demo script (5½ minutes)
 
@@ -48,7 +48,7 @@ Before you start:
    - Show **Check now**, which moves the review to new commits.
    - Resize or collapse the file list.
 7. **PR comments and posting (40 s).** Press `4`.
-   - Show the PR discussion, then **Post to GitHub…**: a preview of exactly what will be posted.
+   - Show the PR discussion, then **Post to pull request…**: a preview of exactly what will be posted.
    - Post it, then show it on GitHub. Say: "Nothing is written to GitHub without this click."
 8. **Find anything (20 s).** Press `⌘K` and type a word. Results come from every open review's
    titles, findings and changed files. Press Enter to jump to the result.
@@ -111,6 +111,7 @@ Three places worth opening:
 | 0016 | "Allow all commands" for one review | One click per review instead of per command; an injected command runs unasked, inside the sandbox |
 | 0017 | The user edits each finding's text before posting; main posts exactly that text | The user's words under their name; main can no longer promise that edited text mentions no one, so Claude's text stays neutralized and the dialog says what an edit does |
 | 0018 | Syntax highlighting with lowlight rendered as React elements, Material Icon Theme icons, bundled JetBrains Mono, rainbow indentation | No CSP change and nothing loaded at startup; the Changes chunk grows (icon tables) and one file holds hard-coded syntax colors |
+| 0019 | Bitbucket Cloud behind one `GitHost` interface, with an Atlassian API token encrypted by the keychain | The UI and the post flow stay host-neutral; Bitbucket posts comment by comment, so a failure can leave part of a review posted |
 
 ## 5. How I work with Claude Code
 
@@ -174,7 +175,6 @@ The `.claude/` folder turns Claude Code into a team that follows this project's 
   - Run the end-to-end test in CI under a virtual display.
   - Signed and notarized macOS builds with auto-update.
   - A packaged `.dmg` checked on a clean machine.
-  - Bitbucket Cloud.
 - **What did Claude Code do, and what did you do?**
   - I set the product, the rules and the reviews; Claude implemented within them.
   - Every phase went through a plan, tests, `pnpm verify` and the reviewer agents.
