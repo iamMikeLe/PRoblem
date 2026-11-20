@@ -37,7 +37,8 @@ review its own room:
 - **Stable findings**: Claude reports findings through a dedicated tool; numbers never change, and you
   accept, dismiss or ask about each one.
 - **Safe by default**: Claude is read-only; anything else asks for approval in the review.
-- **Git host integration**: read PR comments and post findings to GitHub, only when you click.
+- **Git host integration**: read PR comments and post findings to GitHub or Bitbucket Cloud, only
+  when you click.
 - **Activity**: one feed of what finished, failed, needs your approval, or got new commits or
   comments, across every review, with an unread count.
 
@@ -67,7 +68,8 @@ pull requests, install `gh` and run `gh auth login`.
 ## Getting started
 
 Requirements: Node 24+, pnpm 9+, git. From Phase 3 on: Claude Code installed and logged in.
-From Phase 7 on: `gh` logged in for GitHub features.
+From Phase 7 on: `gh` logged in for GitHub features. For Bitbucket Cloud, an Atlassian API token
+with the pull request scopes, added in Settings.
 
 ```sh
 pnpm install
