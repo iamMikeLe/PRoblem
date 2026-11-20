@@ -344,21 +344,21 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         const diff = state.diffs[path];
         return diff ? ok(diff) : fail({ code: "file_not_in_changes", message: "Not changed" });
       }
-      case "github:conversation": {
+      case "pr:conversation": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.conversations[id] ?? { status: "none", reason: "No pull request." });
       }
-      case "github:preview": {
+      case "pr:preview": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.previews[id] ?? { status: "none", reason: "No pull request." });
       }
-      case "github:post": {
+      case "pr:post": {
         const request = ipcContract[channel].input.parse(raw);
         if (state.postError) return fail(state.postError);
         state.posts.push(request);
         return ok({ url: "https://github.com/acme/payments/pull/7#pullrequestreview-1" });
       }
-      case "github:open": {
+      case "pr:open": {
         const { url } = ipcContract[channel].input.parse(raw);
         state.opened.push(url);
         return ok(null);

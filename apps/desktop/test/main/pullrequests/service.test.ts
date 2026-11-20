@@ -7,13 +7,13 @@ import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import { insertFinding, setVerdict } from "../../../src/main/findings/repository.ts";
 import type { GhClient, PullRequestInfo } from "../../../src/main/git/gh.ts";
+import { isGitHubUrl } from "../../../src/main/ipc/handlers.ts";
+import { insertProject } from "../../../src/main/projects/repository.ts";
 import {
   createGitHubService,
   formatFinding,
   type GitHubService,
-} from "../../../src/main/github/service.ts";
-import { isGitHubUrl } from "../../../src/main/ipc/handlers.ts";
-import { insertProject } from "../../../src/main/projects/repository.ts";
+} from "../../../src/main/pullrequests/service.ts";
 import {
   getReviewRecord,
   insertReview,

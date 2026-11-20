@@ -34,10 +34,10 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "reviews:refresh": () => {
       throw new Error("not used");
     },
-    "github:conversation": () => ({ status: "none", reason: "x" }),
-    "github:preview": () => ({ status: "none", reason: "x" }),
-    "github:post": () => ({ url: "https://github.com/a/b/pull/1" }),
-    "github:open": () => null,
+    "pr:conversation": () => ({ status: "none", reason: "x" }),
+    "pr:preview": () => ({ status: "none", reason: "x" }),
+    "pr:post": () => ({ url: "https://github.com/a/b/pull/1" }),
+    "pr:open": () => null,
     "app:reportError": () => null,
     "search:query": () => ({ reviews: [], findings: [], files: [] }),
     "changes:files": () => ({ fromSha: "a", toSha: "b", files: [] }),
@@ -92,14 +92,14 @@ describe("IPC dispatcher", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("hands github:post the user's texts untouched, and refuses texts GitHub would not take", async () => {
-    const post = vi.fn<IpcHandlers["github:post"]>(() => ({
+  it("hands pr:post the user's texts untouched, and refuses texts GitHub would not take", async () => {
+    const post = vi.fn<IpcHandlers["pr:post"]>(() => ({
       url: "https://github.com/a/b/pull/1",
     }));
-    const dispatch = createDispatcher(handlers({ "github:post": post }), silentLogger);
+    const dispatch = createDispatcher(handlers({ "pr:post": post }), silentLogger);
     const findings = [{ number: 2, text: "  cc @alice\n" }];
 
-    const result = await dispatch("github:post", {
+    const result = await dispatch("pr:post", {
       id: "r1",
       event: "COMMENT",
       body: "",
@@ -109,7 +109,7 @@ describe("IPC dispatcher", () => {
     expect(post).toHaveBeenCalledWith({ id: "r1", event: "COMMENT", body: "", findings });
 
     for (const bad of [[2], [{ number: 2, text: "" }], [{ number: 2, text: "x".repeat(65_537) }]]) {
-      const refused = await dispatch("github:post", {
+      const refused = await dispatch("pr:post", {
         id: "r1",
         event: "COMMENT",
         body: "",

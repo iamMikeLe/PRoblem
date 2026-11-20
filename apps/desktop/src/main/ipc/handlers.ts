@@ -5,8 +5,8 @@ import type { SessionService } from "../claude/sessions.ts";
 import type { EditorOpener } from "../editor/open.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { FindingsService } from "../findings/service.ts";
-import type { GitHubService } from "../github/service.ts";
 import type { ProjectService } from "../projects/service.ts";
+import type { GitHubService } from "../pullrequests/service.ts";
 import type { ReviewService } from "../reviews/service.ts";
 import type { SearchService } from "../search/service.ts";
 import type { IpcHandlers } from "./dispatcher.ts";
@@ -98,10 +98,10 @@ export function createHandlers({
       log.error("renderer error", report);
       return null;
     },
-    "github:conversation": ({ id }) => github.conversation(id),
-    "github:preview": ({ id }) => github.preview(id),
-    "github:post": (input) => github.post(input),
-    "github:open": async ({ url }) => {
+    "pr:conversation": ({ id }) => github.conversation(id),
+    "pr:preview": ({ id }) => github.preview(id),
+    "pr:post": (input) => github.post(input),
+    "pr:open": async ({ url }) => {
       if (!isGitHubUrl(url))
         throw new AppFailure("invalid_url", "Only github.com links can be opened");
       await openExternal(url);
