@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createBitbucketApi, MAX_PAGES } from "../../../src/main/pullrequests/bitbucketApi.ts";
+import {
+  createBitbucketApi,
+  MAX_PAGES,
+  testBitbucketConnection,
+} from "../../../src/main/pullrequests/bitbucketApi.ts";
 
 const CREDENTIALS = { email: "me@example.com", token: "ATATT-token" };
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -78,7 +82,7 @@ describe("Bitbucket API client", () => {
       [json({}, 401), "bitbucket_auth_failed", /email and API token/],
       [
         json({ error: { message: "missing scope" } }, 403),
-        "bitbucket_auth_failed",
+        "bitbucket_forbidden",
         /missing scope.*scopes/,
       ],
       [json({}, 404), "bitbucket_failed", /did not find/],
@@ -133,5 +137,24 @@ describe("Bitbucket API client", () => {
     await expect(refused.api.post("/c", {}, Item)).rejects.toMatchObject({
       code: "bitbucket_failed",
     });
+  });
+});
+
+describe("Bitbucket connection test", () => {
+  it("names the account, accepts a token without profile access, and explains failures", async () => {
+    const ok = setup(() => json({ display_name: "Mike" }));
+    expect(await testBitbucketConnection(ok.api)).toEqual({
+      ok: true,
+      message: "Connected to Bitbucket as Mike.",
+    });
+    const scoped = setup(() => json({}, 403));
+    expect(await testBitbucketConnection(scoped.api)).toMatchObject({ ok: true });
+    const wrong = setup(() => json({}, 401));
+    expect(await testBitbucketConnection(wrong.api)).toEqual({
+      ok: false,
+      message: expect.stringMatching(/refused the email and API token/),
+    });
+    const none = createBitbucketApi({ fetch: vi.fn(), credentials: () => undefined });
+    expect(await testBitbucketConnection(none)).toMatchObject({ ok: false, message: /Settings/ });
   });
 });

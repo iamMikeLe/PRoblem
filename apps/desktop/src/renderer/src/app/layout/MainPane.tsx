@@ -14,7 +14,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { ComposeRegular, DismissRegular } from "@fluentui/react-icons";
-import type { Finding, Review } from "@problem/shared";
+import { type Finding, hostLabel, type Review } from "@problem/shared";
 import { lazy, Suspense, useState } from "react";
 import { Composer } from "../../features/conversation/Composer.tsx";
 import { Conversation } from "../../features/conversation/Conversation.tsx";
@@ -25,7 +25,7 @@ import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
 import { useProjects } from "../../features/projects/queries.ts";
 import { PostReviewDialog } from "../../features/pullrequests/PostReviewDialog.tsx";
-import { useOpenGitHub } from "../../features/pullrequests/queries.ts";
+import { useOpenPullRequestLink } from "../../features/pullrequests/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
@@ -178,10 +178,10 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
     );
   }
   const projects = useProjects();
-  // The "post to GitHub" preview, and the link of the review just posted.
+  // The "post to pull request" preview, and the link of the review just posted.
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState<{ reviewId: string; url: string }>();
-  const openGitHub = useOpenGitHub();
+  const openLink = useOpenPullRequestLink();
   const setDraft = useDrafts((state) => state.setDraft);
   const counts = useFindingCounts();
 
@@ -289,7 +289,7 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
         </Tooltip>
         {posted?.reviewId === review.id && (
           <MessageBar intent="success" className={styles.posted}>
-            <MessageBarBody>Posted to GitHub.</MessageBarBody>
+            <MessageBarBody>Posted to {hostLabel(posted.url)}.</MessageBarBody>
             <MessageBarActions
               containerAction={
                 <Button
@@ -300,8 +300,8 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
                 />
               }
             >
-              <Button size="small" onClick={() => openGitHub.mutate(posted.url)}>
-                Open on GitHub
+              <Button size="small" onClick={() => openLink.mutate(posted.url)}>
+                Open on {hostLabel(posted.url)}
               </Button>
             </MessageBarActions>
           </MessageBar>

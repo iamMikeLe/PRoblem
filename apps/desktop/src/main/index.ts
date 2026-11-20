@@ -24,7 +24,7 @@ import type { RendererSource } from "./ipc/trust.ts";
 import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
 import { createBitbucketHost } from "./pullrequests/bitbucket.ts";
-import { createBitbucketApi } from "./pullrequests/bitbucketApi.ts";
+import { createBitbucketApi, testBitbucketConnection } from "./pullrequests/bitbucketApi.ts";
 import { createGitHubHost } from "./pullrequests/github.ts";
 import { createPullRequestService } from "./pullrequests/service.ts";
 import { createReviewService } from "./reviews/service.ts";
@@ -112,10 +112,8 @@ async function start(): Promise<void> {
   const credentials = createCredentialStore({ db, secrets });
   const gh = createGhClient();
   const activity = createActivityService({ db, broadcast, log });
-  const hosts = [
-    createGitHubHost(gh),
-    createBitbucketHost(createBitbucketApi({ fetch, credentials: () => credentials.bitbucket() })),
-  ];
+  const bitbucketApi = createBitbucketApi({ fetch, credentials: () => credentials.bitbucket() });
+  const hosts = [createGitHubHost(gh), createBitbucketHost(bitbucketApi)];
   const reviews = createReviewService({
     db,
     activity,
@@ -195,6 +193,7 @@ async function start(): Promise<void> {
         pullRequests,
         hosts,
         credentials,
+        testBitbucket: () => testBitbucketConnection(bitbucketApi),
         search,
         activity,
         log,

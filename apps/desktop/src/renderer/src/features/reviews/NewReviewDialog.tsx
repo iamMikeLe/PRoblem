@@ -74,7 +74,7 @@ function initialState(projects: readonly Project[], projectId: string | undefine
   };
 }
 
-/** Starts a review of a branch or a GitHub pull request. */
+/** Starts a review of a branch or a GitHub or Bitbucket pull request. */
 export function NewReviewDialog({ open, projects, initialProjectId, onClose, onCreated }: Props) {
   const styles = useStyles();
   const create = useCreateReview();
@@ -163,14 +163,14 @@ export function NewReviewDialog({ open, projects, initialProjectId, onClose, onC
               <Field
                 label="Branch or pull request"
                 required
-                hint="A branch name, or a GitHub pull request link."
+                hint="A branch name, a pull request number like #42, or a GitHub or Bitbucket pull request link."
                 {...fieldError(errorFor("source"))}
               >
                 <Combobox
                   freeform
                   value={form.source}
                   maxLength={REVIEW_SOURCE_MAX}
-                  placeholder="feature/my-change or https://github.com/…/pull/42"
+                  placeholder="feature/my-change, #42 or a pull request link"
                   onChange={(event) => update({ source: event.target.value })}
                   onOptionSelect={(_, data) => update({ source: data.optionValue ?? form.source })}
                 >

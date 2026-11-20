@@ -62,6 +62,7 @@ function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
     "bitbucket:status": () => ({ configured: false, email: null }),
     "bitbucket:save": () => ({ configured: true, email: "me@example.com" }),
     "bitbucket:remove": () => ({ configured: false, email: null }),
+    "bitbucket:test": () => ({ ok: true, message: "x" }),
     ...overrides,
   };
 }

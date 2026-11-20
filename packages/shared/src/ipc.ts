@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { ActivityItemSchema, MarkActivityReadRequestSchema } from "./activity.ts";
-import { BitbucketStatusSchema, SaveBitbucketCredentialsSchema } from "./bitbucket.ts";
+import {
+  BitbucketStatusSchema,
+  BitbucketTestResultSchema,
+  SaveBitbucketCredentialsSchema,
+} from "./bitbucket.ts";
 import {
   ChangeFiltersSchema,
   ChangeSetSchema,
@@ -81,6 +85,7 @@ export const AppErrorCodeSchema = z.enum([
   "secret_storage_unavailable",
   "bitbucket_not_configured",
   "bitbucket_auth_failed",
+  "bitbucket_forbidden",
   "bitbucket_rate_limited",
   "bitbucket_unreachable",
   "bitbucket_failed",
@@ -305,6 +310,8 @@ export const ipcContract = {
   /** Saves the Atlassian email and API token, encrypted (ADR 0019). */
   "bitbucket:save": { input: SaveBitbucketCredentialsSchema, output: BitbucketStatusSchema },
   "bitbucket:remove": { input: z.undefined(), output: BitbucketStatusSchema },
+  /** Tries the saved credentials against Bitbucket. */
+  "bitbucket:test": { input: z.undefined(), output: BitbucketTestResultSchema },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;
 
 // Fails to compile if the contract has a channel that `IPC_CHANNELS` (the preload allowlist) lacks.

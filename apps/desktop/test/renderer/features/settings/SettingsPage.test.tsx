@@ -1,5 +1,5 @@
 import { teamsDarkTheme, teamsLightTheme } from "@fluentui/react-components";
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadTheme, useTheme } from "../../../../src/renderer/src/lib/theme.ts";
 import { renderApp } from "../../renderApp.tsx";
@@ -72,3 +72,65 @@ function hexToRgb(hex: string): string {
   const value = Number.parseInt(hex.slice(1), 16);
   return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
 }
+
+describe("Bitbucket settings", () => {
+  afterEach(() => {
+    cleanup();
+    removeBridge();
+  });
+
+  async function openBitbucket() {
+    renderApp();
+    fireEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    return within(await screen.findByRole("region", { name: "Bitbucket" }));
+  }
+
+  it("saves the email and token, then empties the token field", async () => {
+    const api = stubBridge([makeProject("p1", "payments-api")]);
+    const section = await openBitbucket();
+    expect(await section.findByText("No token saved.")).toBeTruthy();
+    const save = section.getByRole("button", { name: "Save credentials" });
+    expect(save.getAttribute("aria-disabled")).toBe("true");
+    expect(
+      section.getByRole("button", { name: "Test connection" }).getAttribute("aria-disabled"),
+    ).toBe("true");
+
+    fireEvent.change(section.getByRole("textbox", { name: "Atlassian email" }), {
+      target: { value: "not-an-email" },
+    });
+    const token = section.getByLabelText("API token") as HTMLInputElement;
+    expect(token.type).toBe("password");
+    fireEvent.change(token, { target: { value: "ATATT-token" } });
+    fireEvent.click(save);
+    expect(await section.findByText("Enter the email of your Atlassian account.")).toBeTruthy();
+
+    fireEvent.change(section.getByRole("textbox", { name: "Atlassian email" }), {
+      target: { value: "me@example.com" },
+    });
+    fireEvent.click(save);
+    expect(await section.findByText("Saved for me@example.com.")).toBeTruthy();
+    expect(api.calls).toContainEqual({
+      channel: "bitbucket:save",
+      input: { email: "me@example.com", token: "ATATT-token" },
+    });
+    await waitFor(() => expect(token.value).toBe(""));
+    expect(token.placeholder).toMatch(/paste a new token to replace it/);
+  });
+
+  it("tests the saved connection and removes it", async () => {
+    const api = stubBridge([makeProject("p1", "payments-api")]);
+    api.bitbucket = { configured: true, email: "me@example.com" };
+    api.bitbucketTest = { ok: false, message: "Bitbucket refused the email and API token." };
+    const section = await openBitbucket();
+    expect(await section.findByText("Saved for me@example.com.")).toBeTruthy();
+    // The token is never filled in from what was saved.
+    expect((section.getByLabelText("API token") as HTMLInputElement).value).toBe("");
+
+    fireEvent.click(section.getByRole("button", { name: "Test connection" }));
+    expect(await section.findByText("Bitbucket refused the email and API token.")).toBeTruthy();
+
+    fireEvent.click(section.getByRole("button", { name: "Remove" }));
+    expect(await section.findByText("No token saved.")).toBeTruthy();
+    expect(api.calls.map((c) => c.channel)).toContain("bitbucket:remove");
+  });
+});
