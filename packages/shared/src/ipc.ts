@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { ActivityItemSchema, MarkActivityReadRequestSchema } from "./activity.ts";
 import {
+  BitbucketStatusSchema,
+  BitbucketTestResultSchema,
+  SaveBitbucketCredentialsSchema,
+} from "./bitbucket.ts";
+import {
   ChangeFiltersSchema,
   ChangeSetSchema,
   FileDiffSchema,
@@ -26,7 +31,7 @@ import {
   PostReviewRequestSchema,
   PostReviewResultSchema,
   PrConversationSchema,
-} from "./github.ts";
+} from "./pullrequests.ts";
 import { SearchRequestSchema, SearchResultsSchema } from "./search.ts";
 import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
@@ -77,6 +82,14 @@ export const AppErrorCodeSchema = z.enum([
   "post_uncertain",
   "no_pull_request",
   "invalid_url",
+  "secret_storage_unavailable",
+  "bitbucket_not_configured",
+  "bitbucket_auth_failed",
+  "bitbucket_forbidden",
+  "bitbucket_rate_limited",
+  "bitbucket_unreachable",
+  "bitbucket_failed",
+  "post_partial",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
@@ -243,16 +256,16 @@ export const ipcContract = {
     output: FileDiffSchema,
   },
   /** The pull request's existing discussion (fetched from GitHub with `gh`). */
-  "github:conversation": {
+  "pr:conversation": {
     input: z.strictObject({ id: ReviewIdSchema }),
     output: PrConversationSchema,
   },
   /** What posting would send: each finding's exact text and whether it goes on a line. */
-  "github:preview": { input: z.strictObject({ id: ReviewIdSchema }), output: PostPreviewSchema },
+  "pr:preview": { input: z.strictObject({ id: ReviewIdSchema }), output: PostPreviewSchema },
   /** Posts a GitHub review. Only ever called from the preview dialog's button. */
-  "github:post": { input: PostReviewRequestSchema, output: PostReviewResultSchema },
+  "pr:post": { input: PostReviewRequestSchema, output: PostReviewResultSchema },
   /** Opens a github.com link in the browser (anything else is refused). */
-  "github:open": { input: z.strictObject({ url: z.string().max(2048) }), output: z.null() },
+  "pr:open": { input: z.strictObject({ url: z.string().max(2048) }), output: z.null() },
   /** Tool calls of all reviews that wait for the user. */
   "approvals:list": { input: z.undefined(), output: z.array(PendingApprovalSchema) },
   /** Answers an approval card. Fails with `approval_not_found` once it was answered or expired. */
@@ -292,6 +305,13 @@ export const ipcContract = {
   "activity:list": { input: z.undefined(), output: z.array(ActivityItemSchema) },
   /** Marks Activity rows as read. */
   "activity:markRead": { input: MarkActivityReadRequestSchema, output: z.null() },
+  /** Whether Bitbucket credentials are saved, and for which account. Never the token. */
+  "bitbucket:status": { input: z.undefined(), output: BitbucketStatusSchema },
+  /** Saves the Atlassian email and API token, encrypted (ADR 0019). */
+  "bitbucket:save": { input: SaveBitbucketCredentialsSchema, output: BitbucketStatusSchema },
+  "bitbucket:remove": { input: z.undefined(), output: BitbucketStatusSchema },
+  /** Tries the saved credentials against Bitbucket. */
+  "bitbucket:test": { input: z.undefined(), output: BitbucketTestResultSchema },
 } as const satisfies Record<IpcChannel, { input: z.ZodType; output: z.ZodType }>;
 
 // Fails to compile if the contract has a channel that `IPC_CHANNELS` (the preload allowlist) lacks.

@@ -1,6 +1,8 @@
 import {
   type ActivityItem,
   type AppSettings,
+  type BitbucketStatus,
+  type BitbucketTestResult,
   type ChangeSet,
   type ClaudeCatalog,
   type CloseReviewResult,
@@ -23,6 +25,7 @@ import {
   type ProblemBridge,
   type Project,
   type Review,
+  type SaveBitbucketCredentials,
   type SearchResults,
   type SendMessageRequest,
   type SetVerdictRequest,
@@ -93,12 +96,19 @@ export const api = {
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
   },
-  github: {
-    conversation: (id: string): Promise<PrConversation> => call("github:conversation", { id }),
-    preview: (id: string): Promise<PostPreview> => call("github:preview", { id }),
-    post: (request: PostReviewRequest): Promise<PostReviewResult> => call("github:post", request),
+  bitbucket: {
+    status: (): Promise<BitbucketStatus> => call("bitbucket:status", undefined),
+    save: (request: SaveBitbucketCredentials): Promise<BitbucketStatus> =>
+      call("bitbucket:save", request),
+    remove: (): Promise<BitbucketStatus> => call("bitbucket:remove", undefined),
+    test: (): Promise<BitbucketTestResult> => call("bitbucket:test", undefined),
+  },
+  pullRequests: {
+    conversation: (id: string): Promise<PrConversation> => call("pr:conversation", { id }),
+    preview: (id: string): Promise<PostPreview> => call("pr:preview", { id }),
+    post: (request: PostReviewRequest): Promise<PostReviewResult> => call("pr:post", request),
     open: async (url: string): Promise<void> => {
-      await call("github:open", { url });
+      await call("pr:open", { url });
     },
   },
   changes: {

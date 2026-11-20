@@ -12,9 +12,9 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import { ArrowSyncRegular, SendRegular } from "@fluentui/react-icons";
-import type { PrComment, PrConversation } from "@problem/shared";
+import { HOST_LABELS, type PrComment, type PrConversation } from "@problem/shared";
 import { Markdown } from "../conversation/Markdown.tsx";
-import { useOpenGitHub, usePrConversation } from "./queries.ts";
+import { useOpenPullRequestLink, usePrConversation } from "./queries.ts";
 
 type Conversation = Extract<PrConversation, { status: "ok" }>;
 
@@ -94,11 +94,11 @@ interface Props {
   onPost: () => void;
 }
 
-/** The pull request's discussion on GitHub: review threads, comments and reviews. */
+/** The pull request's discussion on its host: review threads, comments and reviews. */
 export function CommentsTab({ reviewId, onPost }: Props) {
   const styles = useStyles();
   const conversation = usePrConversation(reviewId);
-  const open = useOpenGitHub();
+  const open = useOpenPullRequestLink();
   const data = conversation.data;
 
   return (
@@ -118,7 +118,7 @@ export function CommentsTab({ reviewId, onPost }: Props) {
             <div className={styles.toolbar}>
               <Text className={styles.grow} truncate wrap={false}>
                 <Link
-                  aria-label={`Open ${data.pullRequest.repo}#${data.pullRequest.number} on GitHub`}
+                  aria-label={`Open ${data.pullRequest.repo}#${data.pullRequest.number} on ${HOST_LABELS[data.pullRequest.host]}`}
                   onClick={() => open.mutate(data.pullRequest.url)}
                 >
                   {data.pullRequest.repo}#{data.pullRequest.number}

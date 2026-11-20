@@ -3,6 +3,8 @@ import {
   type AppErrorCode,
   type AppEvent,
   type AppSettings,
+  type BitbucketStatus,
+  type BitbucketTestResult,
   type ChangeSet,
   type ClaudeCatalog,
   DEFAULT_CHANGE_FILTERS,
@@ -162,6 +164,10 @@ export interface StubState {
   editorError?: StubError | undefined;
   /** What the native folder picker "chooses"; `null` = the user cancels. */
   pickedFolder: string | null;
+  /** Saved Bitbucket credentials, as the main process would report them. */
+  bitbucket: BitbucketStatus;
+  /** What "Test connection" answers. */
+  bitbucketTest: BitbucketTestResult;
   /** When set, the matching call fails with this error. */
   listError?: StubError | undefined;
   createError?: StubError | undefined;
@@ -216,6 +222,8 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
       ],
     },
     pickedFolder: null,
+    bitbucket: { configured: false, email: null },
+    bitbucketTest: { ok: true, message: "Connected to Bitbucket as Mike." },
     emit: (event) => {
       for (const listener of listeners) listener(event);
     },
@@ -344,21 +352,28 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         const diff = state.diffs[path];
         return diff ? ok(diff) : fail({ code: "file_not_in_changes", message: "Not changed" });
       }
-      case "github:conversation": {
+      case "pr:conversation": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.conversations[id] ?? { status: "none", reason: "No pull request." });
       }
-      case "github:preview": {
+      case "pr:preview": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.previews[id] ?? { status: "none", reason: "No pull request." });
       }
-      case "github:post": {
+      case "pr:post": {
         const request = ipcContract[channel].input.parse(raw);
         if (state.postError) return fail(state.postError);
         state.posts.push(request);
-        return ok({ url: "https://github.com/acme/payments/pull/7#pullrequestreview-1" });
+        // Like main: the link of what was posted, on the pull request's own host.
+        const pr = state.previews[request.id];
+        const onBitbucket = pr?.status === "ok" && pr.pullRequest.host === "bitbucket";
+        return ok({
+          url: onBitbucket
+            ? `${pr.pullRequest.url}#comment-1`
+            : "https://github.com/acme/payments/pull/7#pullrequestreview-1",
+        });
       }
-      case "github:open": {
+      case "pr:open": {
         const { url } = ipcContract[channel].input.parse(raw);
         state.opened.push(url);
         return ok(null);
@@ -429,6 +444,18 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
         );
         return ok(null);
       }
+      case "bitbucket:status":
+        return ok(state.bitbucket);
+      case "bitbucket:save": {
+        const { email } = ipcContract[channel].input.parse(raw);
+        state.bitbucket = { configured: true, email };
+        return ok(state.bitbucket);
+      }
+      case "bitbucket:remove":
+        state.bitbucket = { configured: false, email: null };
+        return ok(state.bitbucket);
+      case "bitbucket:test":
+        return ok(state.bitbucketTest);
     }
   }
 

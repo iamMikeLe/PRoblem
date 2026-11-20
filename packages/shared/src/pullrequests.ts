@@ -1,12 +1,36 @@
 import { z } from "zod";
 
 /**
- * A review's pull request on GitHub: its existing discussion, and posting findings as a GitHub
- * review (ADR 0014). Everything here comes from GitHub and is written by other people: it is shown
- * as content and given to Claude as untrusted text.
+ * A review's pull request on its git host: its existing discussion, and posting findings to it
+ * (ADR 0014, 0019). Everything here comes from the host and is written by other people: it is
+ * shown as content and given to Claude as untrusted text.
  */
 
+export const HostKindSchema = z.enum(["github", "bitbucket"]);
+export type HostKind = z.infer<typeof HostKindSchema>;
+
+/** The host's name for people. */
+export const HOST_LABELS: Record<HostKind, string> = { github: "GitHub", bitbucket: "Bitbucket" };
+
+/**
+ * The host whose website `url` is on (exactly github.com or bitbucket.org), for labels only: links
+ * are opened by the main process, which checks them itself.
+ */
+export function hostKindOfUrl(url: string): HostKind | undefined {
+  const match = /^https:\/\/(github\.com|bitbucket\.org)(?:[/?#]|$)/i.exec(url);
+  const host = match?.[1]?.toLowerCase();
+  return host === "github.com" ? "github" : host === "bitbucket.org" ? "bitbucket" : undefined;
+}
+
+/** "GitHub" or "Bitbucket" for a link on that host's website. */
+export function hostLabel(url: string): string {
+  const kind = hostKindOfUrl(url);
+  return kind ? HOST_LABELS[kind] : "the pull request";
+}
+
 export const PullRequestLinkSchema = z.object({
+  /** Links saved before Bitbucket support are GitHub's. */
+  host: HostKindSchema.default("github"),
   /** `owner/repo`, lowercase. */
   repo: z.string(),
   number: z.number().int().positive(),
@@ -157,10 +181,11 @@ export type PostReviewResult = z.infer<typeof PostReviewResultSchema>;
 
 /**
  * Text written by Claude (which read the pull request) or by other people must not notify anyone
- * when posted: every `@` before a name gets a zero-width space, so GitHub shows it but links no
+ * when posted: every `@` before a name gets a zero-width space, so the host shows it but links no
  * one. GitHub finds mentions after rendering markdown (`_@x_`, `` `a`@x ``), so no context is safe
- * to skip; e-mail addresses look the same afterwards.
+ * to skip; e-mail addresses look the same afterwards. Bitbucket also mentions with
+ * `@{account-id}`, and hosts differ in which names count, so every `@` before a non-space is.
  */
 export function neutralizeMentions(text: string): string {
-  return text.replace(/@(?=[A-Za-z0-9])/g, "@\u200B");
+  return text.replace(/@(?=\S)/g, "@\u200B");
 }

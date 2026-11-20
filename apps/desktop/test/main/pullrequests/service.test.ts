@@ -7,13 +7,13 @@ import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import { insertFinding, setVerdict } from "../../../src/main/findings/repository.ts";
 import type { GhClient, PullRequestInfo } from "../../../src/main/git/gh.ts";
-import {
-  createGitHubService,
-  formatFinding,
-  type GitHubService,
-} from "../../../src/main/github/service.ts";
-import { isGitHubUrl } from "../../../src/main/ipc/handlers.ts";
 import { insertProject } from "../../../src/main/projects/repository.ts";
+import { createGitHubHost } from "../../../src/main/pullrequests/github.ts";
+import {
+  createPullRequestService,
+  formatFinding,
+  type PullRequestService,
+} from "../../../src/main/pullrequests/service.ts";
 import {
   getReviewRecord,
   insertReview,
@@ -129,7 +129,7 @@ describe("GitHub service", () => {
   let dir: string;
   let cleanup: () => Promise<void>;
   let gh: { [K in keyof GhClient]: ReturnType<typeof vi.fn<GhClient[K]>> };
-  let github: GitHubService;
+  let github: PullRequestService;
   let projectId: string;
   let graphqlAnswer: unknown;
   let activity: ActivityService;
@@ -172,9 +172,9 @@ describe("GitHub service", () => {
       postReview: vi.fn(async () => ({ html_url: `${PR_URL}#pullrequestreview-1` })),
     };
     activity = createActivityService({ db, broadcast: () => {}, log: silentLogger });
-    github = createGitHubService({
+    github = createPullRequestService({
       db,
-      gh,
+      hosts: [createGitHubHost(gh)],
       activity,
       review: (id) => {
         const record = getReviewRecord(db, id);
@@ -568,9 +568,13 @@ describe("GitHub service", () => {
     expect(neutralizeMentions("@org/team")).toBe(`@${z}org/team`);
     expect(neutralizeMentions("a@b.c")).toBe(`a@${z}b.c`);
     expect(neutralizeMentions("@ alone")).toBe("@ alone");
+    expect(neutralizeMentions("@_lead and @élise")).toBe(`@${z}_lead and @${z}élise`);
+    // Bitbucket's account-id mentions.
+    expect(neutralizeMentions("@{557058:abc}")).toBe(`@${z}{557058:abc}`);
   });
 
   it("opens only github.com links", () => {
+    const isGitHubUrl = (url: string) => createGitHubHost(gh).isWebUrl(url);
     expect(isGitHubUrl(PR_URL)).toBe(true);
     for (const bad of [
       "http://github.com/a",

@@ -87,7 +87,7 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] Post findings as a GitHub review after a preview dialog (inline or summary)
 - [x] Approve / request changes / comment
 - [x] Branch reviews find their open PR (`gh pr list --head`) (ADR 0014)
-- [ ] Stretch: Bitbucket Cloud
+- [x] Stretch: Bitbucket Cloud: PR links and `#n`, comments, posting; API token in Settings (ADR 0019)
 
 ## Phase 8: Polish
 

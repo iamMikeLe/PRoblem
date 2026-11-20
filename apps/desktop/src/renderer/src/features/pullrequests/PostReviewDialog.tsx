@@ -20,6 +20,7 @@ import {
   tokens,
 } from "@fluentui/react-components";
 import {
+  HOST_LABELS,
   PostFindingSchema,
   type PostItem,
   PostReviewRequestSchema,
@@ -75,7 +76,7 @@ interface Props {
 }
 
 /**
- * The only way anything is written to GitHub (ADR 0014): the user sees exactly what is posted —
+ * The only way anything is written to GitHub or Bitbucket (ADR 0014, 0019): the user sees exactly what is posted —
  * the summary, each finding's text and where it goes — and clicks Post. Each finding's text can be
  * edited first; edits live only in this dialog (ADR 0017).
  */
@@ -126,7 +127,9 @@ export function PostReviewDialog({ reviewId, open, onOpenChange, onPosted }: Pro
     <Dialog open={open} onOpenChange={(_, d) => onOpenChange(d.open)}>
       <DialogSurface className={styles.surface}>
         <DialogBody>
-          <DialogTitle>Post a review to GitHub</DialogTitle>
+          <DialogTitle>
+            Post a review to {data ? HOST_LABELS[data.pullRequest.host] : "the pull request"}
+          </DialogTitle>
           <DialogContent className={styles.content}>
             {preview.isLoading && <Spinner size="small" label="Preparing the review" />}
             {preview.error && (
@@ -145,6 +148,12 @@ export function PostReviewDialog({ reviewId, open, onOpenChange, onPosted }: Pro
                   To {data.pullRequest.repo}#{data.pullRequest.number}. Nothing is sent before you
                   click Post.
                 </Text>
+                {data.pullRequest.host === "bitbucket" && (
+                  <Caption1 className={styles.muted}>
+                    Bitbucket takes each finding as its own comment, then the summary, then your
+                    verdict. If one fails, what was posted stays and the rest can be posted again.
+                  </Caption1>
+                )}
                 {!data.upToDate && (
                   <MessageBar intent="warning">
                     <MessageBarBody>

@@ -8,6 +8,9 @@ import { openDatabase } from "../../../src/main/db/database.ts";
 import { AppFailure, silentLogger } from "../../../src/main/errors.ts";
 import type { GhClient } from "../../../src/main/git/gh.ts";
 import { createProjectService, type ProjectService } from "../../../src/main/projects/service.ts";
+import { createBitbucketHost } from "../../../src/main/pullrequests/bitbucket.ts";
+import type { BitbucketApi } from "../../../src/main/pullrequests/bitbucketApi.ts";
+import { createGitHubHost } from "../../../src/main/pullrequests/github.ts";
 import { createReviewService, type ReviewService } from "../../../src/main/reviews/service.ts";
 import {
   type GitHubFixture,
@@ -38,6 +41,9 @@ describe("review service", () => {
   let projects: ProjectService;
   let reviews: ReviewService;
   let gh: GhClient;
+  /** What the fake Bitbucket answers for any pull request, and the paths asked for. */
+  let bitbucketPr: Record<string, unknown>;
+  let bitbucketPaths: string[];
 
   const request = (overrides: Partial<CreateReviewRequest> = {}): CreateReviewRequest => ({
     projectId: project.id,
@@ -70,13 +76,41 @@ describe("review service", () => {
         throw new Error("not used");
       }),
     };
+    bitbucketPaths = [];
+    bitbucketPr = {
+      id: 12,
+      title: "Retry on Bitbucket",
+      source: {
+        branch: { name: "feature" },
+        commit: { hash: fx.featureSha.slice(0, 12) },
+        repository: { full_name: "acme/payments" },
+      },
+      destination: { branch: { name: "main" } },
+    };
+    const api: BitbucketApi = {
+      get: async (path, schema) => {
+        bitbucketPaths.push(path);
+        return schema.parse(bitbucketPr);
+      },
+      list: async () => ({ values: [], truncated: false }),
+      post: async () => {
+        throw new Error("not used");
+      },
+    };
     reviews = createReviewService({
       db,
       worktreesDir: join(dir, "worktrees"),
-      gh,
+      hosts: [createGitHubHost(gh), createBitbucketHost(api)],
       log: silentLogger,
     });
   });
+
+  /** Moves the fixture's remote to Bitbucket Cloud (git still fetches from the local copy). */
+  function moveRemoteToBitbucket() {
+    const origin = join(dir, "origin.git");
+    git(fx.repo, "remote", "set-url", "origin", "git@bitbucket.org:acme/payments.git");
+    git(fx.repo, "config", `url.${origin}.insteadOf`, "git@bitbucket.org:acme/payments.git");
+  }
 
   afterEach(async () => {
     db.close();
@@ -120,6 +154,83 @@ describe("review service", () => {
       baseBranch: "main",
     });
     expect(git(fx.repo, "rev-parse", "refs/problem/pull/7")).toBe(fx.featureSha);
+  });
+
+  it("reviews a Bitbucket pull request from its link, fetching its source branch", async () => {
+    moveRemoteToBitbucket();
+    const url = "https://bitbucket.org/acme/payments/pull-requests/12";
+    const review = await reviews.create(request({ source: `${url}/diff` }));
+
+    expect(bitbucketPaths).toEqual(["/repositories/acme/payments/pullrequests/12"]);
+    expect(review).toMatchObject({
+      title: "Retry on Bitbucket",
+      source: { kind: "pull-request", url, number: 12, repo: "acme/payments" },
+      headBranch: "feature",
+      headSha: fx.featureSha,
+      baseBranch: "main",
+    });
+    expect(git(fx.repo, "rev-parse", "refs/problem/pull/12")).toBe(fx.featureSha);
+  });
+
+  it("reads #12 as a pull request of the project's own host", async () => {
+    expect((await reviews.create(request({ source: "#7" }))).source).toMatchObject({
+      kind: "pull-request",
+      url: PR_URL,
+    });
+    moveRemoteToBitbucket();
+    expect((await reviews.create(request({ source: "#12" }))).source).toMatchObject({
+      kind: "pull-request",
+      url: "https://bitbucket.org/acme/payments/pull-requests/12",
+    });
+  });
+
+  it("fetches a Bitbucket pull request from a fork by a URL the app builds", async () => {
+    moveRemoteToBitbucket();
+    const origin = join(dir, "origin.git");
+    // The fork has the same branch; git is pointed at the local copy for its URL.
+    git(
+      fx.repo,
+      "config",
+      "--add",
+      `url.${origin}.insteadOf`,
+      "git@bitbucket.org:someone/payments.git",
+    );
+    bitbucketPr = {
+      ...bitbucketPr,
+      source: {
+        branch: { name: "feature" },
+        commit: { hash: fx.featureSha.slice(0, 12) },
+        repository: { full_name: "Someone/Payments" },
+        links: { clone: [{ href: "ext::sh -c touch% /tmp/pwned" }] },
+      },
+    };
+    const review = await reviews.create(
+      request({ source: "https://bitbucket.org/acme/payments/pull-requests/12" }),
+    );
+    expect(review.headSha).toBe(fx.featureSha);
+
+    bitbucketPr = {
+      ...bitbucketPr,
+      source: { ...(bitbucketPr.source as object), repository: { full_name: "../../etc" } },
+    };
+    expect(
+      await failureCode(() =>
+        reviews.create(request({ source: "https://bitbucket.org/acme/payments/pull-requests/12" })),
+      ),
+    ).toBe("fetch_failed");
+  });
+
+  it("refuses a Bitbucket source branch git would read as an option", async () => {
+    moveRemoteToBitbucket();
+    bitbucketPr = {
+      ...bitbucketPr,
+      source: { ...(bitbucketPr.source as object), branch: { name: "--upload-pack=touch x" } },
+    };
+    expect(
+      await failureCode(() =>
+        reviews.create(request({ source: "https://bitbucket.org/acme/payments/pull-requests/12" })),
+      ),
+    ).toBe("invalid_source");
   });
 
   it("rejects pull requests of other repositories and links that are not GitHub PRs", async () => {

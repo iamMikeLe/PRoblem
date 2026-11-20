@@ -20,8 +20,8 @@ describe("ipc contract", () => {
   });
 });
 
-describe("github:post input", () => {
-  const schema = ipcContract["github:post"].input;
+describe("pr:post input", () => {
+  const schema = ipcContract["pr:post"].input;
   const request = (findings: unknown) => ({ id: "r1", event: "COMMENT", body: "", findings });
 
   it("carries each finding's final text, exactly as written", () => {
