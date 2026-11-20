@@ -23,9 +23,9 @@ import { useConversation } from "../../features/conversation/queries.ts";
 import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
 import { useFindingCounts } from "../../features/findings/queries.ts";
-import { PostReviewDialog } from "../../features/github/PostReviewDialog.tsx";
-import { useOpenGitHub } from "../../features/github/queries.ts";
 import { useProjects } from "../../features/projects/queries.ts";
+import { PostReviewDialog } from "../../features/pullrequests/PostReviewDialog.tsx";
+import { useOpenGitHub } from "../../features/pullrequests/queries.ts";
 import { CloseReviewDialog } from "../../features/reviews/CloseReviewDialog.tsx";
 import { describeReview, shortSha } from "../../features/reviews/describe.ts";
 import { StatusDot } from "../../features/reviews/StatusDot.tsx";
@@ -39,7 +39,7 @@ const ChangesTab = lazy(() =>
   import("../../features/changes/ChangesTab.tsx").then((m) => ({ default: m.ChangesTab })),
 );
 const CommentsTab = lazy(() =>
-  import("../../features/github/CommentsTab.tsx").then((m) => ({ default: m.CommentsTab })),
+  import("../../features/pullrequests/CommentsTab.tsx").then((m) => ({ default: m.CommentsTab })),
 );
 
 type ReviewTab = "conversation" | "findings" | "changes" | "comments";

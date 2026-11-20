@@ -93,12 +93,12 @@ export const api = {
   claude: {
     catalog: (): Promise<ClaudeCatalog> => call("claude:catalog", undefined),
   },
-  github: {
-    conversation: (id: string): Promise<PrConversation> => call("github:conversation", { id }),
-    preview: (id: string): Promise<PostPreview> => call("github:preview", { id }),
-    post: (request: PostReviewRequest): Promise<PostReviewResult> => call("github:post", request),
+  pullRequests: {
+    conversation: (id: string): Promise<PrConversation> => call("pr:conversation", { id }),
+    preview: (id: string): Promise<PostPreview> => call("pr:preview", { id }),
+    post: (request: PostReviewRequest): Promise<PostReviewResult> => call("pr:post", request),
     open: async (url: string): Promise<void> => {
-      await call("github:open", { url });
+      await call("pr:open", { url });
     },
   },
   changes: {

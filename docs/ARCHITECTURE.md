@@ -45,7 +45,7 @@ flowchart LR
 | `src/main/changes/`, `git/diff.ts` | Changed files and per-file diffs between merge base and head (ADR 0013) | no |
 | `src/main/activity/` | The Activity feed: rows recorded by the session, review and GitHub services (ADR 0015) | no |
 | `src/main/search/` | Title-bar search over open reviews, their findings and changed files (plain word matching, no index) | no |
-| `src/main/github/` | PR discussion (GraphQL via `gh`), digest for Claude, preview and posting of GitHub reviews (ADR 0014) | no |
+| `src/main/pullrequests/` | PR discussion (GraphQL via `gh`), digest for Claude, preview and posting of GitHub reviews (ADR 0014) | no |
 | `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
 | `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |

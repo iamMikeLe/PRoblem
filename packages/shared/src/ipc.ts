@@ -26,7 +26,7 @@ import {
   PostReviewRequestSchema,
   PostReviewResultSchema,
   PrConversationSchema,
-} from "./github.ts";
+} from "./pullrequests.ts";
 import { SearchRequestSchema, SearchResultsSchema } from "./search.ts";
 import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
@@ -243,16 +243,16 @@ export const ipcContract = {
     output: FileDiffSchema,
   },
   /** The pull request's existing discussion (fetched from GitHub with `gh`). */
-  "github:conversation": {
+  "pr:conversation": {
     input: z.strictObject({ id: ReviewIdSchema }),
     output: PrConversationSchema,
   },
   /** What posting would send: each finding's exact text and whether it goes on a line. */
-  "github:preview": { input: z.strictObject({ id: ReviewIdSchema }), output: PostPreviewSchema },
+  "pr:preview": { input: z.strictObject({ id: ReviewIdSchema }), output: PostPreviewSchema },
   /** Posts a GitHub review. Only ever called from the preview dialog's button. */
-  "github:post": { input: PostReviewRequestSchema, output: PostReviewResultSchema },
+  "pr:post": { input: PostReviewRequestSchema, output: PostReviewResultSchema },
   /** Opens a github.com link in the browser (anything else is refused). */
-  "github:open": { input: z.strictObject({ url: z.string().max(2048) }), output: z.null() },
+  "pr:open": { input: z.strictObject({ url: z.string().max(2048) }), output: z.null() },
   /** Tool calls of all reviews that wait for the user. */
   "approvals:list": { input: z.undefined(), output: z.array(PendingApprovalSchema) },
   /** Answers an approval card. Fails with `approval_not_found` once it was answered or expired. */
