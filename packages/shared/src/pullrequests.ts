@@ -165,10 +165,11 @@ export type PostReviewResult = z.infer<typeof PostReviewResultSchema>;
 
 /**
  * Text written by Claude (which read the pull request) or by other people must not notify anyone
- * when posted: every `@` before a name gets a zero-width space, so GitHub shows it but links no
+ * when posted: every `@` before a name gets a zero-width space, so the host shows it but links no
  * one. GitHub finds mentions after rendering markdown (`_@x_`, `` `a`@x ``), so no context is safe
- * to skip; e-mail addresses look the same afterwards.
+ * to skip; e-mail addresses look the same afterwards. Bitbucket also mentions with
+ * `@{account-id}`.
  */
 export function neutralizeMentions(text: string): string {
-  return text.replace(/@(?=[A-Za-z0-9])/g, "@\u200B");
+  return text.replace(/@(?=[A-Za-z0-9{])/g, "@\u200B");
 }

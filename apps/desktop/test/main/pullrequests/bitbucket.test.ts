@@ -148,3 +148,122 @@ describe("Bitbucket host", () => {
     await expect(bb.conversation(link)).rejects.toMatchObject({ code: "bitbucket_failed" });
   });
 });
+
+describe("posting to Bitbucket", () => {
+  const BASE = "/repositories/acme/payments/pullrequests/7";
+  const post = (event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" = "APPROVE") => ({
+    pullRequest: link,
+    commitId: "c".repeat(40),
+    event,
+    body: "Summary\n\n---\n\n**Minor: x**",
+    inline: [
+      { number: 1, path: "src/app.ts", line: 12, text: "one" },
+      { number: 2, path: "src/b.ts", line: 3, text: "two" },
+    ],
+    summaryNumbers: [3],
+  });
+
+  /** A fake Bitbucket for writes: `answer(n)` gives the n-th POST's response. */
+  function writer(answer: (n: number) => Response | Promise<Response>) {
+    const calls: { path: string; body: unknown }[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({
+        path: new URL(String(input)).pathname.replace("/2.0", ""),
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      });
+      const n = calls.length;
+      // Like the real fetch: a timeout (abort) rejects a request that has not answered.
+      return new Promise<Response>((resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        Promise.resolve(answer(n)).then(resolve, reject);
+      });
+    });
+    const api = createBitbucketApi({
+      fetch,
+      credentials: () => ({ email: "me@x.io", token: "t" }),
+      timeoutMs: 50,
+    });
+    const marked: [number[], string][] = [];
+    return {
+      host: createBitbucketHost(api),
+      calls,
+      marked,
+      onPosted: (numbers: number[], url: string) => marked.push([numbers, url]),
+    };
+  }
+  const created = (id: number) => new Response(JSON.stringify({ id }), { status: 201 });
+
+  it("posts each inline finding, then the summary, then the approval", async () => {
+    const w = writer((n) => (n <= 3 ? created(100 + n) : new Response("{}", { status: 200 })));
+    const result = await w.host.post(post(), w.onPosted);
+
+    expect(w.calls).toEqual([
+      {
+        path: `${BASE}/comments`,
+        body: { content: { raw: "one" }, inline: { path: "src/app.ts", to: 12 } },
+      },
+      {
+        path: `${BASE}/comments`,
+        body: { content: { raw: "two" }, inline: { path: "src/b.ts", to: 3 } },
+      },
+      { path: `${BASE}/comments`, body: { content: { raw: "Summary\n\n---\n\n**Minor: x**" } } },
+      { path: `${BASE}/approve`, body: undefined },
+    ]);
+    expect(w.marked).toEqual([
+      [[1], `${PR_URL}#comment-101`],
+      [[2], `${PR_URL}#comment-102`],
+      [[3], `${PR_URL}#comment-103`],
+    ]);
+    expect(result).toEqual({ url: `${PR_URL}#comment-103`, submittedAt: null });
+  });
+
+  it("requests changes, and posts no verdict for a comment", async () => {
+    const changes = writer((n) => (n <= 3 ? created(n) : new Response("{}", { status: 200 })));
+    await changes.host.post(post("REQUEST_CHANGES"), changes.onPosted);
+    expect(changes.calls.at(-1)?.path).toBe(`${BASE}/request-changes`);
+
+    const comment = writer((n) => created(n));
+    await comment.host.post(post("COMMENT"), comment.onPosted);
+    expect(comment.calls.map((c) => c.path.split("/").at(-1))).toEqual([
+      "comments",
+      "comments",
+      "comments",
+    ]);
+  });
+
+  it("stops at a failure, keeps what was posted and never approves", async () => {
+    const w = writer((n) =>
+      n <= 2
+        ? created(n)
+        : new Response(JSON.stringify({ error: { message: "bad line" } }), { status: 400 }),
+    );
+    await expect(w.host.post(post(), w.onPosted)).rejects.toMatchObject({
+      code: "post_partial",
+      message: expect.stringMatching(/Posted 2 of 4 parts.*bad line.*still selectable/),
+    });
+    expect(w.marked.map(([numbers]) => numbers)).toEqual([[1], [2]]);
+    expect(w.calls.some((c) => c.path.endsWith("/approve"))).toBe(false);
+
+    const first = writer(() => new Response("{}", { status: 401 }));
+    await expect(first.host.post(post(), first.onPosted)).rejects.toMatchObject({
+      code: "bitbucket_auth_failed",
+    });
+    expect(first.marked).toEqual([]);
+  });
+
+  it("marks a finding whose comment may exist after a timeout", async () => {
+    const w = writer((n) =>
+      n === 1
+        ? created(1)
+        : new Promise<Response>(() => {
+            // Never answers: the client times out.
+          }),
+    );
+    await expect(w.host.post(post(), w.onPosted)).rejects.toMatchObject({ code: "post_uncertain" });
+    expect(w.marked).toEqual([
+      [[1], `${PR_URL}#comment-1`],
+      [[2], PR_URL],
+    ]);
+    expect(w.calls).toHaveLength(2);
+  });
+});
