@@ -44,6 +44,8 @@ const Comment = z.object({
     .object({
       path: z.string(),
       to: z.number().int().nullish(),
+      /** The old line, for a comment on a removed line (`to` is then null). */
+      from: z.number().int().nullish(),
       outdated: z.boolean().optional(),
     })
     .nullish(),
@@ -53,7 +55,7 @@ const Comment = z.object({
 type Comment = z.infer<typeof Comment>;
 
 /** What Bitbucket answers for a new comment: only its id is used. */
-const PostedComment = z.object({ id: z.number().int() });
+const PostedComment = z.object({ id: z.number().int(), created_on: z.string().optional() });
 
 /** The pull request's page; built here, never taken from the API's answer. */
 export const bitbucketPrUrl = (repo: string, number: number): string =>
@@ -61,6 +63,10 @@ export const bitbucketPrUrl = (repo: string, number: number): string =>
 
 const repoPath = (repo: string): string => {
   const [workspace = "", slug = ""] = repo.split("/");
+  // `fetch` would resolve dot segments in the path: never let a name move it.
+  if ([workspace, slug].some((part) => part === "" || part === "." || part === "..")) {
+    throw new AppFailure("bitbucket_failed", `Not a Bitbucket repository name: ${repo}`);
+  }
   return `/repositories/${segment(workspace)}/${segment(slug)}`;
 };
 
@@ -98,16 +104,24 @@ export function bitbucketFetchSource(
   const refspec = `+refs/heads/${pr.headBranch}:${target}`;
   const repo = bitbucketRepoOf(remote.url);
   const fork = pr.sourceRepo;
-  if (fork === undefined || fork === repo)
-    return { from: remote.name, refspec, branch: pr.headBranch };
+  if (fork === undefined) {
+    // E.g. a deleted fork: fetching the branch name from our own repository could be other code.
+    throw new AppFailure(
+      "fetch_failed",
+      "Bitbucket does not say which repository this pull request's branch is in (was the fork deleted?)",
+    );
+  }
+  if (fork === repo) return { from: remote.name, refspec, branch: pr.headBranch };
   if (!REPO_NAME.test(fork) || fork.split("/").some((part) => part === "." || part === "..")) {
     throw new AppFailure(
       "fetch_failed",
       "The pull request comes from a fork with an unexpected name",
     );
   }
-  const from = remote.url.trim().toLowerCase().startsWith("https://")
-    ? `https://bitbucket.org/${fork}.git`
+  const https = /^https:\/\/(?:([\w.%+-]+)@)?bitbucket\.org\//i.exec(remote.url.trim());
+  // Keep the remote's user name, so the same git credentials apply to the fork.
+  const from = https
+    ? `https://${https[1] ? `${https[1]}@` : ""}bitbucket.org/${fork}.git`
     : `git@bitbucket.org:${fork}.git`;
   return { from, refspec, branch: pr.headBranch };
 }
@@ -158,7 +172,9 @@ export function toConversation(
         path: root.inline.path,
         line: line !== null && line > 0 ? line : null,
         isResolved: root.resolution !== undefined && root.resolution !== null,
-        isOutdated: root.inline.outdated === true || line === null,
+        // A comment on a removed line has only `from`: it is current, just not on a new line.
+        isOutdated:
+          root.inline.outdated === true || (line === null && (root.inline.from ?? null) === null),
         comments: [],
       };
       threads.set(root.id, thread);
@@ -166,7 +182,7 @@ export function toConversation(
     thread.comments.push(toComment(comment));
   }
 
-  const reviews: PrReview[] = (data.participants ?? []).flatMap((participant) => {
+  const reviews: PrReview[] = (data.participants ?? []).flatMap((participant, index) => {
     const state =
       participant.state === "approved"
         ? "APPROVED"
@@ -177,7 +193,8 @@ export function toConversation(
     const at = participant.participated_on;
     return [
       {
-        id: `${state}-${author(participant.user)}`,
+        // Names repeat ("Former user"): the position keeps ids unique.
+        id: `${state}-${index}`,
         author: author(participant.user),
         state,
         body: "",
@@ -252,10 +269,15 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
     async post(post, onPosted) {
       const { repo, number, url: prUrl } = post.pullRequest;
       const base = `${repoPath(repo)}/pullrequests/${number}`;
-      const steps: { numbers: number[]; send: () => Promise<string | undefined> }[] = [];
-      const comment = async (content: Record<string, unknown>) => {
+      type Sent = { url: string; at: string | null } | undefined;
+      const steps: { numbers: number[]; send: () => Promise<Sent> }[] = [];
+      const comment = async (content: Record<string, unknown>): Promise<Sent> => {
         const created = await api.post(`${base}/comments`, content, PostedComment);
-        return `${prUrl}#comment-${created.id}`;
+        const at = created.created_on;
+        return {
+          url: `${prUrl}#comment-${created.id}`,
+          at: at !== undefined && !Number.isNaN(Date.parse(at)) ? at : null,
+        };
       };
       for (const item of post.inline) {
         steps.push({
@@ -287,12 +309,16 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
       }
 
       let url = prUrl;
+      let submittedAt: string | null = null;
       let done = 0;
       for (const step of steps) {
         try {
           const posted = await step.send();
-          if (posted !== undefined) url = posted;
-          if (step.numbers.length > 0) onPosted(step.numbers, url);
+          if (posted !== undefined) {
+            url = posted.url;
+            submittedAt = posted.at ?? submittedAt;
+          }
+          if (step.numbers.length > 0) onPosted(step.numbers, url, posted?.at ?? null);
           done++;
         } catch (error) {
           // It may exist: never offer it again as if it did not.
@@ -301,7 +327,7 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
             error.code === "post_uncertain" &&
             step.numbers.length > 0
           ) {
-            onPosted(step.numbers, prUrl);
+            onPosted(step.numbers, prUrl, null);
           }
           if (done === 0 || !(error instanceof AppFailure) || error.code === "post_uncertain")
             throw error;
@@ -312,7 +338,8 @@ export function createBitbucketHost(api: BitbucketApi): GitHost {
           );
         }
       }
-      return { url, submittedAt: null };
+      // Bitbucket's own time of the last comment: the local clock may differ from it.
+      return { url, submittedAt };
     },
   };
 }

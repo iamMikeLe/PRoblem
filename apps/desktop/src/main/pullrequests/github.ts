@@ -83,15 +83,16 @@ export function createGitHubHost(gh: GhClient): GitHost {
       } catch (error) {
         // GitHub may have posted it: never offer these findings again as if they were not.
         if (error instanceof AppFailure && error.code === "post_uncertain")
-          onPosted(numbers, prUrl);
+          onPosted(numbers, prUrl, null);
         throw error;
       }
       const parsed = z
         .object({ html_url: z.string(), submitted_at: z.string().nullish() })
         .safeParse(answer);
       const url = parsed.success ? parsed.data.html_url : prUrl;
-      onPosted(numbers, url);
-      return { url, submittedAt: (parsed.success ? parsed.data.submitted_at : null) ?? null };
+      const submittedAt = (parsed.success ? parsed.data.submitted_at : null) ?? null;
+      onPosted(numbers, url, submittedAt);
+      return { url, submittedAt };
     },
   };
 }

@@ -72,6 +72,13 @@ export function formatFinding(finding: Finding, withLocation: boolean): string {
 /** How long creating a review waits for the PR discussion before starting without it. */
 const FIRST_DIGEST_TIMEOUT_MS = 10_000;
 
+/** The message of a "no Bitbucket credentials saved" failure, else `undefined`. */
+function notConfigured(error: unknown): string | undefined {
+  return error instanceof AppFailure && error.code === "bitbucket_not_configured"
+    ? error.message
+    : undefined;
+}
+
 interface Linked {
   host: GitHost;
   link: PullRequestLink;
@@ -123,9 +130,16 @@ export function createPullRequestService(deps: PullRequestServiceDeps): PullRequ
   }
 
   async function fetchConversation(review: Review): Promise<PrConversation> {
-    const pr = await pullRequestOf(review);
-    if (typeof pr === "string") return { status: "none", reason: pr };
-    return pr.host.conversation(pr.link);
+    try {
+      const pr = await pullRequestOf(review);
+      if (typeof pr === "string") return { status: "none", reason: pr };
+      return await pr.host.conversation(pr.link);
+    } catch (error) {
+      // No Bitbucket token yet: the review simply has no readable pull request, not an error.
+      const reason = notConfigured(error);
+      if (reason !== undefined) return { status: "none", reason };
+      throw error;
+    }
   }
 
   /** The latest discussion read per review: new comments are told from it at send time. */
@@ -179,7 +193,17 @@ export function createPullRequestService(deps: PullRequestServiceDeps): PullRequ
   }
 
   async function preview(reviewId: string): Promise<PostPreview> {
-    const review = deps.review(reviewId);
+    try {
+      return await previewOf(deps.review(reviewId));
+    } catch (error) {
+      const reason = notConfigured(error);
+      if (reason !== undefined) return { status: "none", reason };
+      throw error;
+    }
+  }
+
+  async function previewOf(review: Review): Promise<PostPreview> {
+    const reviewId = review.id;
     const pr = await pullRequestOf(review);
     if (typeof pr === "string") return { status: "none", reason: pr };
     const info = await pr.host.viewPullRequest(pr.link.repo, pr.link.number);
@@ -338,17 +362,43 @@ export function createPullRequestService(deps: PullRequestServiceDeps): PullRequ
     const host = hostByKind(hosts, plan.pullRequest.host);
     if (!host)
       throw new AppFailure("no_pull_request", "This pull request's host is not supported.");
-    const { url, submittedAt } = await host.post(
-      {
-        pullRequest: plan.pullRequest,
-        commitId: review.headSha,
-        event: request.event,
-        body,
-        inline,
-        summaryNumbers: summary.map((item) => item.number),
-      },
-      (numbers, postedUrl) => markPosted(db, request.id, numbers, postedUrl),
-    );
+    // What landed, as the host confirmed it: recorded even when the post stops part-way, so the
+    // user's own comments are never listed as new ones.
+    let confirmed: { findings: number; url: string; at: string } | undefined;
+    let result: { url: string; submittedAt: string | null };
+    try {
+      result = await host.post(
+        {
+          pullRequest: plan.pullRequest,
+          commitId: review.headSha,
+          event: request.event,
+          body,
+          inline,
+          summaryNumbers: summary.map((item) => item.number),
+        },
+        (numbers, postedUrl, at) => {
+          markPosted(db, request.id, numbers, postedUrl);
+          if (at !== null) {
+            confirmed = {
+              findings: (confirmed?.findings ?? 0) + numbers.length,
+              url: postedUrl,
+              at,
+            };
+          }
+        },
+      );
+    } catch (error) {
+      if (confirmed) {
+        deps.activity?.record(request.id, {
+          kind: "posted",
+          findings: confirmed.findings,
+          url: confirmed.url,
+          submittedAt: confirmed.at,
+        });
+      }
+      throw error;
+    }
+    const { url, submittedAt } = result;
     deps.activity?.record(request.id, {
       kind: "posted",
       findings: chosen.length,

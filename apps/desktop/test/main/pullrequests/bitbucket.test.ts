@@ -1,6 +1,9 @@
 import { PrConversationSchema } from "@problem/shared";
 import { describe, expect, it, vi } from "vitest";
-import { createBitbucketHost } from "../../../src/main/pullrequests/bitbucket.ts";
+import {
+  bitbucketFetchSource,
+  createBitbucketHost,
+} from "../../../src/main/pullrequests/bitbucket.ts";
 import { createBitbucketApi } from "../../../src/main/pullrequests/bitbucketApi.ts";
 
 const REPO = "acme/payments";
@@ -110,6 +113,8 @@ describe("Bitbucket host", () => {
             inline: { path: "src/old.ts", to: null },
             resolution: { type: "resolved" },
           }),
+          // On a removed line: current, just without a new line number.
+          comment(8, { inline: { path: "src/gone.ts", to: null, from: 4 } }),
           comment(6, { deleted: true }),
           // A reply whose parent was deleted stands on its own.
           comment(7, { parent: { id: 6 } }),
@@ -132,8 +137,11 @@ describe("Bitbucket host", () => {
         ],
       },
       expect.objectContaining({ id: "5", line: null, isResolved: true, isOutdated: true }),
+      expect.objectContaining({ id: "8", path: "src/gone.ts", line: null, isOutdated: false }),
     ]);
     expect(conversation.comments.map((c) => c.id)).toEqual(["3", "4", "7"]);
+    // Former users share a name: ids stay unique.
+    expect(new Set(conversation.reviews.map((r) => r.id)).size).toBe(conversation.reviews.length);
     expect(conversation.reviews).toEqual([
       expect.objectContaining({ author: "Alice", state: "APPROVED", body: "" }),
       expect.objectContaining({ author: "Former user", state: "CHANGES_REQUESTED" }),
@@ -141,6 +149,42 @@ describe("Bitbucket host", () => {
     expect(conversation.truncated).toBe(false);
     // Bitbucket's times (microseconds, +00:00) fit the shared contract.
     expect(PrConversationSchema.safeParse(conversation).success).toBe(true);
+  });
+
+  it("fetches a fork as the remote does, and refuses an unknown source repository", () => {
+    const pr = {
+      number: 7,
+      title: "t",
+      url: PR_URL,
+      headBranch: "feature",
+      headSha: HEAD,
+      baseBranch: "main",
+    };
+    const target = "refs/problem/pull/7";
+    const https = { name: "origin", url: "https://mike@bitbucket.org/acme/payments.git" };
+    expect(bitbucketFetchSource({ ...pr, sourceRepo: "acme/payments" }, target, https)).toEqual({
+      from: "origin",
+      refspec: `+refs/heads/feature:${target}`,
+      branch: "feature",
+    });
+    expect(
+      bitbucketFetchSource({ ...pr, sourceRepo: "someone/payments" }, target, https).from,
+    ).toBe("https://mike@bitbucket.org/someone/payments.git");
+    const ssh = { name: "origin", url: "git@bitbucket.org:acme/payments.git" };
+    expect(bitbucketFetchSource({ ...pr, sourceRepo: "someone/payments" }, target, ssh).from).toBe(
+      "git@bitbucket.org:someone/payments.git",
+    );
+    expect(() => bitbucketFetchSource(pr, target, ssh)).toThrow(
+      expect.objectContaining({ code: "fetch_failed" }),
+    );
+  });
+
+  it("refuses repository names that would move the API path", async () => {
+    const { host: bb, urls } = host({});
+    await expect(bb.viewPullRequest("acme/..", 7)).rejects.toMatchObject({
+      code: "bitbucket_failed",
+    });
+    expect(urls).toEqual([]);
   });
 
   it("explains a missing or unreachable pull request", async () => {
@@ -183,18 +227,28 @@ describe("posting to Bitbucket", () => {
       credentials: () => ({ email: "me@x.io", token: "t" }),
       timeoutMs: 50,
     });
-    const marked: [number[], string][] = [];
+    const marked: [number[], string, string | null][] = [];
     return {
       host: createBitbucketHost(api),
       calls,
       marked,
-      onPosted: (numbers: number[], url: string) => marked.push([numbers, url]),
+      onPosted: (numbers: number[], url: string, at: string | null) =>
+        marked.push([numbers, url, at]),
     };
   }
   const created = (id: number) => new Response(JSON.stringify({ id }), { status: 201 });
 
   it("posts each inline finding, then the summary, then the approval", async () => {
-    const w = writer((n) => (n <= 3 ? created(100 + n) : new Response("{}", { status: 200 })));
+    const w = writer((n) =>
+      n <= 3
+        ? new Response(
+            JSON.stringify({ id: 100 + n, created_on: `2026-11-20T12:00:0${n}+00:00` }),
+            {
+              status: 201,
+            },
+          )
+        : new Response("{}", { status: 200 }),
+    );
     const result = await w.host.post(post(), w.onPosted);
 
     expect(w.calls).toEqual([
@@ -210,11 +264,15 @@ describe("posting to Bitbucket", () => {
       { path: `${BASE}/approve`, body: undefined },
     ]);
     expect(w.marked).toEqual([
-      [[1], `${PR_URL}#comment-101`],
-      [[2], `${PR_URL}#comment-102`],
-      [[3], `${PR_URL}#comment-103`],
+      [[1], `${PR_URL}#comment-101`, "2026-11-20T12:00:01+00:00"],
+      [[2], `${PR_URL}#comment-102`, "2026-11-20T12:00:02+00:00"],
+      [[3], `${PR_URL}#comment-103`, "2026-11-20T12:00:03+00:00"],
     ]);
-    expect(result).toEqual({ url: `${PR_URL}#comment-103`, submittedAt: null });
+    // Bitbucket's own time of the last comment.
+    expect(result).toEqual({
+      url: `${PR_URL}#comment-103`,
+      submittedAt: "2026-11-20T12:00:03+00:00",
+    });
   });
 
   it("requests changes, and posts no verdict for a comment", async () => {
@@ -261,8 +319,8 @@ describe("posting to Bitbucket", () => {
     );
     await expect(w.host.post(post(), w.onPosted)).rejects.toMatchObject({ code: "post_uncertain" });
     expect(w.marked).toEqual([
-      [[1], `${PR_URL}#comment-1`],
-      [[2], PR_URL],
+      [[1], `${PR_URL}#comment-1`, null],
+      [[2], PR_URL, null],
     ]);
     expect(w.calls).toHaveLength(2);
   });

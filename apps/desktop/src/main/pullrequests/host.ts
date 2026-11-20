@@ -70,11 +70,12 @@ export interface GitHost {
   conversation(pr: PullRequestLink): Promise<PrConversation>;
   /**
    * Posts the findings and summary. Calls `onPosted` for every finding as soon as it is on the
-   * host, or may be (an uncertain write), so a failure part-way never offers it again.
+   * host, or may be (an uncertain write), so a failure part-way never offers it again. `at` is
+   * the host's own time of that write when it said (`null` for an uncertain one).
    */
   post(
     post: HostPost,
-    onPosted: (numbers: number[], url: string) => void,
+    onPosted: (numbers: number[], url: string, at: string | null) => void,
   ): Promise<{ url: string; submittedAt: string | null }>;
 }
 
