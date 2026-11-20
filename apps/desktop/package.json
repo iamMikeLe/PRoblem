@@ -12,6 +12,7 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "package": "electron-vite build && electron-builder --config electron-builder.yml",
+    "release:mac": "node scripts/release-mac.mjs",
     "package:dir": "electron-vite build && electron-builder --config electron-builder.yml --dir",
     "test": "vitest run",
     "e2e": "electron-vite build && playwright test",

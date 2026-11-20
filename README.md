@@ -55,6 +55,15 @@ review its own room:
 | Quality | Vitest, Testing Library, Playwright (Electron), Biome, TypeScript 7 strict, GitHub Actions | |
 | Packaging | electron-builder | `.dmg` / NSIS / AppImage |
 
+## Download
+
+macOS (Apple silicon and Intel): get the `.dmg` from
+[Releases](https://github.com/iamMikeLe/PRoblem/releases), open it and drag PRoblem to
+Applications. The app is signed and notarized, so it opens with a double-click.
+
+PRoblem drives your own Claude Code: install it and log in first (`claude` on your PATH). For
+pull requests, install `gh` and run `gh auth login`.
+
 ## Getting started
 
 Requirements: Node 24+, pnpm 9+, git. From Phase 3 on: Claude Code installed and logged in.
@@ -72,10 +81,31 @@ pnpm dev
 | `pnpm dev` | Electron app in development (electron-vite, HMR) |
 | `pnpm start` | Run the production build locally |
 | `pnpm package` | Build a distributable into `apps/desktop/dist` (unsigned) |
+| `pnpm --filter @problem/desktop release:mac` | Build the signed and notarized `.dmg` (see Releasing) |
 | `pnpm verify` | Lint, type check, test, build: the definition of green |
 | `pnpm test` | Vitest: main process in Node, UI in jsdom |
 | `pnpm e2e` | Builds, then drives the real app with Playwright and a scripted Claude (needs a display) |
 | `pnpm format` | Biome format and safe fixes |
+
+### Releasing
+
+The macOS release is signed with a Developer ID certificate and notarized by Apple. Once, save
+notary credentials in your keychain (it asks for an app-specific password from
+appleid.apple.com):
+
+```sh
+xcrun notarytool store-credentials problem-notary --apple-id <your Apple ID> --team-id <TEAMID>
+```
+
+Then bump `version` in `apps/desktop/package.json` and build:
+
+```sh
+CSC_NAME="<Name> (<TEAMID>)" APPLE_KEYCHAIN_PROFILE=problem-notary \
+  pnpm --filter @problem/desktop release:mac
+```
+
+The identity is always named, never picked from the keychain. The `.dmg` lands in
+`apps/desktop/dist`; attach it to a GitHub release tagged `v<version>`.
 
 Data lives in `~/.problem` (SQLite database, worktrees); set `PROBLEM_HOME` to use another folder.
 
