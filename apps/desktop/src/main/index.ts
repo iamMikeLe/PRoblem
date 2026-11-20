@@ -23,6 +23,8 @@ import { broadcast, registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
 import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
+import { createBitbucketHost } from "./pullrequests/bitbucket.ts";
+import { createBitbucketApi } from "./pullrequests/bitbucketApi.ts";
 import { createGitHubHost } from "./pullrequests/github.ts";
 import { createPullRequestService } from "./pullrequests/service.ts";
 import { createReviewService } from "./reviews/service.ts";
@@ -98,17 +100,6 @@ async function start(): Promise<void> {
   };
 
   const projects = createProjectService({ db, home, log });
-  const gh = createGhClient();
-  const activity = createActivityService({ db, broadcast, log });
-  const reviews = createReviewService({
-    db,
-    activity,
-    worktreesDir: join(dir, "worktrees"),
-    gh,
-    log,
-  });
-  const findings = createFindingsService({ db, broadcast });
-  const changes = createChangesService({ review: (id) => reviews.get(id) });
   // The OS keychain encrypts saved tokens. Linux without a keyring only offers plain text
   // ("basic_text"): saving is refused there rather than storing a token readable on disk.
   const secrets: SecretBox = {
@@ -119,7 +110,21 @@ async function start(): Promise<void> {
     decrypt: (data) => safeStorage.decryptString(Buffer.from(data)),
   };
   const credentials = createCredentialStore({ db, secrets });
-  const hosts = [createGitHubHost(gh)];
+  const gh = createGhClient();
+  const activity = createActivityService({ db, broadcast, log });
+  const hosts = [
+    createGitHubHost(gh),
+    createBitbucketHost(createBitbucketApi({ fetch, credentials: () => credentials.bitbucket() })),
+  ];
+  const reviews = createReviewService({
+    db,
+    activity,
+    worktreesDir: join(dir, "worktrees"),
+    hosts,
+    log,
+  });
+  const findings = createFindingsService({ db, broadcast });
+  const changes = createChangesService({ review: (id) => reviews.get(id) });
   const pullRequests = createPullRequestService({
     db,
     hosts,

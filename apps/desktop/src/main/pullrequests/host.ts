@@ -9,6 +9,17 @@ export interface PrInfo {
   /** The head commit as the host reports it (Bitbucket gives a 12-character prefix). */
   headSha: string;
   baseBranch: string;
+  /** `owner/repo` (lowercase) the head branch lives in, when the host says: a fork if not ours. */
+  sourceRepo?: string | undefined;
+}
+
+/** Where to fetch a pull request's head from, and the refspec to fetch it with. */
+export interface FetchSource {
+  /** A remote name of the project, or a URL the app built itself (never one from an API). */
+  from: string;
+  refspec: string;
+  /** A branch name the refspec contains, to check with git before fetching. */
+  branch?: string;
 }
 
 /** A finding placed on its line in the pull request's diff. */
@@ -42,6 +53,15 @@ export interface GitHost {
   repoOfRemote(remoteUrl: string): string | undefined;
   /** An https link on this host's website that the app may open in the browser. */
   isWebUrl(url: string): boolean;
+  /** A pull request link on this host, parsed (`repo` lowercase). */
+  parsePrUrl(input: string): { repo: string; number: number } | undefined;
+  /** The web page of pull request `number` (for `#12` typed in the New review dialog). */
+  pullRequestUrl(repo: string, number: number): string;
+  /**
+   * How to fetch the pull request's head into `target`. `remote` is the project's remote of the
+   * pull request's repository.
+   */
+  fetchSource(pr: PrInfo, target: string, remote: { name: string; url: string }): FetchSource;
   viewPullRequest(repo: string, number: number): Promise<PrInfo>;
   /** Open pull requests from `branch` of the repository itself (forks left out), newest first. */
   openPullRequestsForBranch(repo: string, branch: string): Promise<PrInfo[]>;
