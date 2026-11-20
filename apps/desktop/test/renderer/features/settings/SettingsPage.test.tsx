@@ -98,7 +98,7 @@ describe("Bitbucket settings", () => {
     fireEvent.change(section.getByRole("textbox", { name: "Atlassian email" }), {
       target: { value: "not-an-email" },
     });
-    const token = section.getByLabelText("API token") as HTMLInputElement;
+    const token = section.getByLabelText(/API token/) as HTMLInputElement;
     expect(token.type).toBe("password");
     fireEvent.change(token, { target: { value: "ATATT-token" } });
     fireEvent.click(save);
@@ -114,7 +114,7 @@ describe("Bitbucket settings", () => {
       input: { email: "me@example.com", token: "ATATT-token" },
     });
     await waitFor(() => expect(token.value).toBe(""));
-    expect(token.placeholder).toMatch(/paste a new token to replace it/);
+    expect(await section.findByText(/Paste a new one to replace it/)).toBeTruthy();
   });
 
   it("tests the saved connection and removes it", async () => {
@@ -124,13 +124,23 @@ describe("Bitbucket settings", () => {
     const section = await openBitbucket();
     expect(await section.findByText("Saved for me@example.com.")).toBeTruthy();
     // The token is never filled in from what was saved.
-    expect((section.getByLabelText("API token") as HTMLInputElement).value).toBe("");
+    expect((section.getByLabelText(/API token/) as HTMLInputElement).value).toBe("");
 
     fireEvent.click(section.getByRole("button", { name: "Test connection" }));
     expect(await section.findByText("Bitbucket refused the email and API token.")).toBeTruthy();
 
-    fireEvent.click(section.getByRole("button", { name: "Remove" }));
+    // Test connection checks what is saved, so it waits while a new token is typed in.
+    const typed = section.getByLabelText(/API token/) as HTMLInputElement;
+    fireEvent.change(typed, { target: { value: "new-token" } });
+    expect(
+      section.getByRole("button", { name: "Test connection" }).getAttribute("aria-disabled"),
+    ).toBe("true");
+    fireEvent.change(typed, { target: { value: "" } });
+
+    fireEvent.click(section.getByRole("button", { name: "Remove credentials" }));
     expect(await section.findByText("No token saved.")).toBeTruthy();
+    // The failed test's message is gone with the credentials it was about.
+    expect(section.queryByText("Bitbucket refused the email and API token.")).toBeNull();
     expect(api.calls.map((c) => c.channel)).toContain("bitbucket:remove");
   });
 });
