@@ -79,6 +79,12 @@ export const AppErrorCodeSchema = z.enum([
   "no_pull_request",
   "invalid_url",
   "secret_storage_unavailable",
+  "bitbucket_not_configured",
+  "bitbucket_auth_failed",
+  "bitbucket_rate_limited",
+  "bitbucket_unreachable",
+  "bitbucket_failed",
+  "post_partial",
 ]);
 export type AppErrorCode = z.infer<typeof AppErrorCodeSchema>;
 
