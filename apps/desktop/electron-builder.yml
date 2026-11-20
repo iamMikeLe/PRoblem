@@ -13,8 +13,13 @@ mac:
   target:
     - target: dmg
       arch: [universal]
-  # Unsigned for now; see ROADMAP Phase 9.
+  # Unsigned unless an identity is named: `pnpm release:mac` (see README, "Releasing") signs with
+  # the identity in CSC_NAME, under the hardened runtime, and notarizes with APPLE_KEYCHAIN_PROFILE.
+  # Never auto-discovered, so a machine with several certificates cannot sign with the wrong one.
   identity: null
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 win:
   target: nsis
 linux:

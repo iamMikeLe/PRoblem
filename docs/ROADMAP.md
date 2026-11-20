@@ -104,7 +104,8 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] A short GIF in the README (`demo:gif`: recorded by Playwright, assembled by ffmpeg)
 - [x] `/demo-prep` → `docs/DEMO.md`
 - [ ] Rehearse the demo
-- [ ] Code signing and notarization for macOS; auto-update
+- [x] Code signing and notarization for macOS (`release:mac`)
+- [ ] Auto-update
 
 ## Phase 10: Activity
 
