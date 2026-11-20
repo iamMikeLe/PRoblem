@@ -75,7 +75,8 @@ export function createBitbucketApi(deps: BitbucketApiDeps): BitbucketApi {
     let detail = "";
     try {
       const parsed = ErrorBody.safeParse(await response.json());
-      if (parsed.success) detail = `: ${parsed.data.error.message}`;
+      // Shown to the user: kept short, Bitbucket's text is not ours.
+      if (parsed.success) detail = `: ${parsed.data.error.message.slice(0, 200)}`;
     } catch {
       // No JSON body.
     }

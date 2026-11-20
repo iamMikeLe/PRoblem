@@ -568,6 +568,7 @@ describe("GitHub service", () => {
     expect(neutralizeMentions("@org/team")).toBe(`@${z}org/team`);
     expect(neutralizeMentions("a@b.c")).toBe(`a@${z}b.c`);
     expect(neutralizeMentions("@ alone")).toBe("@ alone");
+    expect(neutralizeMentions("@_lead and @élise")).toBe(`@${z}_lead and @${z}élise`);
     // Bitbucket's account-id mentions.
     expect(neutralizeMentions("@{557058:abc}")).toBe(`@${z}{557058:abc}`);
   });
