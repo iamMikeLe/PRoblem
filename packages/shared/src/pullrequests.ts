@@ -1,12 +1,20 @@
 import { z } from "zod";
 
 /**
- * A review's pull request on GitHub: its existing discussion, and posting findings as a GitHub
- * review (ADR 0014). Everything here comes from GitHub and is written by other people: it is shown
- * as content and given to Claude as untrusted text.
+ * A review's pull request on its git host: its existing discussion, and posting findings to it
+ * (ADR 0014, 0019). Everything here comes from the host and is written by other people: it is
+ * shown as content and given to Claude as untrusted text.
  */
 
+export const HostKindSchema = z.enum(["github", "bitbucket"]);
+export type HostKind = z.infer<typeof HostKindSchema>;
+
+/** The host's name for people. */
+export const HOST_LABELS: Record<HostKind, string> = { github: "GitHub", bitbucket: "Bitbucket" };
+
 export const PullRequestLinkSchema = z.object({
+  /** Links saved before Bitbucket support are GitHub's. */
+  host: HostKindSchema.default("github"),
   /** `owner/repo`, lowercase. */
   repo: z.string(),
   number: z.number().int().positive(),

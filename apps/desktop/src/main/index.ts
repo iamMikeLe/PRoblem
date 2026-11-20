@@ -22,7 +22,8 @@ import { broadcast, registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
 import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
-import { createGitHubService } from "./pullrequests/service.ts";
+import { createGitHubHost } from "./pullrequests/github.ts";
+import { createPullRequestService } from "./pullrequests/service.ts";
 import { createReviewService } from "./reviews/service.ts";
 import { createSearchService } from "./search/service.ts";
 import { getSettings, updateSettings } from "./settings/repository.ts";
@@ -107,9 +108,10 @@ async function start(): Promise<void> {
   });
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
-  const github = createGitHubService({
+  const hosts = [createGitHubHost(gh)];
+  const pullRequests = createPullRequestService({
     db,
-    gh,
+    hosts,
     review: (id) => reviews.get(id),
     changes,
     log,
@@ -156,11 +158,11 @@ async function start(): Promise<void> {
       notification.show();
     },
     attention: (waiting) => app.setBadgeCount(waiting),
-    commentsNote: (id) => github.commentsNote(id),
+    commentsNote: (id) => pullRequests.commentsNote(id),
     activity,
     // After each turn, look for news to list in Activity: PR comments and new commits.
     afterTurn: (id) => {
-      github.refreshInBackground(id);
+      pullRequests.refreshInBackground(id);
       reviews.checkInBackground(id);
     },
   });
@@ -174,7 +176,8 @@ async function start(): Promise<void> {
         sessions,
         findings,
         changes,
-        github,
+        pullRequests,
+        hosts,
         search,
         activity,
         log,

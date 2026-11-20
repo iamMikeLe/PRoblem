@@ -6,7 +6,8 @@ import type { EditorOpener } from "../editor/open.ts";
 import { AppFailure, type Logger } from "../errors.ts";
 import type { FindingsService } from "../findings/service.ts";
 import type { ProjectService } from "../projects/service.ts";
-import type { GitHubService } from "../pullrequests/service.ts";
+import type { GitHost } from "../pullrequests/host.ts";
+import type { PullRequestService } from "../pullrequests/service.ts";
 import type { ReviewService } from "../reviews/service.ts";
 import type { SearchService } from "../search/service.ts";
 import type { IpcHandlers } from "./dispatcher.ts";
@@ -17,31 +18,18 @@ export interface HandlerDeps {
   sessions: SessionService;
   findings: FindingsService;
   changes: ChangesService;
-  github: GitHubService;
+  pullRequests: PullRequestService;
+  /** The supported git hosts: their websites are the links `pr:open` may open. */
+  hosts: readonly GitHost[];
   search: SearchService;
   activity: ActivityService;
   log: Logger;
-  /** Opens a URL in the user's browser (already checked to be a github.com link). */
+  /** Opens a URL in the user's browser (already checked to be a pull request host link). */
   openExternal: (url: string) => Promise<void>;
   settings: { get(): AppSettings; update(request: UpdateSettingsRequest): AppSettings };
   editor: EditorOpener;
   /** Shows the native folder picker; resolves with the chosen folder or `null`. */
   pickFolder: () => Promise<string | null>;
-}
-
-/** An https link to github.com itself (not a subdomain, no credentials in the URL). */
-export function isGitHubUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      url.hostname === "github.com" &&
-      url.username === "" &&
-      url.password === ""
-    );
-  } catch {
-    return false;
-  }
 }
 
 /** Binds every IPC channel to the use case that implements it. */
@@ -51,7 +39,8 @@ export function createHandlers({
   sessions,
   findings,
   changes,
-  github,
+  pullRequests,
+  hosts,
   search,
   activity,
   log,
@@ -73,7 +62,7 @@ export function createHandlers({
     "reviews:create": async (input) => {
       const review = await reviews.create(input);
       // Claude starts reviewing right away, knowing what reviewers already said on the PR.
-      sessions.start(review, await github.firstDigest(review));
+      sessions.start(review, await pullRequests.firstDigest(review));
       return reviews.get(review.id);
     },
     "reviews:close": async ({ id }) => {
@@ -98,12 +87,12 @@ export function createHandlers({
       log.error("renderer error", report);
       return null;
     },
-    "pr:conversation": ({ id }) => github.conversation(id),
-    "pr:preview": ({ id }) => github.preview(id),
-    "pr:post": (input) => github.post(input),
+    "pr:conversation": ({ id }) => pullRequests.conversation(id),
+    "pr:preview": ({ id }) => pullRequests.preview(id),
+    "pr:post": (input) => pullRequests.post(input),
     "pr:open": async ({ url }) => {
-      if (!isGitHubUrl(url))
-        throw new AppFailure("invalid_url", "Only github.com links can be opened");
+      if (!hosts.some((host) => host.isWebUrl(url)))
+        throw new AppFailure("invalid_url", "Only pull request host links can be opened");
       await openExternal(url);
       return null;
     },
