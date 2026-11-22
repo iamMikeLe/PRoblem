@@ -5,7 +5,7 @@ description: Write an Architecture Decision Record for PRoblem in docs/adr/. Use
 
 # Write an ADR
 
-ADRs explain *why*, so the decision can be defended later (and in an interview).
+ADRs explain *why*, so the decision can be defended later.
 
 1. Find the next number: `ls docs/adr`. Files are `NNNN-kebab-title.md`.
 2. Use this template, at most one page:
