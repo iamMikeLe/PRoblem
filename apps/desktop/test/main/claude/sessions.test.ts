@@ -256,6 +256,7 @@ describe("session service", () => {
       kind: "turn-end",
       outcome: "success",
       costUsd: 0.25,
+      tokens: null,
       durationMs: 4200,
       message: null,
     });

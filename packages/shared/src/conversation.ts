@@ -75,6 +75,11 @@ export const ConversationEntrySchema = z.discriminatedUnion("kind", [
     kind: z.literal("turn-end"),
     outcome: z.enum(["success", "error", "interrupted"]),
     costUsd: z.number().nullable(),
+    /**
+     * Tokens the turn used: input, output and prompt cache (written and read). Turns saved before
+     * this was recorded have none.
+     */
+    tokens: z.number().int().nonnegative().nullable().default(null),
     durationMs: z.number().nullable(),
     /** Why the turn failed or stopped, for the user. */
     message: z.string().nullable(),

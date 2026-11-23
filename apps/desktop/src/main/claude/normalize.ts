@@ -64,7 +64,26 @@ const ResultSchema = z.object({
   errors: z.array(z.string()).optional(),
   total_cost_usd: z.number().optional(),
   duration_ms: z.number().optional(),
+  usage: z
+    .object({
+      input_tokens: z.number().nullish(),
+      output_tokens: z.number().nullish(),
+      cache_creation_input_tokens: z.number().nullish(),
+      cache_read_input_tokens: z.number().nullish(),
+    })
+    .optional(),
 });
+
+/** All tokens of a turn, prompt cache included; null when the SDK reported no usage. */
+function totalTokens(usage: z.infer<typeof ResultSchema>["usage"]): number | null {
+  if (usage === undefined) return null;
+  const total =
+    (usage.input_tokens ?? 0) +
+    (usage.output_tokens ?? 0) +
+    (usage.cache_creation_input_tokens ?? 0) +
+    (usage.cache_read_input_tokens ?? 0);
+  return Number.isSafeInteger(total) && total >= 0 ? total : null;
+}
 
 export function truncate(text: string, max = TOOL_TEXT_MAX): string {
   return text.length <= max
@@ -145,6 +164,7 @@ function resultEntry(message: z.infer<typeof ResultSchema>): ConversationEntry {
     kind: "turn-end",
     outcome: failed ? "error" : "success",
     costUsd: message.total_cost_usd ?? null,
+    tokens: totalTokens(message.usage),
     durationMs: message.duration_ms ?? null,
     message: failed ? (reason ?? `Claude stopped (${message.subtype})`) : null,
   };
