@@ -24,6 +24,7 @@ import {
   type Project,
   type Review,
   type SearchResults,
+  type SecurityScan,
   type StoredEntry,
   type UpdateCheck,
 } from "@problem/shared";
@@ -59,6 +60,7 @@ export function makeFinding(
     reviewId,
     number,
     severity: "major",
+    securityCategory: null,
     title: `Finding ${number}`,
     file: "src/app.ts",
     line: 10 * number,
@@ -156,6 +158,8 @@ export interface StubState {
   errors: IpcInput<"app:reportError">[];
   /** Findings by review id. */
   findings: Record<string, Finding[]>;
+  /** Security scans by review id (none = not scanned yet). */
+  securityScans: Record<string, SecurityScan>;
   /** The Activity feed, newest first. */
   activity: ActivityItem[];
   settings: AppSettings;
@@ -190,6 +194,7 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
     calls: [],
     entries: {},
     findings: {},
+    securityScans: {},
     activity: [],
     approvals: [],
     changes: {},
@@ -387,6 +392,10 @@ export function stubBridge(initial: Project[] = [], reviews: Review[] = []): Stu
       case "findings:list": {
         const { id } = ipcContract[channel].input.parse(raw);
         return ok(state.findings[id] ?? []);
+      }
+      case "security:scan": {
+        const { id } = ipcContract[channel].input.parse(raw);
+        return ok(state.securityScans[id] ?? null);
       }
       case "app:reportError":
         state.errors.push(ipcContract[channel].input.parse(raw));

@@ -1,4 +1,4 @@
-import type { Review } from "@problem/shared";
+import { type Review, SECURITY_CATEGORIES, SECURITY_CATEGORY_ORDER } from "@problem/shared";
 
 /** The first message of a review: the review prompt plus where the changes are. */
 export function firstTurnPrompt(review: Review): string {
@@ -39,7 +39,7 @@ export function movedNote(fromSha: string, toSha: string): string {
  * starts; the gate itself always uses the current setting.
  */
 export function reviewSystemAppend(fixMode: boolean): string {
-  return `${PERMISSIONS}\n\n${fixMode ? FIX_MODE_ON : FIX_MODE_OFF}\n\n${FINDINGS}`;
+  return `${PERMISSIONS}\n\n${fixMode ? FIX_MODE_ON : FIX_MODE_OFF}\n\n${FINDINGS}\n\n${SECURITY}`;
 }
 
 const PERMISSIONS = `You are running inside PRoblem, a desktop app for code reviews.
@@ -74,3 +74,15 @@ const FINDINGS = `Findings: record every problem you find with the report_findin
 - Messages that start with "[PRoblem]" tell you which findings the user accepted or dismissed.
   Do not argue for a dismissed finding again unless you have new evidence.
 - In your answer, summarize briefly and refer to the numbers instead of repeating every detail.`;
+
+const SECURITY = `Security: besides your review, scan the change for security problems in every category below.
+${SECURITY_CATEGORY_ORDER.map((category) => `- ${category}: ${SECURITY_CATEGORIES[category].covers}.`).join("\n")}
+- Look at every changed file, including config, fixtures, tests, docs and lock files: a secret in
+  a test fixture is still leaked. Never repeat a secret's value; name the file, line and kind.
+- Report each security problem as a finding with "security" set to its category: the title says
+  what was found, file and line say where, "problem" says why it is risky and how an attacker
+  could use it, "suggestion" gives the fix (for a leaked secret: rotate it, then remove it).
+  Use the same severities as other findings.
+- Send "securityScan" with report_findings after every review pass, also when nothing was found:
+  one check per category (pass, fail or not-applicable, with a short note) and a summary of what
+  you scanned and the outcome.`;

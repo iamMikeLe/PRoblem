@@ -122,6 +122,7 @@ export function createHandlers({
     "findings:list": ({ id }) => findings.list(id),
     "findings:counts": () => findings.counts(),
     "findings:setVerdict": (input) => findings.setVerdict(input),
+    "security:scan": ({ id }) => findings.securityScan(id),
     "settings:get": () => settings.get(),
     "settings:update": (input) => settings.update(input),
     "editor:open": async (input) => {

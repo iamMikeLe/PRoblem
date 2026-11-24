@@ -284,6 +284,7 @@ describe("findings", () => {
         add: [{ severity: "major", title: "A", problem: "p", suggestion: "s", reproduction: "" }],
         update: undefined,
         withdraw: undefined,
+        securityScan: undefined,
       },
       {},
     );
@@ -292,7 +293,7 @@ describe("findings", () => {
       isError: false,
     });
     const bad = await tool.handler(
-      { add: undefined, update: [{ number: 7 }], withdraw: undefined },
+      { add: undefined, update: [{ number: 7 }], withdraw: undefined, securityScan: undefined },
       {},
     );
     expect(bad).toMatchObject({ isError: true });

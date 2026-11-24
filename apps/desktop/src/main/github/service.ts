@@ -223,7 +223,12 @@ export function createGitHubService(deps: GitHubServiceDeps): GitHubService {
         placement: reason === null ? "inline" : "summary",
         reason,
         text: formatFinding(finding, reason !== null),
-        selected: finding.verdict === "accepted" && finding.postedUrl === null,
+        // A security finding (a leaked secret, a vulnerability) is public once posted: the user
+        // picks it in the preview, accepting it is not enough.
+        selected:
+          finding.verdict === "accepted" &&
+          finding.postedUrl === null &&
+          finding.securityCategory === null,
         postedUrl: finding.postedUrl,
       });
     }

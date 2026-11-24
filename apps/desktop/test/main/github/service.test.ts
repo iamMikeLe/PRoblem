@@ -348,6 +348,31 @@ describe("GitHub service", () => {
       setVerdict(db, "r1", 4, "dismissed", at);
     });
 
+    it("does not pre-select an accepted security finding: posting it makes it public", async () => {
+      const number = insertFinding(
+        db,
+        "r1",
+        {
+          severity: "blocker",
+          securityCategory: "secrets",
+          title: "Key in .env.example",
+          file: "src/app.ts",
+          line: 11,
+          problem: "p",
+          suggestion: "s",
+          reproduction: "",
+        },
+        at,
+      );
+      setVerdict(db, "r1", number, "accepted", at);
+      const preview = await github.preview("r1");
+      if (preview.status !== "ok") throw new Error(preview.status);
+      const item = preview.items.find((i) => i.number === number);
+      expect(item).toMatchObject({ placement: "inline", selected: false });
+      // Other accepted findings are still pre-selected.
+      expect(preview.items.find((i) => i.number === 1)?.selected).toBe(true);
+    });
+
     it("previews each finding's exact text and place, pre-selecting accepted ones", async () => {
       const preview = await github.preview("r1");
       if (preview.status !== "ok") throw new Error(preview.status);
@@ -540,6 +565,7 @@ describe("GitHub service", () => {
       reviewId: "r1",
       number: 1,
       severity: "minor",
+      securityCategory: null,
       title: "Crash on empty cart",
       file: "src/cart.ts",
       line: 4,

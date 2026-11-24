@@ -93,6 +93,10 @@ channel, validated by `AppEventSchema`.
 7. Claude calls `report_findings` (in-process MCP server, one per turn). Main checks the whole
    report, assigns stable numbers, saves it in one transaction and broadcasts `review.findings`.
    Verdicts the user changes go into the next message as a `[PRoblem]` note (ADR 0004).
+8. Security: the same report can mark findings with a `security` category and carry a
+   `securityScan` (summary plus one pass/fail/not-applicable check per category, all required).
+   Security findings are ordinary findings shown in the Security tab instead of Findings; the
+   latest scan per review lives in `security_scans` and is broadcast as `review.securityScan`.
 
 ## Storage
 

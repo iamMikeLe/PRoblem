@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { PendingApprovalSchema, StoredEntrySchema } from "./conversation.ts";
 import { FindingSchema, ReviewStatusSchema } from "./domain.ts";
+import { SecurityScanSchema } from "./security.ts";
 
 /**
  * Events the main process pushes to the renderer on `EVENT_CHANNEL`.
@@ -34,6 +35,8 @@ export const AppEventSchema = z.discriminatedUnion("type", [
     reviewId: z.string(),
     findings: z.array(FindingSchema),
   }),
+  /** Claude reported a new security scan for the review. */
+  z.object({ type: z.literal("review.securityScan"), scan: SecurityScanSchema }),
 ]);
 export type AppEvent = z.infer<typeof AppEventSchema>;
 

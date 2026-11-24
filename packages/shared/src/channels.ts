@@ -32,6 +32,7 @@ export const IPC_CHANNELS = [
   "search:query",
   "app:reportError",
   "findings:setVerdict",
+  "security:scan",
   "settings:get",
   "settings:update",
   "editor:open",

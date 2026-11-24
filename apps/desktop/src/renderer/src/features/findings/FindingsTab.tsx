@@ -71,7 +71,7 @@ const SEVERITY: Record<
   minor: { label: "Minor", color: "warning" },
   nit: { label: "Nit", color: "informative" },
 };
-const SEVERITY_ORDER: Record<Severity, number> = { blocker: 0, major: 1, minor: 2, nit: 3 };
+export const SEVERITY_ORDER: Record<Severity, number> = { blocker: 0, major: 1, minor: 2, nit: 3 };
 
 const VERDICT_LABEL: Record<Verdict, string> = {
   open: "Open",
@@ -236,7 +236,15 @@ const useStyles = makeStyles({
 });
 
 /** One titled part of the detail: Problem, How to reproduce, Suggestion. */
-function Part({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+export function Part({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
   const styles = useStyles();
   const id = useId();
   return (
@@ -298,7 +306,8 @@ export function FindingsTab({ reviewId, onAsk, initialSelected, onPost }: Props)
   const [selected, setSelected] = useState<number | undefined>(initialSelected);
   const detailPanel = usePanel("findings.detail", DETAIL_LIMITS);
 
-  const all = findings.data ?? [];
+  // Security findings have their own tab.
+  const all = (findings.data ?? []).filter((finding) => finding.securityCategory === null);
   const shown = all
     .filter((finding) => matchesFilter(finding, filter))
     .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] || a.number - b.number);

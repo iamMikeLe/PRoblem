@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { activityKey } from "../activity/queries.ts";
 import { findingCountsKey, findingsKey } from "../findings/queries.ts";
 import { reviewsKey } from "../reviews/queries.ts";
+import { securityScanKey } from "../security/queries.ts";
 import { catalogKey } from "./queries.ts";
 import { useConversationStore } from "./store.ts";
 
@@ -32,6 +33,9 @@ export function useAppEvents(onShowReview: (reviewId: string) => void): void {
       if (event.type === "review.findings") {
         client.setQueryData(findingsKey(event.reviewId), event.findings);
         void client.invalidateQueries({ queryKey: findingCountsKey });
+      }
+      if (event.type === "review.securityScan") {
+        client.setQueryData(securityScanKey(event.scan.reviewId), event.scan);
       }
       // Models and commands load during a turn; pick them up once one has ended.
       if (event.type === "review.entry" && event.entry.entry.kind === "turn-end") {

@@ -174,4 +174,19 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX activity_by_review ON activity (review_id, kind);
     `,
   },
+  {
+    version: 11,
+    name: "security_scan",
+    sql: `
+      -- The SecurityCategory of a security finding; NULL for every other finding.
+      ALTER TABLE findings ADD COLUMN security_category TEXT;
+      -- The latest security scan of a review; \`checks\` is a JSON SecurityCheck[].
+      CREATE TABLE security_scans (
+        review_id  TEXT PRIMARY KEY REFERENCES reviews(id) ON DELETE CASCADE,
+        summary    TEXT NOT NULL,
+        checks     TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

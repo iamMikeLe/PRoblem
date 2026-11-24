@@ -24,6 +24,7 @@ import {
   type Project,
   type Review,
   type SearchResults,
+  type SecurityScan,
   type SendMessageRequest,
   type SetVerdictRequest,
   type StoredEntry,
@@ -124,6 +125,9 @@ export const api = {
     counts: (): Promise<Record<string, FindingCounts>> => call("findings:counts", undefined),
     setVerdict: (request: SetVerdictRequest): Promise<Finding> =>
       call("findings:setVerdict", request),
+  },
+  security: {
+    scan: (id: string): Promise<SecurityScan | null> => call("security:scan", { id }),
   },
   settings: {
     get: (): Promise<AppSettings> => call("settings:get", undefined),

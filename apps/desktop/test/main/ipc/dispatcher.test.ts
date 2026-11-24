@@ -16,6 +16,7 @@ const project: Project = {
 function handlers(overrides: Partial<IpcHandlers> = {}): IpcHandlers {
   return {
     "projects:list": () => [project],
+    "security:scan": () => null,
     "projects:create": () => project,
     "projects:update": () => project,
     "projects:remove": () => null,
