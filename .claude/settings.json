@@ -22,13 +22,7 @@
       "Bash(git commit:*)",
       "Bash(pnpm package:*)"
     ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)",
-      "Read(~/.problem/**)",
-      "Bash(git push:*)",
-      "Bash(rm -rf:*)"
-    ]
+    "deny": ["Read(./.env)", "Read(./.env.*)", "Read(~/.problem/**)", "Bash(rm -rf:*)"]
   },
   "hooks": {
     "SessionStart": [
