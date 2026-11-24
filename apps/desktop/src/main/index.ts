@@ -2,13 +2,14 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { editorTemplate } from "@problem/shared";
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Notification, safeStorage, shell } from "electron";
 import { createActivityService } from "./activity/service.ts";
 import { createChangesService } from "./changes/service.ts";
 import { findExecutable } from "./claude/executable.ts";
 import { fakeClaude } from "./claude/fake.ts";
 import { createSessionService } from "./claude/sessions.ts";
 import { DATABASE_NAME, dataDir } from "./config.ts";
+import { createCredentialStore, type SecretBox } from "./credentials/store.ts";
 import { openDatabase } from "./db/database.ts";
 import { createEditorOpener, spawnDetached } from "./editor/open.ts";
 import { absolutePathOnly, loginShellPath } from "./env.ts";
@@ -16,13 +17,16 @@ import type { Logger } from "./errors.ts";
 import { createFindingsService } from "./findings/service.ts";
 import { createGhClient } from "./git/gh.ts";
 import { repairWorktree } from "./git/worktree.ts";
-import { createGitHubService } from "./github/service.ts";
 import { createDispatcher } from "./ipc/dispatcher.ts";
 import { createHandlers } from "./ipc/handlers.ts";
 import { broadcast, registerIpc } from "./ipc/register.ts";
 import type { RendererSource } from "./ipc/trust.ts";
 import { migrateLegacyDataDir, moveFolder, relocateReviews } from "./legacy.ts";
 import { createProjectService } from "./projects/service.ts";
+import { createBitbucketHost } from "./pullrequests/bitbucket.ts";
+import { createBitbucketApi, testBitbucketConnection } from "./pullrequests/bitbucketApi.ts";
+import { createGitHubHost } from "./pullrequests/github.ts";
+import { createPullRequestService } from "./pullrequests/service.ts";
 import { createReviewService } from "./reviews/service.ts";
 import { createSearchService } from "./search/service.ts";
 import { getSettings, updateSettings } from "./settings/repository.ts";
@@ -96,20 +100,32 @@ async function start(): Promise<void> {
   };
 
   const projects = createProjectService({ db, home, log });
+  // The OS keychain encrypts saved tokens. Linux without a keyring only offers plain text
+  // ("basic_text"): saving is refused there rather than storing a token readable on disk.
+  const secrets: SecretBox = {
+    available: () =>
+      safeStorage.isEncryptionAvailable() &&
+      (process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text"),
+    encrypt: (text) => safeStorage.encryptString(text),
+    decrypt: (data) => safeStorage.decryptString(Buffer.from(data)),
+  };
+  const credentials = createCredentialStore({ db, secrets });
   const gh = createGhClient();
   const activity = createActivityService({ db, broadcast, log });
+  const bitbucketApi = createBitbucketApi({ fetch, credentials: () => credentials.bitbucket() });
+  const hosts = [createGitHubHost(gh), createBitbucketHost(bitbucketApi)];
   const reviews = createReviewService({
     db,
     activity,
     worktreesDir: join(dir, "worktrees"),
-    gh,
+    hosts,
     log,
   });
   const findings = createFindingsService({ db, broadcast });
   const changes = createChangesService({ review: (id) => reviews.get(id) });
-  const github = createGitHubService({
+  const pullRequests = createPullRequestService({
     db,
-    gh,
+    hosts,
     review: (id) => reviews.get(id),
     changes,
     log,
@@ -156,11 +172,11 @@ async function start(): Promise<void> {
       notification.show();
     },
     attention: (waiting) => app.setBadgeCount(waiting),
-    commentsNote: (id) => github.commentsNote(id),
+    commentsNote: (id) => pullRequests.commentsNote(id),
     activity,
     // After each turn, look for news to list in Activity: PR comments and new commits.
     afterTurn: (id) => {
-      github.refreshInBackground(id);
+      pullRequests.refreshInBackground(id);
       reviews.checkInBackground(id);
     },
   });
@@ -174,7 +190,10 @@ async function start(): Promise<void> {
         sessions,
         findings,
         changes,
-        github,
+        pullRequests,
+        hosts,
+        credentials,
+        testBitbucket: () => testBitbucketConnection(bitbucketApi),
         search,
         activity,
         log,

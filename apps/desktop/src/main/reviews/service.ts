@@ -11,8 +11,6 @@ import type {
 } from "@problem/shared";
 import type { ActivityService } from "../activity/service.ts";
 import { AppFailure, type Logger } from "../errors.ts";
-import type { GhClient } from "../git/gh.ts";
-import { githubRepoOf, parsePullRequestUrl } from "../git/github.ts";
 import {
   assertBranchName,
   commitsBetween,
@@ -36,6 +34,7 @@ import {
   removeWorktree,
 } from "../git/worktree.ts";
 import { getProject, isUniqueViolation } from "../projects/repository.ts";
+import type { GitHost } from "../pullrequests/host.ts";
 import {
   findOpenInPlaceReview,
   getReviewRecord,
@@ -49,7 +48,8 @@ export interface ReviewServiceDeps {
   db: DatabaseSync;
   /** Parent folder of all review worktrees (`~/.problem/worktrees`). */
   worktreesDir: string;
-  gh: GhClient;
+  /** The git hosts whose pull requests can be reviewed (ADR 0019). */
+  hosts: readonly GitHost[];
   log: Logger;
   /** The Activity feed: new commits found by a check (ADR 0015). */
   activity?: Pick<ActivityService, "record" | "last" | "resolve">;
@@ -88,13 +88,16 @@ interface ResolvedHead {
 
 const shortSha = (sha: string) => sha.slice(0, 8);
 
+/** `#12` in the New review dialog: a pull request number, not a branch name. */
+const PR_NUMBER = /^#[1-9]\d{0,8}$/;
+
 /** Background checks for new commits of one review run at most this often. */
 const BACKGROUND_CHECK_MS = 5 * 60_000;
 
 type Unattended = { unattended?: boolean };
 
 export function createReviewService(deps: ReviewServiceDeps): ReviewService {
-  const { db, gh, log } = deps;
+  const { db, hosts, log } = deps;
   const now = deps.now ?? (() => new Date());
 
   // In-place reviews of one project share its checkout: run their starts and closes one at a time.
@@ -120,36 +123,57 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
     url: string,
     options: Unattended = {},
   ): Promise<ResolvedHead> {
-    const ref = parsePullRequestUrl(url);
-    if (!ref) {
+    const parsed = hosts
+      .map((host) => ({ host, ref: host.parsePrUrl(url) }))
+      .find((entry) => entry.ref !== undefined);
+    if (!parsed?.ref) {
       throw new AppFailure(
         "invalid_source",
-        "Only GitHub pull request links are supported (https://github.com/<owner>/<repo>/pull/<n>)",
+        "Only GitHub and Bitbucket pull request links are supported (https://github.com/<owner>/<repo>/pull/<n>, https://bitbucket.org/<workspace>/<repo>/pull-requests/<n>)",
       );
     }
-    const repo = `${ref.owner}/${ref.repo}`.toLowerCase();
-    const remote = (await listRemotes(root)).find((r) => githubRepoOf(r.url) === repo);
+    const { host } = parsed;
+    const { repo, number } = parsed.ref;
+    const remote = (await listRemotes(root)).find((r) => host.repoOfRemote(r.url) === repo);
     if (!remote) {
       throw new AppFailure(
         "pr_repo_mismatch",
         `This project has no remote for ${repo}; the pull request belongs to another repository`,
       );
     }
-    const info = await gh.viewPullRequest(repo, ref.number);
+    const info = await host.viewPullRequest(repo, number);
     // Fetch into the app's own namespace, so parallel starts never race on FETCH_HEAD.
-    const target = `refs/problem/pull/${ref.number}`;
-    await fetchRefspec(root, remote.name, `+refs/pull/${ref.number}/head:${target}`, options);
+    const target = `refs/problem/pull/${number}`;
+    const from = host.fetchSource(info, target, remote);
+    if (from.branch !== undefined) await assertBranchName(root, from.branch);
+    await fetchRefspec(root, from.from, from.refspec, options);
     const headSha = await resolveCommit(root, target);
-    if (!headSha)
-      throw new AppFailure("fetch_failed", `Could not fetch pull request #${ref.number}`);
+    if (!headSha) throw new AppFailure("fetch_failed", `Could not fetch pull request #${number}`);
     return {
       source: { kind: "pull-request", url: info.url, number: info.number, repo },
       title: info.title,
-      headBranch: info.headRefName,
+      headBranch: info.headBranch,
       headSha,
-      defaultBase: info.baseRefName,
+      defaultBase: info.baseBranch,
       remote: remote.name,
     };
+  }
+
+  /** `#12`: pull request 12 of the project's own repository, on the host of its main remote. */
+  async function numberToUrl(root: string, input: string): Promise<string> {
+    const remote = primaryRemote(await listRemotes(root));
+    const found = remote
+      ? hosts
+          .map((host) => ({ host, repo: host.repoOfRemote(remote.url) }))
+          .find((entry) => entry.repo !== undefined)
+      : undefined;
+    if (!found?.repo) {
+      throw new AppFailure(
+        "invalid_source",
+        "This project has no GitHub or Bitbucket remote; paste the pull request's link instead.",
+      );
+    }
+    return found.host.pullRequestUrl(found.repo, Number(input.slice(1)));
   }
 
   async function resolveBranch(
@@ -219,10 +243,11 @@ export function createReviewService(deps: ReviewServiceDeps): ReviewService {
   async function create(input: CreateReviewRequest): Promise<Review> {
     const project = projectOrFail(input.projectId);
     const root = project.path;
-    const looksLikeUrl = input.source.includes("://");
-    const head = looksLikeUrl
+    const head = input.source.includes("://")
       ? await resolvePullRequest(root, input.source)
-      : await resolveBranch(root, input.source);
+      : PR_NUMBER.test(input.source)
+        ? await resolvePullRequest(root, await numberToUrl(root, input.source))
+        : await resolveBranch(root, input.source);
 
     const baseBranch = input.base ?? head.defaultBase;
     const baseSha = await resolveBaseCommit(root, head.remote, baseBranch);

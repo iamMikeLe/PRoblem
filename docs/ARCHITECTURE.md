@@ -43,11 +43,12 @@ flowchart LR
 | `src/main/claude/` | Session service (Agent SDK), SDK → entry normalizer, read-only tool policy, `report_findings` MCP server | no |
 | `src/main/findings/` | Findings repository, report validation, verdicts and the note to Claude (ADR 0004) | no |
 | `src/main/changes/`, `git/diff.ts` | Changed files and per-file diffs between merge base and head (ADR 0013) | no |
-| `src/main/activity/` | The Activity feed: rows recorded by the session, review and GitHub services (ADR 0015) | no |
+| `src/main/activity/` | The Activity feed: rows recorded by the session, review and pull request services (ADR 0015) | no |
 | `src/main/search/` | Title-bar search over open reviews, their findings and changed files (plain word matching, no index) | no |
-| `src/main/github/` | PR discussion (GraphQL via `gh`), digest for Claude, preview and posting of GitHub reviews (ADR 0014) | no |
+| `src/main/pullrequests/` | PR discussion, digest for Claude, preview and posting, behind one `GitHost` per host: GitHub via `gh`, Bitbucket Cloud via its REST API (ADR 0014, 0019) | no |
+| `src/main/credentials/` | Git host credentials, the token encrypted with the OS keychain (ADR 0019) | no |
 | `src/main/editor/`, `settings/` | Open `file:line` in the user's editor (ADR 0011); app settings | no |
-| `src/main/db/`, `git/` | SQLite + migrations; git, `gh` and GitHub URL helpers | no |
+| `src/main/db/`, `git/` | SQLite + migrations; git, `gh`, GitHub and Bitbucket URL helpers | no |
 | `src/main/env.ts` | Login-shell PATH for apps started from Finder | no |
 | `src/preload/index.ts` | `window.problem` bridge | yes |
 | `src/renderer/` | React app | no (browser APIs) |
@@ -129,6 +130,8 @@ Single user, local machine, untrusted input (PR contents):
   an option (ADR 0009).
 - Checkouts of review code run with all git hooks disabled (ADR 0009).
 - Writing to a git host needs an explicit click per review.
+- The Bitbucket API token is encrypted with the OS keychain and never sent to the renderer; HTTP
+  goes only to `api.bitbucket.org`, follows no redirects and checks every page link (ADR 0019).
 
 ## Decisions
 
@@ -152,3 +155,4 @@ Single user, local machine, untrusted input (PR contents):
 | [0016](adr/0016-allow-all-commands.md) | "Allow all commands" for one review: any Bash command, still in the sandbox; survives fix-mode edits |
 | [0017](adr/0017-editable-post-text.md) | The user edits each finding's text (Write / Preview) before posting; main posts exactly that text |
 | [0018](adr/0018-diff-highlighting-and-file-icons.md) | Diff highlighting with lowlight (lazy grammars, React elements), Material file icons, bundled JetBrains Mono; one file of syntax colors |
+| [0019](adr/0019-bitbucket-cloud.md) | Bitbucket Cloud behind a `GitHost` interface; Atlassian API token encrypted with the keychain; comment-by-comment posting |

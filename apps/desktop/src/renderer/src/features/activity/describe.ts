@@ -1,4 +1,4 @@
-import type { ActivityDetail, ActivityItem } from "@problem/shared";
+import { type ActivityDetail, type ActivityItem, hostLabel } from "@problem/shared";
 import type { SearchTarget } from "../search/GlobalSearch.tsx";
 
 const SEVERITY = { blocker: "Blocker", major: "Major", minor: "Minor", nit: "Nit" } as const;
@@ -35,8 +35,8 @@ export function describeActivity(detail: ActivityDetail): { title: string; summa
       return { title: "New PR comments", summary: plural(detail.count, "new comment") };
     case "posted":
       return {
-        title: "Posted to GitHub",
-        summary: `${plural(detail.findings, "finding")} in a GitHub review`,
+        title: `Posted to ${hostLabel(detail.url)}`,
+        summary: `${plural(detail.findings, "finding")} on the pull request`,
       };
   }
 }

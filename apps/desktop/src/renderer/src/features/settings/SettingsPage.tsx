@@ -24,6 +24,7 @@ import {
 } from "@problem/shared";
 import { useState } from "react";
 import { THEMES, ThemeNameSchema, useTheme } from "../../lib/theme.ts";
+import { BitbucketSettings } from "./BitbucketSettings.tsx";
 import { useSettings, useUpdateSettings } from "./queries.ts";
 
 const useStyles = makeStyles({
@@ -46,7 +47,7 @@ const useStyles = makeStyles({
   actions: { display: "flex", gap: tokens.spacingHorizontalS, alignItems: "center" },
 });
 
-/** App-wide settings: the theme, and which editor opens `file:line` links. */
+/** App-wide settings: the theme, which editor opens `file:line` links, and Bitbucket. */
 export function SettingsPage() {
   const styles = useStyles();
   const settings = useSettings();
@@ -62,6 +63,7 @@ export function SettingsPage() {
         )}
         {settings.isLoading && <Spinner size="small" label="Loading" />}
         {settings.data && <EditorSettings saved={settings.data} />}
+        <BitbucketSettings />
       </div>
     </main>
   );

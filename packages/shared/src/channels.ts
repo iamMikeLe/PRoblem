@@ -20,10 +20,10 @@ export const IPC_CHANNELS = [
   "reviews:refresh",
   "changes:files",
   "changes:file",
-  "github:conversation",
-  "github:preview",
-  "github:post",
-  "github:open",
+  "pr:conversation",
+  "pr:preview",
+  "pr:post",
+  "pr:open",
   "approvals:list",
   "approvals:decide",
   "claude:catalog",
@@ -38,6 +38,10 @@ export const IPC_CHANNELS = [
   "dialog:pickFolder",
   "activity:list",
   "activity:markRead",
+  "bitbucket:status",
+  "bitbucket:save",
+  "bitbucket:remove",
+  "bitbucket:test",
 ] as const;
 
 export type IpcChannel = (typeof IPC_CHANNELS)[number];
