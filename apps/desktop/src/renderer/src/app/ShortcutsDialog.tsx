@@ -14,7 +14,10 @@ import { ALT_LABEL, MOD_LABEL } from "../lib/shortcuts.ts";
 const SHORTCUTS: readonly { keys: readonly string[]; what: string }[] = [
   { keys: [`${MOD_LABEL}K`], what: "Search reviews, findings and files" },
   { keys: [`${ALT_LABEL}↓`, `${ALT_LABEL}↑`], what: "Next or previous review" },
-  { keys: ["1", "2", "3", "4"], what: "Conversation, Findings, Changes, PR comments" },
+  {
+    keys: ["1", "2", "3", "4", "5"],
+    what: "Conversation, Findings, Changes, PR comments, Security",
+  },
   { keys: ["J", "K"], what: "Next or previous finding (Findings tab)" },
   { keys: ["R"], what: "Reply: focus the message box" },
   { keys: [`${MOD_LABEL}B`], what: "Show or hide the reviews list" },

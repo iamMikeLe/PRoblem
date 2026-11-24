@@ -1,14 +1,23 @@
 import { realpathSync } from "node:fs";
 import { isAbsolute, posix } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { type Finding, SeveritySchema } from "@problem/shared";
+import {
+  type Finding,
+  SECURITY_CATEGORY_ORDER,
+  SecurityCategorySchema,
+  SecurityCheckStatusSchema,
+  type SecurityScan,
+  SeveritySchema,
+} from "@problem/shared";
 import { z } from "zod";
 import {
   countAllFindings,
   type FindingContent,
   getFinding,
+  getSecurityScan,
   insertFinding,
   listFindings,
+  saveSecurityScan,
   updateFindingContent,
   type VerdictChange,
   withdrawFinding,
@@ -25,6 +34,9 @@ const NumberSchema = z.number().int().positive().describe("The finding's number,
 const fields = {
   severity: SeveritySchema.describe(
     "blocker: must be fixed before merging; major: should be fixed; minor: worth fixing; nit: optional polish.",
+  ),
+  security: SecurityCategorySchema.describe(
+    "Only for a security problem: its category. Omit for any other finding.",
   ),
   // One line: titles are echoed into Claude's next prompt (verdictNote), so no line breaks.
   title: z
@@ -55,6 +67,7 @@ const fields = {
 
 const NewFindingSchema = z.object({
   ...fields,
+  security: fields.security.optional(),
   file: fields.file.optional(),
   line: fields.line.optional(),
   reproduction: fields.reproduction.optional(),
@@ -71,6 +84,10 @@ export const ReportShape = {
       z.object({
         number: NumberSchema,
         severity: fields.severity.optional(),
+        security: fields.security
+          .nullable()
+          .optional()
+          .describe("New security category, or null when it is not a security problem."),
         title: fields.title.optional(),
         file: fields.file.nullable().optional().describe("New path, or null to clear it."),
         line: fields.line.nullable().optional(),
@@ -87,6 +104,38 @@ export const ReportShape = {
     .max(50)
     .optional()
     .describe("Findings that no longer apply (for example fixed by a new commit), with why."),
+  securityScan: z
+    .object({
+      summary: z
+        .string()
+        .trim()
+        .min(1)
+        .max(10_000)
+        .describe(
+          "What you scanned (files, kinds of change) and the outcome, in a few sentences (markdown).",
+        ),
+      checks: z
+        .array(
+          z.object({
+            category: SecurityCategorySchema,
+            status: SecurityCheckStatusSchema.describe(
+              "fail: you reported security findings in this category; pass: checked, nothing found; not-applicable: the change cannot affect it.",
+            ),
+            note: z
+              .string()
+              .trim()
+              .min(1)
+              .max(1000)
+              .describe("One or two sentences: what you looked at for this category."),
+          }),
+        )
+        .max(SECURITY_CATEGORY_ORDER.length)
+        .describe("Exactly one entry per security category."),
+    })
+    .optional()
+    .describe(
+      "The security scan of the change. Send it after every review pass, also when nothing was found; it replaces the previous scan.",
+    ),
 };
 export const ReportSchema = z.object(ReportShape);
 export type Report = z.infer<typeof ReportSchema>;
@@ -97,7 +146,7 @@ The app assigns numbers (#1, #2, ...) and returns them; refer to findings by the
 Report each distinct problem once; do not re-add a finding that already has a number.`;
 
 export type ReportOutcome =
-  | { ok: true; text: string; findings: Finding[] }
+  | { ok: true; text: string; findings: Finding[]; scan: SecurityScan | null }
   | { ok: false; text: string };
 
 /**
@@ -175,7 +224,15 @@ export function applyReport(
   const additions: FindingContent[] = [];
   for (const [index, item] of (report.add ?? []).entries()) {
     const where = location(item.file, item.line, `add[${index}]`);
-    if (where) additions.push({ ...item, reproduction: item.reproduction ?? "", ...where });
+    if (where) {
+      const { security, ...rest } = item;
+      additions.push({
+        ...rest,
+        securityCategory: security ?? null,
+        reproduction: item.reproduction ?? "",
+        ...where,
+      });
+    }
   }
 
   const updates: { number: number; content: FindingContent }[] = [];
@@ -199,6 +256,7 @@ export function applyReport(
       number: item.number,
       content: {
         severity: item.severity ?? current.severity,
+        securityCategory: item.security === undefined ? current.securityCategory : item.security,
         title: item.title ?? current.title,
         problem: item.problem ?? current.problem,
         suggestion: item.suggestion ?? current.suggestion,
@@ -214,6 +272,17 @@ export function applyReport(
     else if (current.withdrawnReason !== null)
       problems.push(`#${item.number} is already withdrawn.`);
   }
+  const scan = report.securityScan;
+  if (scan) {
+    const reported = scan.checks.map((check) => check.category);
+    if (new Set(reported).size !== reported.length) {
+      problems.push("securityScan: a category is listed twice.");
+    }
+    const missing = SECURITY_CATEGORY_ORDER.filter((category) => !reported.includes(category));
+    if (missing.length > 0) {
+      problems.push(`securityScan: add a check for ${missing.join(", ")}.`);
+    }
+  }
   const total = countAllFindings(db, reviewId) + additions.length;
   if (additions.length > 0 && total > MAX_FINDINGS_PER_REVIEW) {
     problems.push(
@@ -224,7 +293,7 @@ export function applyReport(
   if (problems.length > 0) {
     return { ok: false, text: `Nothing was saved:\n- ${problems.join("\n- ")}` };
   }
-  if (additions.length + updates.length + (report.withdraw?.length ?? 0) === 0) {
+  if (additions.length + updates.length + (report.withdraw?.length ?? 0) === 0 && !scan) {
     return { ok: false, text: "Nothing was saved: the report is empty." };
   }
 
@@ -243,6 +312,14 @@ export function applyReport(
       withdrawFinding(db, reviewId, number, reason, now);
       saved.push(`#${number} withdrawn`);
     }
+    if (scan) {
+      const order = SECURITY_CATEGORY_ORDER;
+      const checks = [...scan.checks].sort(
+        (a, b) => order.indexOf(a.category) - order.indexOf(b.category),
+      );
+      saveSecurityScan(db, reviewId, { summary: scan.summary, checks }, now);
+      saved.push("security scan");
+    }
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -252,6 +329,7 @@ export function applyReport(
     ok: true,
     text: `Saved:\n- ${saved.join("\n- ")}`,
     findings: listFindings(db, reviewId),
+    scan: scan ? getSecurityScan(db, reviewId) : null,
   };
 }
 

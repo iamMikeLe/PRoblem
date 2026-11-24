@@ -3,6 +3,11 @@ import {
   type Finding,
   type FindingCounts,
   FindingSchema,
+  type SecurityCategory,
+  type SecurityCheck,
+  SecurityCheckSchema,
+  type SecurityScan,
+  SecurityScanSchema,
   type Severity,
   type Verdict,
   VerdictSchema,
@@ -18,6 +23,7 @@ const RowSchema = z.object({
   review_id: z.string(),
   number: z.number(),
   severity: z.string(),
+  security_category: z.string().nullable(),
   title: z.string(),
   file: z.string().nullable(),
   line: z.number().nullable(),
@@ -32,7 +38,7 @@ const RowSchema = z.object({
   updated_at: z.string(),
 });
 
-const COLUMNS = `review_id, number, severity, title, file, line, problem, suggestion, reproduction,
+const COLUMNS = `review_id, number, severity, security_category, title, file, line, problem, suggestion, reproduction,
   verdict, changed_since_verdict, withdrawn_reason, posted_url, created_at, updated_at`;
 
 function toFinding(raw: unknown): Finding {
@@ -41,6 +47,7 @@ function toFinding(raw: unknown): Finding {
     reviewId: row.review_id,
     number: row.number,
     severity: row.severity,
+    securityCategory: row.security_category,
     title: row.title,
     file: row.file,
     line: row.line,
@@ -58,6 +65,8 @@ function toFinding(raw: unknown): Finding {
 
 export interface FindingContent {
   severity: Severity;
+  /** Omitted or `null`: not a security finding. */
+  securityCategory?: SecurityCategory | null;
   title: string;
   file: string | null;
   line: number | null;
@@ -117,14 +126,15 @@ export function insertFinding(
   // node:sqlite is synchronous, so reading the max and inserting cannot interleave.
   const row = db
     .prepare(
-      `INSERT INTO findings (review_id, number, severity, title, file, line, problem, suggestion,
-         reproduction, created_at, updated_at)
-       SELECT ?, COALESCE(MAX(number), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM findings WHERE review_id = ?
+      `INSERT INTO findings (review_id, number, severity, security_category, title, file, line,
+         problem, suggestion, reproduction, created_at, updated_at)
+       SELECT ?, COALESCE(MAX(number), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM findings WHERE review_id = ?
        RETURNING number`,
     )
     .get(
       reviewId,
       content.severity,
+      content.securityCategory ?? null,
       content.title,
       content.file,
       content.line,
@@ -150,11 +160,12 @@ export function updateFindingContent(
   now: Date,
 ): void {
   db.prepare(
-    `UPDATE findings SET severity = ?, title = ?, file = ?, line = ?, problem = ?, suggestion = ?,
+    `UPDATE findings SET severity = ?, security_category = ?, title = ?, file = ?, line = ?, problem = ?, suggestion = ?,
        reproduction = ?, changed_since_verdict = CASE WHEN verdict = 'open' THEN 0 ELSE 1 END, updated_at = ?
      WHERE review_id = ? AND number = ?`,
   ).run(
     content.severity,
+    content.securityCategory ?? null,
     content.title,
     content.file,
     content.line,
@@ -256,4 +267,41 @@ export function markPosted(
     "UPDATE findings SET posted_url = ? WHERE review_id = ? AND number = ?",
   );
   for (const number of numbers) update.run(url, reviewId, number);
+}
+
+const ScanRowSchema = z.object({
+  review_id: z.string(),
+  summary: z.string(),
+  checks: z.string(),
+  updated_at: z.string(),
+});
+
+export function getSecurityScan(db: DatabaseSync, reviewId: string): SecurityScan | null {
+  const raw = db
+    .prepare(
+      "SELECT review_id, summary, checks, updated_at FROM security_scans WHERE review_id = ?",
+    )
+    .get(reviewId);
+  if (raw === undefined) return null;
+  const row = ScanRowSchema.parse(raw);
+  return SecurityScanSchema.parse({
+    reviewId: row.review_id,
+    summary: row.summary,
+    checks: z.array(SecurityCheckSchema).parse(JSON.parse(row.checks)),
+    updatedAt: row.updated_at,
+  });
+}
+
+/** Replaces the review's security scan. */
+export function saveSecurityScan(
+  db: DatabaseSync,
+  reviewId: string,
+  scan: { summary: string; checks: readonly SecurityCheck[] },
+  now: Date,
+): void {
+  db.prepare(
+    `INSERT INTO security_scans (review_id, summary, checks, updated_at) VALUES (?, ?, ?, ?)
+     ON CONFLICT (review_id) DO UPDATE SET summary = excluded.summary, checks = excluded.checks,
+       updated_at = excluded.updated_at`,
+  ).run(reviewId, scan.summary, JSON.stringify(scan.checks), now.toISOString());
 }

@@ -114,3 +114,8 @@ Each phase ends with something demoable and `pnpm verify` green. Work an item wi
 - [x] Activity pane: All / Unread, mark all as read; a row opens its review on the right tab or finding
 - [x] Unread count on the rail; end-to-end test and screenshot
 - [x] "Allow all commands" on Bash cards: one grant per review, still sandboxed (ADR 0016)
+
+## Phase 11: Security scan
+
+- [x] Security tab next to Findings: scan summary and a checklist of every category (secrets, sensitive data, injection, other exploitable vulnerabilities, dangerous practices), shown even when nothing is found
+- [x] Security findings through `report_findings` (`security` category, same severities), with where, why it is risky and the fix; kept out of the Findings tab

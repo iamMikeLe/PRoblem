@@ -5,11 +5,15 @@ import { api } from "../../lib/api.ts";
 export const findingsKey = (reviewId: string) => ["findings", "list", reviewId] as const;
 export const findingCountsKey = ["findings", "counts"] as const;
 
-/** Findings of a review. `review.findings` events replace the cached list (see `useAppEvents`). */
-export function useFindings(reviewId: string) {
+/**
+ * Findings of a review (none while `reviewId` is undefined). `review.findings` events replace the
+ * cached list (see `useAppEvents`).
+ */
+export function useFindings(reviewId: string | undefined) {
   return useQuery({
-    queryKey: findingsKey(reviewId),
-    queryFn: () => api.findings.list(reviewId),
+    queryKey: findingsKey(reviewId ?? ""),
+    queryFn: () => (reviewId === undefined ? [] : api.findings.list(reviewId)),
+    enabled: reviewId !== undefined,
     staleTime: Number.POSITIVE_INFINITY,
   });
 }

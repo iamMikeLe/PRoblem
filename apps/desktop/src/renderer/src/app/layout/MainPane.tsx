@@ -22,7 +22,7 @@ import { useDrafts } from "../../features/conversation/drafts.ts";
 import { useConversation } from "../../features/conversation/queries.ts";
 import { usePendingApprovals, useReviewStatus } from "../../features/conversation/store.ts";
 import { FindingsTab } from "../../features/findings/FindingsTab.tsx";
-import { useFindingCounts } from "../../features/findings/queries.ts";
+import { useFindings } from "../../features/findings/queries.ts";
 import { PostReviewDialog } from "../../features/github/PostReviewDialog.tsx";
 import { useOpenGitHub } from "../../features/github/queries.ts";
 import { useProjects } from "../../features/projects/queries.ts";
@@ -41,9 +41,13 @@ const ChangesTab = lazy(() =>
 const CommentsTab = lazy(() =>
   import("../../features/github/CommentsTab.tsx").then((m) => ({ default: m.CommentsTab })),
 );
+const SecurityTab = lazy(() =>
+  import("../../features/security/SecurityTab.tsx").then((m) => ({ default: m.SecurityTab })),
+);
 
-type ReviewTab = "conversation" | "findings" | "changes" | "comments";
-const TABS: readonly ReviewTab[] = ["conversation", "findings", "changes", "comments"];
+type ReviewTab = "conversation" | "findings" | "security" | "changes" | "comments";
+/** In shortcut order (1, 2, ...); Security came last, so the older shortcuts keep their keys. */
+const TABS: readonly ReviewTab[] = ["conversation", "findings", "changes", "comments", "security"];
 const isReviewTab = (value: unknown): value is ReviewTab =>
   typeof value === "string" && (TABS as readonly string[]).includes(value);
 
@@ -141,6 +145,32 @@ function ConversationTab({
   );
 }
 
+/**
+ * Open findings on a tab (no verdict yet, not withdrawn), like the list pane counts them: split
+ * between Findings and Security.
+ */
+function TabCount({ reviewId, kind }: { reviewId: string; kind: "findings" | "security" }) {
+  const styles = useStyles();
+  const findings = useFindings(reviewId);
+  const count = (findings.data ?? []).filter(
+    (finding) =>
+      (kind === "security") === (finding.securityCategory !== null) &&
+      finding.verdict === "open" &&
+      finding.withdrawnReason === null,
+  ).length;
+  if (count === 0) return null;
+  return (
+    <Badge
+      className={styles.count}
+      size="small"
+      appearance="tint"
+      color={kind === "security" ? "danger" : "brand"}
+    >
+      {count}
+    </Badge>
+  );
+}
+
 interface Props {
   review: Review | undefined;
   /** A search result to show in this review (a new object each time one is chosen). */
@@ -156,8 +186,10 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
   const [closing, setClosing] = useState(false);
   // The review of an "Ask about #N": its composer takes focus once, then this is cleared.
   const [asking, setAsking] = useState<string>();
-  // The finding to select when the Findings tab opens from the Changes tab.
+  // The finding to select when the Findings or Security tab opens from elsewhere.
   const [shownFinding, setShownFinding] = useState<number>();
+  // The security finding to show when the Security tab opens from elsewhere, for its review only.
+  const [shownSecurity, setShownSecurity] = useState<{ reviewId: string; number: number }>();
   // The file to select when the Changes tab opens from search.
   const [shownFile, setShownFile] = useState<string>();
   // A new search result: switch tabs while rendering (no effect, so no flash of the old tab).
@@ -177,17 +209,32 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
             : "conversation",
     );
   }
+  // A finding chosen in search or Activity may be a security finding: show it in its own tab.
+  const reviewFindings = useFindings(review?.id);
+  // Only right after that choice (`shownFocus` is this review's), and once: it moves to
+  // `shownSecurity`, so a later report or switching reviews never changes the tab by itself.
+  if (
+    review &&
+    tab === "findings" &&
+    shownFinding !== undefined &&
+    shownFocus?.reviewId === review.id &&
+    reviewFindings.data?.some((f) => f.number === shownFinding && f.securityCategory !== null)
+  ) {
+    setShownSecurity({ reviewId: review.id, number: shownFinding });
+    setShownFinding(undefined);
+    setTab("security");
+  }
   const projects = useProjects();
   // The "post to GitHub" preview, and the link of the review just posted.
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState<{ reviewId: string; url: string }>();
   const openGitHub = useOpenGitHub();
   const setDraft = useDrafts((state) => state.setDraft);
-  const counts = useFindingCounts();
 
   const selectTab = (value: ReviewTab) => {
     setAsking(undefined);
     setShownFinding(undefined);
+    setShownSecurity(undefined);
     setShownFile(undefined);
     setTab(value);
   };
@@ -226,8 +273,8 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
     );
   }
 
-  const openCount = counts.data?.[review.id]?.open ?? 0;
   const project = projects.data?.find((p) => p.id === review.projectId);
+  const securityFinding = shownSecurity?.reviewId === review.id ? shownSecurity.number : undefined;
   const ask = (finding: Finding, request?: string) => {
     const prefix = request ?? `About #${finding.number} (${finding.title}): `;
     // A full request keeps what the user had typed, on its own paragraph below.
@@ -260,11 +307,11 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
           <Tab value="conversation">Conversation</Tab>
           <Tab value="findings">
             Findings
-            {openCount > 0 && (
-              <Badge className={styles.count} size="small" appearance="tint" color="brand">
-                {openCount}
-              </Badge>
-            )}
+            <TabCount reviewId={review.id} kind="findings" />
+          </Tab>
+          <Tab value="security">
+            Security
+            <TabCount reviewId={review.id} kind="security" />
           </Tab>
           <Tab value="changes">Changes</Tab>
           <Tab value="comments">PR comments</Tab>
@@ -329,6 +376,16 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
               {/* The last grid row holds the composer on the Conversation tab. */}
               <div />
             </>
+          ) : tab === "security" ? (
+            <>
+              <SecurityTab
+                key={`${review.id}:${securityFinding ?? ""}`}
+                reviewId={review.id}
+                initialFinding={securityFinding}
+                onAsk={(finding) => ask(finding)}
+              />
+              <div />
+            </>
           ) : tab === "changes" ? (
             <>
               <ChangesTab
@@ -337,6 +394,11 @@ export function MainPane({ review, focus, onClosed, onNewReview }: Props) {
                 initialFile={shownFile}
                 project={project}
                 onShowFinding={(finding) => {
+                  if (finding.securityCategory !== null) {
+                    setShownSecurity({ reviewId: review.id, number: finding.number });
+                    setTab("security");
+                    return;
+                  }
                   setShownFinding(finding.number);
                   setTab("findings");
                 }}

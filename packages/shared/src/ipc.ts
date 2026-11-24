@@ -28,6 +28,7 @@ import {
   PrConversationSchema,
 } from "./github.ts";
 import { SearchRequestSchema, SearchResultsSchema } from "./search.ts";
+import { SecurityScanSchema } from "./security.ts";
 import { AppSettingsSchema, UpdateSettingsRequestSchema } from "./settings.ts";
 
 /**
@@ -282,6 +283,11 @@ export const ipcContract = {
   },
   /** The user accepts, dismisses or reopens a finding. */
   "findings:setVerdict": { input: SetVerdictRequestSchema, output: FindingSchema },
+  /** The latest security scan of a review; `null` until Claude has reported one. */
+  "security:scan": {
+    input: z.strictObject({ id: ReviewIdSchema }),
+    output: SecurityScanSchema.nullable(),
+  },
   "settings:get": { input: z.undefined(), output: AppSettingsSchema },
   "settings:update": { input: UpdateSettingsRequestSchema, output: AppSettingsSchema },
   /** Opens a file of a review in the user's editor (the command from the settings). */

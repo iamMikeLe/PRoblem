@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ChangeFiltersSchema } from "./changes.ts";
+import { SecurityCategorySchema } from "./security.ts";
 
 /**
  * Domain model shared by server and web. Zod schemas are the single source of truth:
@@ -85,6 +86,8 @@ export const FindingSchema = z.object({
   reviewId: z.string(),
   number: z.number().int().positive(),
   severity: SeveritySchema,
+  /** Set for a security finding (shown in the Security tab); `null` for any other finding. */
+  securityCategory: SecurityCategorySchema.nullable(),
   title: z.string().min(1),
   /** Path relative to the review's folder; `null` for a finding about the change as a whole. */
   file: z.string().nullable(),

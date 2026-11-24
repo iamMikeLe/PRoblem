@@ -1,9 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
-import type { AppEvent, Finding, FindingCounts, SetVerdictRequest } from "@problem/shared";
+import type {
+  AppEvent,
+  Finding,
+  FindingCounts,
+  SecurityScan,
+  SetVerdictRequest,
+} from "@problem/shared";
 import { AppFailure } from "../errors.ts";
 import { getReviewRecord } from "../reviews/repository.ts";
 import { applyReport, type ReportOutcome } from "./report.ts";
-import { countFindings, listFindings, setVerdict } from "./repository.ts";
+import { countFindings, getSecurityScan, listFindings, setVerdict } from "./repository.ts";
 
 export interface FindingsServiceDeps {
   db: DatabaseSync;
@@ -15,6 +21,8 @@ export interface FindingsService {
   list(reviewId: string): Finding[];
   counts(): Record<string, FindingCounts>;
   setVerdict(request: SetVerdictRequest): Finding;
+  /** The review's latest security scan; `null` until Claude reported one. */
+  securityScan(reviewId: string): SecurityScan | null;
   /** Claude's `report_findings` call for a review; saved findings are broadcast. */
   report(reviewId: string, workdir: string, input: unknown): ReportOutcome;
 }
@@ -42,6 +50,10 @@ export function createFindingsService({
       return listFindings(db, reviewId);
     },
     counts: () => countFindings(db),
+    securityScan(reviewId) {
+      assertOpenReview(reviewId);
+      return getSecurityScan(db, reviewId);
+    },
     setVerdict({ id, number, verdict }) {
       assertOpenReview(id);
       const finding = setVerdict(db, id, number, verdict, clock());
@@ -55,7 +67,10 @@ export function createFindingsService({
         return { ok: false, text: "Nothing was saved: this review has been closed." };
       }
       const outcome = applyReport(db, reviewId, workdir, input, clock());
-      if (outcome.ok) publish(reviewId, outcome.findings);
+      if (outcome.ok) {
+        publish(reviewId, outcome.findings);
+        if (outcome.scan) broadcast({ type: "review.securityScan", scan: outcome.scan });
+      }
       return outcome;
     },
   };
